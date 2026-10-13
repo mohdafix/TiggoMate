@@ -1,0 +1,82 @@
+[
+  {
+    "id": "csh_powertrain_overview",
+    "title": "Chery Tiggo 7 PHEV CSH Powertrain & Architecture",
+    "section": "Powertrain & Specifications",
+    "documentName": "Chery Tiggo 7 PHEV Malaysian Market Guide & Owner's Handbook",
+    "pageNumber": 12,
+    "market": "Malaysia",
+    "content": "The Malaysian-market Chery Tiggo 7 PHEV CSH is equipped with the Chery Super Hybrid (CSH) system. It features a 1.5L TCI 4-cylinder turbocharged dedicated hybrid engine producing 115 kW (156 PS) and 230 Nm of torque, paired with dual high-output permanent magnet synchronous electric motors through a 3-speed Dedicated Hybrid Transmission (3DHT). Total system output delivers up to 240 kW (326 PS) and 545 Nm of torque. The traction battery is a ~19.27 kWh ternary lithium/LFP pack delivering a pure electric range of approximately 80 to 100 km (NEDC rated 100 km). Combined range exceeds 1,000 km on a full 51L-60L fuel tank and fully charged battery.",
+    "tags": ["powertrain", "engine", "electric motor", "battery", "range", "specifications", "3dht", "csh"]
+  },
+  {
+    "id": "driving_modes_auto",
+    "title": "Hybrid Driving Modes: AUTO, EV, and HEV Operation",
+    "section": "Driving & Operating Modes",
+    "documentName": "Chery Tiggo 7 PHEV Malaysian Market Guide & Owner's Handbook",
+    "pageNumber": 28,
+    "market": "Malaysia",
+    "content": "Operating Modes for the Tiggo 7 PHEV:\n1. EV Mode: Forces pure electric drive using traction battery power until the State of Charge (SOC) drops below the safe threshold (typically ~20-25%) or sudden maximum kickdown throttle is applied.\n2. HEV Mode (Hybrid): Automatically orchestrates the 1.5T engine and dual electric motors for optimal efficiency or maximum output.\n3. AUTO Mode: The default recommended driving mode. In AUTO mode, the vehicle's electronic control unit decides whether to drive on electric power, engage the engine in series mode (generating electricity for the motors), or engage parallel direct engine drive through the 3-speed DHT. The petrol engine does NOT start immediately at low speeds or when starting off. It will remain off as long as battery SOC is adequate and power demand is moderate. Engine start is triggered by: high acceleration demands, battery SOC dropping below target reserve (~20-25%), climbing steep inclines, or cabin heating/climate conditioning demands.",
+    "tags": ["auto mode", "ev mode", "hev mode", "driving mode", "engine start", "battery level", "hybrid"]
+  },
+  {
+    "id": "long_journey_battery_management",
+    "title": "Battery Management Strategy on Long Journeys",
+    "section": "Energy & Driving Tips",
+    "documentName": "Chery Tiggo 7 PHEV Malaysian Market Guide & Owner's Handbook",
+    "pageNumber": 34,
+    "market": "Malaysia",
+    "content": "For highway trips (e.g., PLUS Highway travels in Malaysia):\n- Do not deplete the battery to 0% in pure EV mode at high highway speeds. Driving in pure EV at 110-120 km/h rapidly depletes the 19.27 kWh pack within 50-60 km with high aerodynamic drag.\n- Select HEV / AUTO mode early on highways so the 1.5T engine operates directly in its optimal mechanical gear via the 3DHT, preserving battery SOC.\n- Maintain 40-50% battery reserve for city traffic, hill climbs (e.g., Genting Highlands / Cameron Highlands), or start-stop driving at your destination where electric propulsion is most efficient.\n- Take advantage of regenerative braking during long downhill descents to replenish the battery.",
+    "tags": ["long journey", "highway", "battery management", "soc reserve", "efficiency", "plus highway"]
+  },
+  {
+    "id": "charging_instructions",
+    "title": "Charging Guidelines & AC Charging Speed",
+    "section": "Charging & Electrical System",
+    "documentName": "Chery Tiggo 7 PHEV Malaysian Market Guide & Owner's Handbook",
+    "pageNumber": 45,
+    "market": "Malaysia",
+    "content": "Charging specifications for Malaysian Tiggo 7 PHEV:\n- Charging Port: Type 2 (Mennekes) AC charging inlet.\n- On-board Charger (OBC): Supports single-phase AC charging up to 3.3 kW / 6.6 kW.\n- Full AC charge time: Approximately 3.0 to 4.5 hours from 15% to 100% using a 7kW AC home wallbox or public AC charger (e.g., ChargEV, JomCharge, Gentari).\n- Portable 3-pin trickle charger (2.2 kW): Takes approximately 7 to 9 hours.\n- Battery care: To maximize traction battery lifespan, maintain daily charging between 20% and 80-90% SOC when possible, with a full 100% charge once or twice a month to allow the Battery Management System (BMS) cell balancing.",
+    "tags": ["charging", "ac charging", "type 2", "wallbox", "charge time", "battery care", "gentari", "chargev"]
+  },
+  {
+    "id": "maintenance_schedule_malaysia",
+    "title": "Maintenance Schedule & Service Intervals in Malaysia",
+    "section": "Service & Maintenance",
+    "documentName": "Chery Malaysia Official Warranty & Service Booklet",
+    "pageNumber": 8,
+    "market": "Malaysia",
+    "content": "Maintenance Schedule for Chery Tiggo 7 PHEV in Malaysia:\n1. 1,000 km or 1 Month Initial Inspection: Free inspection. Critical checks include chassis bolt torque, fluid levels, hybrid coolant circuits, and dealer onboarding/activation of the CarLinko telematics 4G eSIM.\n2. Regular Service Intervals: Every 10,000 km or 6 months (whichever comes first).\n3. Engine Oil: Fully synthetic 0W-20 dedicated hybrid engine oil (changed every 10,000 km / 6 months).\n4. Air Filter & Cabin Pollen Filter: Replace every 20,000 km or 12 months.\n5. Brake Fluid: Replace every 40,000 km or 24 months.\n6. Dedicated Hybrid Transmission (3DHT) Fluid: Inspect at each service; change as prescribed by official Chery Malaysia service schedule.\n7. High Voltage Battery & Inverter Coolant: Inspect level and freeze point at every 10,000 km service.",
+    "tags": ["maintenance", "service intervals", "1000 km service", "10000 km", "carlinko activation", "engine oil", "0w-20", "warranty"]
+  },
+  {
+    "id": "tyres_and_pressures",
+    "title": "Tyre Specifications, Pressures, and Rotation Schedule",
+    "section": "Tyres & Chassis",
+    "documentName": "Chery Tiggo 7 PHEV Malaysian Market Guide & Owner's Handbook",
+    "pageNumber": 72,
+    "market": "Malaysia",
+    "content": "Tyre & Wheel Specifications for Tiggo 7 PHEV (Malaysian spec):\n- Tyre Size: 225/55 R18 98V or 225/60 R18.\n- Cold Tyre Inflation Pressure (Standard Load, 1-3 occupants): 230 - 240 kPa (2.3 - 2.4 bar / 33 - 35 psi) front and rear.\n- Fully Loaded Pressure: 250 kPa (2.5 bar / 36 psi) front and rear.\n- Check tyre pressures when cold (vehicle parked for at least 3 hours or driven less than 1.6 km).\n- Tyre Rotation: Recommended every 10,000 km to equalize wear between front drive/regenerative axle and rear axle.",
+    "tags": ["tyres", "tire pressure", "wheel size", "225/55 r18", "tyre rotation", "kpa", "bar", "psi"]
+  },
+  {
+    "id": "warning_lights_troubleshooting",
+    "title": "Dashboard Warning Lights & Hybrid System Indicators",
+    "section": "Dashboard & Indicators",
+    "documentName": "Chery Tiggo 7 PHEV Malaysian Market Guide & Owner's Handbook",
+    "pageNumber": 18,
+    "market": "Malaysia",
+    "content": "Warning Indicators on the Tiggo 7 PHEV instrument cluster:\n1. Green 'READY': Indicates high-voltage contactors are closed and the vehicle is operational. Since the 1.5T engine may not start immediately, the car will move silently in EV mode when gear is engaged.\n2. Amber Battery / Fault Warning: High-voltage system anomaly. Power output may be restricted (turtle mode). Safely pull over, switch vehicle off, wait 5 minutes, and restart.\n3. Red High Voltage Hazard Symbol: Severe high-voltage insulation or interlock fault. Do NOT touch high-voltage cables (bright orange). Stop driving immediately and contact Chery Roadside Assistance.\n4. 12V Auxiliary Battery Light: Indicates charging fault of the 12V low-voltage battery. The Tiggo 7 PHEV relies on the 12V battery to close high-voltage contactors; if 12V is depleted, the car will not start even if the high-voltage traction battery is 100% full.\n5. TPMS Warning: Illuminates when cold tyre pressure drops > 20% below setpoint. Reinflate to 230-240 kPa and recalibrate via central screen.",
+    "tags": ["warning lights", "ready light", "high voltage fault", "12v battery", "tpms", "troubleshooting", "amber light"]
+  },
+  {
+    "id": "carlinko_connectivity_guide",
+    "title": "CarLinko Telematics & Connected Services Activation",
+    "section": "Connected Services",
+    "documentName": "Chery Malaysia Connected Services Bulletin",
+    "pageNumber": 1,
+    "market": "Malaysia",
+    "content": "CarLinko is the official Chery telematics mobile application for the Malaysian market. It connects to the vehicle's onboard T-Box telematics unit via 4G eSIM.\n- Activation Status: Newly delivered vehicles typically require dealer activation and owner ID verification during the 1,000 km first inspection.\n- Before activation: The vehicle does NOT stream live telemetry to external apps. Any vehicle app or assistant must honestly report 'Not connected' or 'Connection not activated'.\n- Features after activation: Remote air-conditioning start, lock/unlock, battery SOC monitoring, vehicle locator, trip history.\n- Integration note: Home Assistant community integration (ha-carlinko) interacts with Chery CarLinko cloud. In TiggoMate, cloud credentials remain strictly on the backend, never on the mobile client.",
+    "tags": ["carlinko", "t-box", "esim", "activation", "1000 km", "remote climate", "telematics", "home assistant"]
+  }
+]
