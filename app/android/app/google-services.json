@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "288298688704",
+    "project_id": "tiggomate-phev",
+    "storage_bucket": "tiggomate-phev.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:288298688704:android:807899ccf37d3d9b284d25",
+        "android_client_info": {
+          "package_name": "com.tiggomate.tiggomate_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCBW49v6oyL585Zx16MZikL-RQFoGrzcXo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

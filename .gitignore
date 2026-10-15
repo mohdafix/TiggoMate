@@ -34,9 +34,8 @@ build/
 **/.idea/
 .vscode/
 
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+# Local research repos
+j5-ev-dashboard/
 .dart_tool/
 **/.dart_tool/
 .flutter-plugins-dependencies

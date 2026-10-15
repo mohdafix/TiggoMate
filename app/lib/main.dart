@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'firebase_options.dart';
 import 'src/ai/ai_service.dart';
 import 'src/carlinko/vehicle_repository.dart';
 import 'src/mytnb/mytnb_api.dart';
@@ -10,7 +12,15 @@ import 'src/ui/neo_dashboard.dart';
 import 'src/ui/chery_service_centres_screen.dart';
 import 'src/ui/trips_logbook_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    debugPrint('Firebase.initializeApp warning (offline fallback active): $e');
+  }
   runApp(const TiggoMateApp());
 }
 

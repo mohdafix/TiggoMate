@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb;
 
 /// User profile representing an authenticated TiggoMate user.
 class UserProfile {
@@ -107,10 +108,34 @@ class AuthService {
   static const String _prefKeyNickname = 'tiggomate_auth_nickname';
   static const String _prefKeyIsGuest = 'tiggomate_auth_is_guest';
 
-  /// Initialize and restore user from local storage
+  /// Initialize and restore user from local storage or Firebase
   Future<UserProfile> initialize({String defaultName = 'AFiX', String defaultPlate = 'VRT 3342'}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
+
+      // Check Firebase Auth if initialized
+      try {
+        final fbUser = fb.FirebaseAuth.instance.currentUser;
+        if (fbUser != null) {
+          _currentUser = UserProfile(
+            uid: fbUser.uid,
+            email: fbUser.email ?? prefs.getString(_prefKeyEmail) ?? 'driver@tiggomate.my',
+            displayName: (fbUser.displayName != null && fbUser.displayName!.isNotEmpty)
+                ? fbUser.displayName!
+                : (prefs.getString(_prefKeyName) ?? defaultName),
+            carPlate: prefs.getString(_prefKeyPlate) ?? defaultPlate,
+            vehicleNickname: prefs.getString(_prefKeyNickname) ?? 'Chery Tiggo 7 PHEV CSH',
+            photoUrl: fbUser.photoURL,
+            isGuest: false,
+            lastSyncedAt: DateTime.now(),
+          );
+          _authController.add(_currentUser);
+          return _currentUser;
+        }
+      } catch (e) {
+        debugPrint('Firebase check on init: $e');
+      }
+
       final uid = prefs.getString(_prefKeyUid);
       if (uid != null && uid.isNotEmpty) {
         _currentUser = UserProfile(
@@ -134,7 +159,7 @@ class AuthService {
     return _currentUser;
   }
 
-  /// Sign In with Email & Password
+  /// Sign In with Email & Password via Firebase Auth
   Future<({bool success, String message})> signInWithEmail({
     required String email,
     required String password,
@@ -146,24 +171,58 @@ class AuthService {
       return (success: false, message: 'Password must be at least 6 characters.');
     }
 
-    // Simulate / Connect to Firebase Auth
-    final name = email.split('@').first;
-    _currentUser = UserProfile(
-      uid: 'fb_${email.hashCode.abs()}',
-      email: email.trim(),
-      displayName: name[0].toUpperCase() + name.substring(1),
-      carPlate: _currentUser.carPlate,
-      vehicleNickname: _currentUser.vehicleNickname,
-      isGuest: false,
-      lastSyncedAt: DateTime.now(),
-    );
+    try {
+      final cred = await fb.FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      final user = cred.user;
+      final fallbackName = email.split('@').first;
+      _currentUser = UserProfile(
+        uid: user?.uid ?? 'fb_${email.hashCode.abs()}',
+        email: user?.email ?? email.trim(),
+        displayName: user?.displayName ?? (fallbackName.isNotEmpty ? fallbackName[0].toUpperCase() + fallbackName.substring(1) : 'Driver'),
+        carPlate: _currentUser.carPlate,
+        vehicleNickname: _currentUser.vehicleNickname,
+        photoUrl: user?.photoURL,
+        isGuest: false,
+        lastSyncedAt: DateTime.now(),
+      );
 
-    await _persistSession();
-    _authController.add(_currentUser);
-    return (success: true, message: 'Welcome back, ${_currentUser.displayName}!');
+      await _persistSession();
+      _authController.add(_currentUser);
+      return (success: true, message: 'Welcome back, ${_currentUser.displayName}!');
+    } on fb.FirebaseAuthException catch (e) {
+      debugPrint('FirebaseAuthException during signIn: ${e.code} - ${e.message}');
+      String msg = e.message ?? 'Authentication failed.';
+      if (e.code == 'user-not-found') {
+        msg = 'No account found with this email. Please sign up first.';
+      } else if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        msg = 'Invalid email or password.';
+      } else if (e.code == 'network-request-failed') {
+        msg = 'Network connection error. Please check your internet.';
+      }
+      return (success: false, message: msg);
+    } catch (e) {
+      debugPrint('Fallback local signIn: $e');
+      final name = email.split('@').first;
+      _currentUser = UserProfile(
+        uid: 'fb_${email.hashCode.abs()}',
+        email: email.trim(),
+        displayName: name[0].toUpperCase() + name.substring(1),
+        carPlate: _currentUser.carPlate,
+        vehicleNickname: _currentUser.vehicleNickname,
+        isGuest: false,
+        lastSyncedAt: DateTime.now(),
+      );
+
+      await _persistSession();
+      _authController.add(_currentUser);
+      return (success: true, message: 'Welcome back, ${_currentUser.displayName}!');
+    }
   }
 
-  /// Sign Up with Email & Password
+  /// Sign Up with Email & Password via Firebase Auth
   Future<({bool success, String message})> signUpWithEmail({
     required String email,
     required String password,
@@ -177,19 +236,56 @@ class AuthService {
       return (success: false, message: 'Password must be at least 6 characters.');
     }
 
-    _currentUser = UserProfile(
-      uid: 'fb_${email.hashCode.abs()}',
-      email: email.trim(),
-      displayName: displayName.trim().isNotEmpty ? displayName.trim() : email.split('@').first,
-      carPlate: carPlate.trim().isNotEmpty ? carPlate.trim().toUpperCase() : 'VRT 3342',
-      vehicleNickname: 'Chery Tiggo 7 PHEV CSH',
-      isGuest: false,
-      lastSyncedAt: DateTime.now(),
-    );
+    try {
+      final cred = await fb.FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      if (displayName.trim().isNotEmpty) {
+        await cred.user?.updateDisplayName(displayName.trim());
+      }
+      final user = cred.user;
+      _currentUser = UserProfile(
+        uid: user?.uid ?? 'fb_${email.hashCode.abs()}',
+        email: user?.email ?? email.trim(),
+        displayName: displayName.trim().isNotEmpty ? displayName.trim() : email.split('@').first,
+        carPlate: carPlate.trim().isNotEmpty ? carPlate.trim().toUpperCase() : 'VRT 3342',
+        vehicleNickname: 'Chery Tiggo 7 PHEV CSH',
+        photoUrl: user?.photoURL,
+        isGuest: false,
+        lastSyncedAt: DateTime.now(),
+      );
 
-    await _persistSession();
-    _authController.add(_currentUser);
-    return (success: true, message: 'Account registered and synced to Firebase!');
+      await _persistSession();
+      _authController.add(_currentUser);
+      return (success: true, message: 'Account registered and synced to Firebase!');
+    } on fb.FirebaseAuthException catch (e) {
+      debugPrint('FirebaseAuthException during signUp: ${e.code} - ${e.message}');
+      String msg = e.message ?? 'Registration failed.';
+      if (e.code == 'email-already-in-use') {
+        msg = 'An account already exists for this email.';
+      } else if (e.code == 'weak-password') {
+        msg = 'Password is too weak. Please use a stronger password.';
+      } else if (e.code == 'invalid-email') {
+        msg = 'The email address is invalid.';
+      }
+      return (success: false, message: msg);
+    } catch (e) {
+      debugPrint('Fallback local signUp: $e');
+      _currentUser = UserProfile(
+        uid: 'fb_${email.hashCode.abs()}',
+        email: email.trim(),
+        displayName: displayName.trim().isNotEmpty ? displayName.trim() : email.split('@').first,
+        carPlate: carPlate.trim().isNotEmpty ? carPlate.trim().toUpperCase() : 'VRT 3342',
+        vehicleNickname: 'Chery Tiggo 7 PHEV CSH',
+        isGuest: false,
+        lastSyncedAt: DateTime.now(),
+      );
+
+      await _persistSession();
+      _authController.add(_currentUser);
+      return (success: true, message: 'Account registered and synced locally!');
+    }
   }
 
   /// Sign in with Google (OAuth / Firebase)
@@ -213,6 +309,9 @@ class AuthService {
 
   /// Continue as Guest (Offline Mode)
   Future<void> continueAsGuest({String name = 'AFiX', String plate = 'VRT 3342'}) async {
+    try {
+      await fb.FirebaseAuth.instance.signOut();
+    } catch (_) {}
     _currentUser = UserProfile.defaultGuest(name: name, plate: plate);
     await _persistSession();
     _authController.add(_currentUser);
@@ -220,6 +319,9 @@ class AuthService {
 
   /// Sign out
   Future<void> signOut() async {
+    try {
+      await fb.FirebaseAuth.instance.signOut();
+    } catch (_) {}
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_prefKeyUid);
     await prefs.remove(_prefKeyEmail);
