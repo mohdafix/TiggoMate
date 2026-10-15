@@ -495,10 +495,11 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
   }
 
   void _showAddTripPresetModal() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF0D1219),
+      backgroundColor: isDark ? const Color(0xFF0D1219) : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -535,10 +536,11 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
   }
 
   void _showLogModal() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF0D1219),
+      backgroundColor: isDark ? const Color(0xFF0D1219) : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -565,8 +567,10 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF090D12),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [
@@ -577,14 +581,24 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
+                children: [
                   Text(
                     'Trips &',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white, height: 1.1),
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF111827),
+                      height: 1.1,
+                    ),
                   ),
                   Text(
                     'Expense Log',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white, height: 1.1),
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF111827),
+                      height: 1.1,
+                    ),
                   ),
                 ],
               ),
@@ -595,19 +609,23 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF131922),
+                      color: isDark ? const Color(0xFF131922) : Colors.white,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF232D3D)),
+                      border: Border.all(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           _selectedMonth,
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white70),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white70 : const Color(0xFF374151),
+                          ),
                         ),
                         const SizedBox(width: 4),
-                        const Icon(Icons.arrow_drop_down, size: 16, color: Colors.white70),
+                        Icon(Icons.arrow_drop_down, size: 16, color: isDark ? Colors.white70 : const Color(0xFF374151)),
                       ],
                     ),
                   ),
@@ -624,7 +642,7 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF2F81F7).withValues(alpha: 0.15),
+                            color: const Color(0xFF2F81F7).withValues(alpha: isDark ? 0.15 : 0.12),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(color: const Color(0xFF2F81F7)),
                           ),
@@ -650,7 +668,7 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF00D2AA).withValues(alpha: 0.15),
+                            color: const Color(0xFF00D2AA).withValues(alpha: isDark ? 0.15 : 0.12),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(color: const Color(0xFF00D2AA)),
                           ),
@@ -678,10 +696,10 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
           // ---------------- MONTHLY SUMMARY CARD ----------------
           Card(
             elevation: 0,
-            color: const Color(0xFF0D1219),
+            color: isDark ? const Color(0xFF0D1219) : Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(22),
-              side: const BorderSide(color: Color(0xFF1F2937)),
+              side: BorderSide(color: isDark ? const Color(0xFF1F2937) : const Color(0xFFE5E7EB)),
             ),
             child: Padding(
               padding: const EdgeInsets.all(18),
@@ -690,20 +708,24 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'Monthly Summary',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white70),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white70 : const Color(0xFF6B7280),
+                        ),
                       ),
                       // Glowing Saved Badge
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF00D2AA).withValues(alpha: 0.18),
+                          color: const Color(0xFF00D2AA).withValues(alpha: isDark ? 0.18 : 0.15),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: const Color(0xFF00D2AA)),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF00D2AA).withValues(alpha: 0.25),
+                              color: const Color(0xFF00D2AA).withValues(alpha: isDark ? 0.25 : 0.15),
                               blurRadius: 8,
                               spreadRadius: 1,
                             ),
@@ -738,27 +760,31 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                                         RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
                                         (Match m) => '${m[1]},',
                                       ),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 26,
                                     fontWeight: FontWeight.w800,
-                                    color: Colors.white,
+                                    color: isDark ? Colors.white : const Color(0xFF111827),
                                   ),
                                 ),
                                 const SizedBox(width: 4),
-                                const Text(
+                                Text(
                                   'km',
-                                  style: TextStyle(fontSize: 13, color: Colors.white60, fontWeight: FontWeight.w600),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: isDark ? Colors.white60 : const Color(0xFF6B7280),
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ],
                             ),
-                            const Text('Traveled', style: TextStyle(fontSize: 11, color: Colors.white38)),
+                            Text('Traveled', style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : const Color(0xFF9CA3AF))),
                             const SizedBox(height: 2),
-                            const Text('Total Spend', style: TextStyle(fontSize: 11, color: Colors.white38)),
+                            Text('Total Spend', style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : const Color(0xFF9CA3AF))),
                           ],
                         ),
                       ),
 
-                      Container(width: 1, height: 48, color: const Color(0xFF232D3D)),
+                      Container(width: 1, height: 48, color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
                       const SizedBox(width: 16),
 
                       // Spend Breakdown
@@ -769,17 +795,17 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                           children: [
                             Text(
                               'RM ${_totalSpend.toStringAsFixed(2)}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.w800,
-                                color: Colors.white,
+                                color: isDark ? Colors.white : const Color(0xFF111827),
                               ),
                             ),
                             const SizedBox(height: 4),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text('Home AC', style: TextStyle(fontSize: 11, color: Colors.white54)),
+                                Text('Home AC', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF6B7280))),
                                 Text(
                                   'RM ${_homeAcSpend.toStringAsFixed(2)}',
                                   style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF00D2AA)),
@@ -790,7 +816,7 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text('Petrol', style: TextStyle(fontSize: 11, color: Colors.white54)),
+                                Text('Petrol', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF6B7280))),
                                 Text(
                                   'RM ${_petrolSpend.toStringAsFixed(2)}',
                                   style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFFF9F1C)),
@@ -802,7 +828,7 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text('Public EV', style: TextStyle(fontSize: 11, color: Colors.white54)),
+                                  Text('Public EV', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF6B7280))),
                                   Text(
                                     'RM ${_publicEvSpend.toStringAsFixed(2)}',
                                     style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2F81F7)),
@@ -825,9 +851,13 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Recent Trip',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white70),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white70 : const Color(0xFF374151),
+                ),
               ),
               Text(
                 _featuredTrip.highwayNote,
@@ -839,10 +869,10 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
 
           Card(
             elevation: 0,
-            color: const Color(0xFF0D1219),
+            color: isDark ? const Color(0xFF0D1219) : Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(22),
-              side: const BorderSide(color: Color(0xFF1F2937)),
+              side: BorderSide(color: isDark ? const Color(0xFF1F2937) : const Color(0xFFE5E7EB)),
             ),
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -855,7 +885,11 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                       Expanded(
                         child: Text(
                           '${_featuredTrip.title} • ${_featuredTrip.timestamp}',
-                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white : const Color(0xFF111827),
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -863,14 +897,14 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Stylized Dark Mode Route Map Canvas
+                  // Stylized Route Map Canvas
                   Container(
                     height: 140,
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF090E15),
+                      color: isDark ? const Color(0xFF090E15) : const Color(0xFFF3F4F6),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF1C2636)),
+                      border: Border.all(color: isDark ? const Color(0xFF1C2636) : const Color(0xFFE5E7EB)),
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(16),
@@ -881,6 +915,7 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                             painter: _DarkVectorMapPainter(
                               routePoints: _featuredTrip.routePoints,
                               evPointCount: _featuredTrip.evPointCount,
+                              isDark: isDark,
                             ),
                           ),
                           // Route Legend Overlay
@@ -890,20 +925,26 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.75),
+                                color: isDark ? Colors.black.withValues(alpha: 0.75) : Colors.white.withValues(alpha: 0.9),
                                 borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: const Color(0xFF232D3D)),
+                                border: Border.all(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF00D2AA))),
                                   const SizedBox(width: 4),
-                                  const Text('EV Drive', style: TextStyle(fontSize: 9.5, color: Colors.white70)),
+                                  Text(
+                                    'EV Drive',
+                                    style: TextStyle(fontSize: 9.5, color: isDark ? Colors.white70 : const Color(0xFF374151), fontWeight: FontWeight.w600),
+                                  ),
                                   const SizedBox(width: 8),
                                   Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFFFF9F1C))),
                                   const SizedBox(width: 4),
-                                  const Text('1.5T Hybrid', style: TextStyle(fontSize: 9.5, color: Colors.white70)),
+                                  Text(
+                                    '1.5T Hybrid',
+                                    style: TextStyle(fontSize: 9.5, color: isDark ? Colors.white70 : const Color(0xFF374151), fontWeight: FontWeight.w600),
+                                  ),
                                 ],
                               ),
                             ),
@@ -920,23 +961,27 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                       _buildTripStatCol(
                         value: '${_featuredTrip.distanceKm} km',
                         subtext: '${_featuredTrip.evDistanceKm} km EV',
+                        isDark: isDark,
                       ),
-                      _buildStatDivider(),
+                      _buildStatDivider(isDark),
                       _buildTripStatCol(
                         value: '${_featuredTrip.durationMinutes} min',
                         subtext: 'Avg ${_featuredTrip.avgSpeedKmh.toStringAsFixed(0)} km/h',
+                        isDark: isDark,
                       ),
-                      _buildStatDivider(),
+                      _buildStatDivider(isDark),
                       _buildTripStatCol(
                         value: '${_featuredTrip.electricKwh} kWh',
                         subtext: _featuredTrip.petrolLitres > 0 ? '+ ${_featuredTrip.petrolLitres}L' : '0L Petrol',
                         highlightColor: const Color(0xFF00D2AA),
+                        isDark: isDark,
                       ),
-                      _buildStatDivider(),
+                      _buildStatDivider(isDark),
                       _buildTripStatCol(
                         value: 'RM ${_featuredTrip.costRm.toStringAsFixed(2)}',
                         subtext: 'RM ${(_featuredTrip.costRm / (_featuredTrip.distanceKm > 0 ? _featuredTrip.distanceKm : 1)).toStringAsFixed(2)}/km',
-                        highlightColor: Colors.white,
+                        highlightColor: isDark ? Colors.white : const Color(0xFF111827),
+                        isDark: isDark,
                       ),
                     ],
                   ),
@@ -950,9 +995,13 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Recent Trips',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white70),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white70 : const Color(0xFF374151),
+                ),
               ),
               InkWell(
                 onTap: _showAddTripPresetModal,
@@ -980,10 +1029,14 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFF131D2A) : const Color(0xFF0D1219),
+                    color: isSelected
+                        ? (isDark ? const Color(0xFF131D2A) : const Color(0xFFF0FDF4))
+                        : (isDark ? const Color(0xFF0D1219) : Colors.white),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isSelected ? const Color(0xFF00D2AA).withValues(alpha: 0.6) : const Color(0xFF1F2937),
+                      color: isSelected
+                          ? const Color(0xFF00D2AA).withValues(alpha: 0.6)
+                          : (isDark ? const Color(0xFF1F2937) : const Color(0xFFE5E7EB)),
                     ),
                   ),
                   child: Row(
@@ -1012,18 +1065,22 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                           children: [
                             Text(
                               t.title,
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? Colors.white : const Color(0xFF111827),
+                              ),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               '${t.distanceKm} km • ${isPureEv ? "100% Pure EV" : "${t.evRatio.toStringAsFixed(0)}% EV / ${(100 - t.evRatio).toStringAsFixed(0)}% Hybrid"} • RM ${t.costRm.toStringAsFixed(2)}',
-                              style: const TextStyle(fontSize: 11, color: Colors.white54),
+                              style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF6B7280)),
                             ),
                           ],
                         ),
                       ),
 
-                      const Icon(Icons.chevron_right, size: 18, color: Colors.white30),
+                      Icon(Icons.chevron_right, size: 18, color: isDark ? Colors.white30 : const Color(0xFF9CA3AF)),
                     ],
                   ),
                 ),
@@ -1034,9 +1091,13 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
           // ---------------- CUSTOM LOGGED EXPENSES SECTION (IF ANY) ----------------
           if (_customExpenses.isNotEmpty) ...[
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Logged Expenses & Fill-ups',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white70),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white70 : const Color(0xFF374151),
+              ),
             ),
             const SizedBox(height: 10),
             ..._customExpenses.map((rec) {
@@ -1047,9 +1108,9 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0D1219),
+                    color: isDark ? const Color(0xFF0D1219) : Colors.white,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF1F2937)),
+                    border: Border.all(color: isDark ? const Color(0xFF1F2937) : const Color(0xFFE5E7EB)),
                   ),
                   child: Row(
                     children: [
@@ -1063,11 +1124,18 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(rec.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+                            Text(
+                              rec.title,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? Colors.white : const Color(0xFF111827),
+                              ),
+                            ),
                             const SizedBox(height: 2),
                             Text(
                               '${rec.date} • ${rec.units.toStringAsFixed(1)} ${isPetrol ? "L" : "kWh"} @ RM ${rec.unitPrice.toStringAsFixed(2)}${rec.odometerKm != null ? " • Odo: ${rec.odometerKm} km" : ""}',
-                              style: const TextStyle(fontSize: 11, color: Colors.white54),
+                              style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF6B7280)),
                             ),
                           ],
                         ),
@@ -1092,18 +1160,22 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
     );
   }
 
-  Widget _buildTripStatCol({required String value, required String subtext, Color? highlightColor}) {
+  Widget _buildTripStatCol({required String value, required String subtext, Color? highlightColor, required bool isDark}) {
     return Expanded(
       child: Column(
         children: [
           Text(
             value,
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: highlightColor ?? Colors.white),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: highlightColor ?? (isDark ? Colors.white : const Color(0xFF111827)),
+            ),
           ),
           const SizedBox(height: 2),
           Text(
             subtext,
-            style: const TextStyle(fontSize: 9, color: Colors.white38, fontWeight: FontWeight.w500),
+            style: TextStyle(fontSize: 9, color: isDark ? Colors.white38 : const Color(0xFF6B7280), fontWeight: FontWeight.w500),
             textAlign: TextAlign.center,
           ),
         ],
@@ -1111,8 +1183,8 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
     );
   }
 
-  Widget _buildStatDivider() {
-    return Container(width: 1, height: 26, color: const Color(0xFF1F2937));
+  Widget _buildStatDivider(bool isDark) {
+    return Container(width: 1, height: 26, color: isDark ? const Color(0xFF1F2937) : const Color(0xFFE5E7EB));
   }
 }
 
@@ -1120,21 +1192,26 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
 class _DarkVectorMapPainter extends CustomPainter {
   final List<Offset> routePoints;
   final int evPointCount;
+  final bool isDark;
 
-  _DarkVectorMapPainter({required this.routePoints, required this.evPointCount});
+  _DarkVectorMapPainter({
+    required this.routePoints,
+    required this.evPointCount,
+    this.isDark = true,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final bgPaint = Paint()..color = const Color(0xFF090E15);
+    final bgPaint = Paint()..color = isDark ? const Color(0xFF090E15) : const Color(0xFFF3F4F6);
     canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bgPaint);
 
     final roadPaint = Paint()
-      ..color = const Color(0xFF182230)
+      ..color = isDark ? const Color(0xFF182230) : const Color(0xFFD1D5DB)
       ..strokeWidth = 1.8
       ..style = PaintingStyle.stroke;
 
     final minorRoadPaint = Paint()
-      ..color = const Color(0xFF131B26)
+      ..color = isDark ? const Color(0xFF131B26) : const Color(0xFFE5E7EB)
       ..strokeWidth = 1.0
       ..style = PaintingStyle.stroke;
 
@@ -1231,6 +1308,8 @@ class _AddTripPresetSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -1240,14 +1319,24 @@ class _AddTripPresetSheet extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Add Trip from Malaysian Presets', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+              Text(
+                'Add Trip from Malaysian Presets',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF111827),
+                ),
+              ),
               IconButton(
-                icon: const Icon(Icons.close, color: Colors.white54, size: 20),
+                icon: Icon(Icons.close, color: isDark ? Colors.white54 : const Color(0xFF6B7280), size: 20),
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ],
           ),
-          const Text('Tap any route to immediately record the trip with zero manual entry.', style: TextStyle(fontSize: 11.5, color: Colors.white54)),
+          Text(
+            'Tap any route to immediately record the trip with zero manual entry.',
+            style: TextStyle(fontSize: 11.5, color: isDark ? Colors.white54 : const Color(0xFF6B7280)),
+          ),
           const SizedBox(height: 14),
 
           ConstrainedBox(
@@ -1268,9 +1357,9 @@ class _AddTripPresetSheet extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF131922),
+                      color: isDark ? const Color(0xFF131922) : const Color(0xFFF9FAFB),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF232D3D)),
+                      border: Border.all(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
                     ),
                     child: Row(
                       children: [
@@ -1291,11 +1380,18 @@ class _AddTripPresetSheet extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(preset.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                              Text(
+                                preset.title,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : const Color(0xFF111827),
+                                ),
+                              ),
                               const SizedBox(height: 2),
                               Text(
                                 '${preset.distanceKm} km • ${preset.durationMinutes} min • ${preset.highwayNote}',
-                                style: const TextStyle(fontSize: 11, color: Colors.white54),
+                                style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF6B7280)),
                               ),
                             ],
                           ),
@@ -1304,7 +1400,7 @@ class _AddTripPresetSheet extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Text('RM ${preset.costRm.toStringAsFixed(2)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF00D2AA))),
-                            Text(isPureEv ? '100% EV' : '${preset.evRatio.toStringAsFixed(0)}% EV', style: const TextStyle(fontSize: 10, color: Colors.white38)),
+                            Text(isPureEv ? '100% EV' : '${preset.evRatio.toStringAsFixed(0)}% EV', style: TextStyle(fontSize: 10, color: isDark ? Colors.white38 : const Color(0xFF9CA3AF))),
                           ],
                         ),
                       ],
@@ -1452,6 +1548,8 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Padding(
       padding: EdgeInsets.only(
         left: 20,
@@ -1466,32 +1564,42 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('1-Tap Fuel & Charge Logger', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+              Text(
+                '1-Tap Fuel & Charge Logger',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF111827),
+                ),
+              ),
               IconButton(
-                icon: const Icon(Icons.close, color: Colors.white54, size: 20),
+                icon: Icon(Icons.close, color: isDark ? Colors.white54 : const Color(0xFF6B7280), size: 20),
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ],
           ),
-          const Text('Auto-calculates volume and cost using official Malaysian rates.', style: TextStyle(fontSize: 11.5, color: Colors.white54)),
+          Text(
+            'Auto-calculates volume and cost using official Malaysian rates.',
+            style: TextStyle(fontSize: 11.5, color: isDark ? Colors.white54 : const Color(0xFF6B7280)),
+          ),
           const SizedBox(height: 12),
 
           // Tab Selector
           Container(
             decoration: BoxDecoration(
-              color: const Color(0xFF131922),
+              color: isDark ? const Color(0xFF131922) : const Color(0xFFF3F4F6),
               borderRadius: BorderRadius.circular(14),
             ),
             child: TabBar(
               controller: _tabController,
               indicatorSize: TabBarIndicatorSize.tab,
               indicator: BoxDecoration(
-                color: const Color(0xFF00D2AA).withValues(alpha: 0.2),
+                color: const Color(0xFF00D2AA).withValues(alpha: isDark ? 0.2 : 0.15),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: const Color(0xFF00D2AA)),
               ),
               labelColor: const Color(0xFF00D2AA),
-              unselectedLabelColor: Colors.white60,
+              unselectedLabelColor: isDark ? Colors.white60 : const Color(0xFF6B7280),
               labelStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
               tabs: const [
                 Tab(text: '⛽ Petrol RON95'),
@@ -1511,7 +1619,14 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
                 // ---------------- 1. 1-TAP PETROL TAB ----------------
                 ListView(
                   children: [
-                    const Text('Select Station Brand:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white54)),
+                    Text(
+                      'Select Station Brand:',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white54 : const Color(0xFF6B7280),
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 6,
@@ -1519,28 +1634,44 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
                       children: _stationBrands.map((brand) {
                         final isSel = brand == _selectedStationBrand;
                         return ChoiceChip(
-                          label: Text(brand, style: TextStyle(fontSize: 11, color: isSel ? Colors.black : Colors.white70, fontWeight: FontWeight.w600)),
+                          label: Text(
+                            brand,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isSel ? Colors.black : (isDark ? Colors.white70 : const Color(0xFF4B5563)),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                           selected: isSel,
                           selectedColor: const Color(0xFFFF9F1C),
-                          backgroundColor: const Color(0xFF131922),
-                          side: BorderSide(color: isSel ? const Color(0xFFFF9F1C) : const Color(0xFF232D3D)),
+                          backgroundColor: isDark ? const Color(0xFF131922) : const Color(0xFFF3F4F6),
+                          side: BorderSide(
+                            color: isSel ? const Color(0xFFFF9F1C) : (isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
+                          ),
                           onSelected: (val) => setState(() => _selectedStationBrand = brand),
                         );
                       }).toList(),
                     ),
                     const SizedBox(height: 12),
 
-                    const Text('Quick Fill Amount (Ceiling RM 2.05 / L):', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white54)),
+                    Text(
+                      'Quick Fill Amount (Ceiling RM 2.05 / L):',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white54 : const Color(0xFF6B7280),
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        _buildPresetAmountBtn('Full 51L', 51.0 * widget.fuelPrice, (51.0 * widget.fuelPrice).toStringAsFixed(0)),
+                        _buildPresetAmountBtn('Full 51L', 51.0 * widget.fuelPrice, (51.0 * widget.fuelPrice).toStringAsFixed(0), isDark),
                         const SizedBox(width: 6),
-                        _buildPresetAmountBtn('RM 50', 50.0, '24.4L'),
+                        _buildPresetAmountBtn('RM 50', 50.0, '24.4L', isDark),
                         const SizedBox(width: 6),
-                        _buildPresetAmountBtn('RM 30', 30.0, '14.6L'),
+                        _buildPresetAmountBtn('RM 30', 30.0, '14.6L', isDark),
                         const SizedBox(width: 6),
-                        _buildPresetAmountBtn('RM 20', 20.0, '9.8L'),
+                        _buildPresetAmountBtn('RM 20', 20.0, '9.8L', isDark),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -1549,23 +1680,33 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF131922),
+                        color: isDark ? const Color(0xFF131922) : const Color(0xFFF9FAFB),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF232D3D)),
+                        border: Border.all(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Row(
-                            children: const [
-                              Icon(Icons.speed, size: 16, color: Color(0xFF00D2AA)),
-                              SizedBox(width: 8),
-                              Text('Auto Odometer from Vehicle', style: TextStyle(fontSize: 11.5, color: Colors.white70)),
+                            children: [
+                              const Icon(Icons.speed, size: 16, color: Color(0xFF00D2AA)),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Auto Odometer from Vehicle',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: isDark ? Colors.white70 : const Color(0xFF4B5563),
+                                ),
+                              ),
                             ],
                           ),
                           Text(
                             '$_petrolOdometer km',
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : const Color(0xFF111827),
+                            ),
                           ),
                         ],
                       ),
@@ -1602,20 +1743,20 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: isLinked
-                                  ? const Color(0xFF00D2AA).withValues(alpha: 0.12)
-                                  : const Color(0xFF131922),
+                                  ? const Color(0xFF00D2AA).withValues(alpha: isDark ? 0.12 : 0.08)
+                                  : (isDark ? const Color(0xFF131922) : const Color(0xFFF9FAFB)),
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
                                 color: isLinked
                                     ? const Color(0xFF00D2AA).withValues(alpha: 0.4)
-                                    : const Color(0xFF232D3D),
+                                    : (isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
                               ),
                             ),
                             child: Row(
                               children: [
                                 Icon(
                                   isLinked ? Icons.sensors : Icons.electric_bolt_outlined,
-                                  color: isLinked ? const Color(0xFF00D2AA) : Colors.white54,
+                                  color: isLinked ? const Color(0xFF00D2AA) : (isDark ? Colors.white54 : const Color(0xFF6B7280)),
                                   size: 22,
                                 ),
                                 const SizedBox(width: 10),
@@ -1630,14 +1771,14 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
                                         style: TextStyle(
                                           fontSize: 11.5,
                                           fontWeight: FontWeight.bold,
-                                          color: isLinked ? const Color(0xFF00D2AA) : Colors.white70,
+                                          color: isLinked ? const Color(0xFF00D2AA) : (isDark ? Colors.white70 : const Color(0xFF374151)),
                                         ),
                                       ),
                                       Text(
                                         isLinked
                                             ? 'Month: ${account.currentUsageKwh.toStringAsFixed(1)} kWh • Dynamic Tariff: RM ${account.effectiveTariff.toStringAsFixed(3)}/kWh'
                                             : 'Sync directly to calculate charging costs using your actual domestic tariff tier.',
-                                        style: const TextStyle(fontSize: 10.5, color: Colors.white54),
+                                        style: TextStyle(fontSize: 10.5, color: isDark ? Colors.white54 : const Color(0xFF6B7280)),
                                       ),
                                     ],
                                   ),
@@ -1681,9 +1822,9 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF00D2AA).withValues(alpha: 0.12),
+                        color: const Color(0xFF00D2AA).withValues(alpha: isDark ? 0.12 : 0.08),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: 0.5)),
+                        border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: isDark ? 0.5 : 0.4)),
                       ),
                       child: Row(
                         children: [
@@ -1696,7 +1837,7 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
                                 Text('Current Battery: ${widget.currentBatteryPct}% SoC', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF00D2AA))),
                                 Text(
                                   'Deficit to 100%: ${(100 - widget.currentBatteryPct)}% (~${((100 - widget.currentBatteryPct) / 100 * 19.27).toStringAsFixed(1)} kWh needed)',
-                                  style: const TextStyle(fontSize: 11, color: Colors.white70),
+                                  style: TextStyle(fontSize: 11, color: isDark ? Colors.white70 : const Color(0xFF4B5563)),
                                 ),
                               ],
                             ),
@@ -1706,18 +1847,26 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
                     ),
                     const SizedBox(height: 12),
 
-                    const Text('Select Charge Preset:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white54)),
+                    Text(
+                      'Select Charge Preset:',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white54 : const Color(0xFF6B7280),
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     Row(
                       children: [
                         _buildHomeChargePresetBtn(
                           'Top to 100%',
                           ((100 - widget.currentBatteryPct) / 100 * 19.27).clamp(3.0, 19.27),
+                          isDark,
                         ),
                         const SizedBox(width: 6),
-                        _buildHomeChargePresetBtn('Full 19.3 kWh', 19.27),
+                        _buildHomeChargePresetBtn('Full 19.3 kWh', 19.27, isDark),
                         const SizedBox(width: 6),
-                        _buildHomeChargePresetBtn('+ 10.0 kWh', 10.0),
+                        _buildHomeChargePresetBtn('+ 10.0 kWh', 10.0, isDark),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -1726,9 +1875,9 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF131922),
+                        color: isDark ? const Color(0xFF131922) : const Color(0xFFF9FAFB),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF232D3D)),
+                        border: Border.all(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1740,9 +1889,16 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
                                 _isOffPeak
                                     ? 'TNB Off-Peak / Solar (RM 0.28 / kWh)'
                                     : 'TNB Normal Rate (RM ${(widget.myTnbRepo?.selectedAccountNotifier.value?.effectiveTariff ?? widget.tnbTariff).toStringAsFixed(3)} / kWh)',
-                                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.white),
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? Colors.white : const Color(0xFF111827),
+                                ),
                               ),
-                              const Text('10:00 PM – 08:00 AM off-peak rate', style: TextStyle(fontSize: 9.5, color: Colors.white38)),
+                              Text(
+                                '10:00 PM – 08:00 AM off-peak rate',
+                                style: TextStyle(fontSize: 9.5, color: isDark ? Colors.white38 : const Color(0xFF6B7280)),
+                              ),
                             ],
                           ),
                           Switch(
@@ -1788,11 +1944,20 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
                           return Padding(
                             padding: const EdgeInsets.only(right: 6),
                             child: ChoiceChip(
-                              label: Text(net, style: TextStyle(fontSize: 11, color: isSel ? Colors.black : Colors.white70, fontWeight: FontWeight.bold)),
+                              label: Text(
+                                net,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isSel ? Colors.black : (isDark ? Colors.white70 : const Color(0xFF4B5563)),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                               selected: isSel,
                               selectedColor: const Color(0xFF2F81F7),
-                              backgroundColor: const Color(0xFF131922),
-                              side: BorderSide(color: isSel ? const Color(0xFF2F81F7) : const Color(0xFF232D3D)),
+                              backgroundColor: isDark ? const Color(0xFF131922) : const Color(0xFFF3F4F6),
+                              side: BorderSide(
+                                color: isSel ? const Color(0xFF2F81F7) : (isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
+                              ),
                               onSelected: (val) => setState(() => _networkFilter = net),
                             ),
                           );
@@ -1812,9 +1977,13 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
-                              color: isSel ? const Color(0xFF1A2638) : const Color(0xFF131922),
+                              color: isSel
+                                  ? (isDark ? const Color(0xFF1A2638) : const Color(0xFFEFF6FF))
+                                  : (isDark ? const Color(0xFF131922) : const Color(0xFFF9FAFB)),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: isSel ? const Color(0xFF2F81F7) : const Color(0xFF232D3D)),
+                              border: Border.all(
+                                color: isSel ? const Color(0xFF2F81F7) : (isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
+                              ),
                             ),
                             child: Row(
                               children: [
@@ -1831,12 +2000,25 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text('${station.network} • ${station.stationName}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
-                                      Text(station.rateDescription, style: const TextStyle(fontSize: 10, color: Colors.white54)),
+                                      Text(
+                                        '${station.network} • ${station.stationName}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: isDark ? Colors.white : const Color(0xFF111827),
+                                        ),
+                                      ),
+                                      Text(
+                                        station.rateDescription,
+                                        style: TextStyle(fontSize: 10, color: isDark ? Colors.white54 : const Color(0xFF6B7280)),
+                                      ),
                                     ],
                                   ),
                                 ),
-                                Text('RM ${station.defaultCostRm.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF2F81F7))),
+                                Text(
+                                  'RM ${station.defaultCostRm.toStringAsFixed(2)}',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF2F81F7)),
+                                ),
                                 const SizedBox(width: 8),
                                 IconButton(
                                   icon: const Icon(Icons.navigation_outlined, size: 16, color: Color(0xFF2F81F7)),
@@ -1883,7 +2065,7 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
     );
   }
 
-  Widget _buildPresetAmountBtn(String label, double amountRm, String subtext) {
+  Widget _buildPresetAmountBtn(String label, double amountRm, String subtext, bool isDark) {
     final isSel = (_selectedPetrolAmountRm - amountRm).abs() < 0.1;
     return Expanded(
       child: InkWell(
@@ -1892,9 +2074,13 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: isSel ? const Color(0xFFFF9F1C) : const Color(0xFF131922),
+            color: isSel
+                ? const Color(0xFFFF9F1C)
+                : (isDark ? const Color(0xFF131922) : const Color(0xFFF3F4F6)),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: isSel ? const Color(0xFFFF9F1C) : const Color(0xFF232D3D)),
+            border: Border.all(
+              color: isSel ? const Color(0xFFFF9F1C) : (isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
+            ),
           ),
           child: Column(
             children: [
@@ -1903,14 +2089,14 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: isSel ? Colors.black : Colors.white,
+                  color: isSel ? Colors.black : (isDark ? Colors.white : const Color(0xFF111827)),
                 ),
               ),
               Text(
                 subtext,
                 style: TextStyle(
                   fontSize: 9.5,
-                  color: isSel ? Colors.black87 : Colors.white38,
+                  color: isSel ? Colors.black87 : (isDark ? Colors.white38 : const Color(0xFF6B7280)),
                 ),
               ),
             ],
@@ -1920,7 +2106,7 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
     );
   }
 
-  Widget _buildHomeChargePresetBtn(String label, double kwh) {
+  Widget _buildHomeChargePresetBtn(String label, double kwh, bool isDark) {
     final isSel = (_homeKwhToCharge - kwh).abs() < 0.5;
     return Expanded(
       child: InkWell(
@@ -1934,9 +2120,13 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: isSel ? const Color(0xFF00D2AA) : const Color(0xFF131922),
+            color: isSel
+                ? const Color(0xFF00D2AA)
+                : (isDark ? const Color(0xFF131922) : const Color(0xFFF3F4F6)),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: isSel ? const Color(0xFF00D2AA) : const Color(0xFF232D3D)),
+            border: Border.all(
+              color: isSel ? const Color(0xFF00D2AA) : (isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
+            ),
           ),
           child: Column(
             children: [
@@ -1945,14 +2135,14 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: isSel ? Colors.black : Colors.white,
+                  color: isSel ? Colors.black : (isDark ? Colors.white : const Color(0xFF111827)),
                 ),
               ),
               Text(
                 '${kwh.toStringAsFixed(1)} kWh',
                 style: TextStyle(
                   fontSize: 9.5,
-                  color: isSel ? Colors.black87 : Colors.white38,
+                  color: isSel ? Colors.black87 : (isDark ? Colors.white38 : const Color(0xFF6B7280)),
                 ),
               ),
             ],

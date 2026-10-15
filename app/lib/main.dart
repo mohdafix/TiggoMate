@@ -1283,7 +1283,7 @@ class MarkdownMessageView extends StatelessWidget {
             style: baseStyle.copyWith(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: baseStyle.color,
             ),
           ),
         ));
@@ -1295,7 +1295,7 @@ class MarkdownMessageView extends StatelessWidget {
             style: baseStyle.copyWith(
               fontSize: 15.5,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: baseStyle.color,
               letterSpacing: 0.1,
             ),
           ),
@@ -1308,7 +1308,7 @@ class MarkdownMessageView extends StatelessWidget {
             style: baseStyle.copyWith(
               fontSize: 17,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: baseStyle.color,
             ),
           ),
         ));
@@ -1320,7 +1320,7 @@ class MarkdownMessageView extends StatelessWidget {
             style: baseStyle.copyWith(
               fontSize: 19,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: baseStyle.color,
             ),
           ),
         ));
@@ -1340,7 +1340,7 @@ class MarkdownMessageView extends StatelessWidget {
             text: TextSpan(
               children: _parseInlineMarkdown(
                 quoteContent,
-                baseStyle.copyWith(fontSize: 12.5, color: Colors.white70),
+                baseStyle.copyWith(fontSize: 12.5, color: baseStyle.color?.withValues(alpha: 0.8)),
               ),
             ),
           ),
@@ -1491,7 +1491,7 @@ class MarkdownMessageView extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
             margin: const EdgeInsets.symmetric(horizontal: 2),
             decoration: BoxDecoration(
-              color: const Color(0xFF232D3D),
+              color: (baseStyle.color ?? Colors.white).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
@@ -1499,7 +1499,7 @@ class MarkdownMessageView extends StatelessWidget {
               style: style.copyWith(
                 fontFamily: 'monospace',
                 fontSize: (style.fontSize ?? 13.5) * 0.9,
-                color: const Color(0xFF00D2AA),
+                color: accentColor,
               ),
             ),
           ),
@@ -1783,14 +1783,16 @@ class _AssistantTabState extends State<AssistantTab> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Column(
       children: [
         // Chat Header
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: const BoxDecoration(
-            color: Color(0xFF131922),
-            border: Border(bottom: BorderSide(color: Color(0xFF232D3D))),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF131922) : Colors.white,
+            border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB))),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1824,9 +1826,9 @@ class _AssistantTabState extends State<AssistantTab> {
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF182230),
+                        color: isDark ? const Color(0xFF182230) : const Color(0xFFF3F4F6),
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFF232D3D)),
+                        border: Border.all(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
                       ),
                       child: const Icon(Icons.tune, color: Color(0xFF00D2AA), size: 16),
                     ),
@@ -1855,12 +1857,14 @@ class _AssistantTabState extends State<AssistantTab> {
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.85),
                   decoration: BoxDecoration(
-                    color: isUser ? const Color(0xFF2F81F7) : const Color(0xFF182230),
+                    color: isUser
+                        ? const Color(0xFF2F81F7)
+                        : (isDark ? const Color(0xFF182230) : const Color(0xFFF3F4F6)),
                     borderRadius: BorderRadius.circular(16).copyWith(
                       bottomRight: isUser ? const Radius.circular(2) : const Radius.circular(16),
                       bottomLeft: !isUser ? const Radius.circular(2) : const Radius.circular(16),
                     ),
-                    border: isUser ? null : Border.all(color: const Color(0xFF232D3D)),
+                    border: isUser ? null : Border.all(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1870,7 +1874,9 @@ class _AssistantTabState extends State<AssistantTab> {
                         baseStyle: TextStyle(
                           fontSize: 13.5,
                           height: 1.45,
-                          color: isUser ? Colors.white : Colors.white.withValues(alpha: 0.95),
+                          color: isUser
+                              ? Colors.white
+                              : (isDark ? Colors.white.withValues(alpha: 0.95) : const Color(0xFF111827)),
                         ),
                         accentColor: isUser ? Colors.white : const Color(0xFF00D2AA),
                       ),
@@ -1913,9 +1919,15 @@ class _AssistantTabState extends State<AssistantTab> {
             separatorBuilder: (context, index) => const SizedBox(width: 8),
             itemBuilder: (context, idx) {
               return ActionChip(
-                label: Text(_suggestions[idx], style: const TextStyle(fontSize: 11, color: Colors.white70)),
-                backgroundColor: const Color(0xFF182230),
-                side: const BorderSide(color: Color(0xFF232D3D)),
+                label: Text(
+                  _suggestions[idx],
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.white70 : const Color(0xFF374151),
+                  ),
+                ),
+                backgroundColor: isDark ? const Color(0xFF182230) : const Color(0xFFF3F4F6),
+                side: BorderSide(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 onPressed: () => _sendMessage(_suggestions[idx]),
               );
@@ -1927,25 +1939,35 @@ class _AssistantTabState extends State<AssistantTab> {
         // Chat Input Bar
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: const BoxDecoration(
-            color: Color(0xFF131922),
-            border: Border(top: BorderSide(color: Color(0xFF232D3D))),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF131922) : Colors.white,
+            border: Border(top: BorderSide(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB))),
           ),
           child: Row(
             children: [
               Expanded(
                 child: TextField(
                   controller: _controller,
-                  style: const TextStyle(fontSize: 14),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark ? Colors.white : const Color(0xFF111827),
+                  ),
                   decoration: InputDecoration(
                     hintText: 'Ask about your Tiggo 7...',
-                    hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+                    hintStyle: TextStyle(
+                      color: isDark ? Colors.white38 : const Color(0xFF9CA3AF),
+                      fontSize: 13,
+                    ),
                     filled: true,
-                    fillColor: const Color(0xFF090D12),
+                    fillColor: isDark ? const Color(0xFF090D12) : const Color(0xFFF3F4F6),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(24),
-                      borderSide: const BorderSide(color: Color(0xFF232D3D)),
+                      borderSide: BorderSide(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: BorderSide(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(24),
@@ -2402,13 +2424,13 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
     ),
   ];
 
-  Widget _buildSubTabSwitcher() {
+  Widget _buildSubTabSwitcher(bool isDark) {
     return Container(
       height: 38,
       decoration: BoxDecoration(
-        color: const Color(0xFF131922),
+        color: isDark ? const Color(0xFF131922) : const Color(0xFFF3F4F6),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF232D3D)),
+        border: Border.all(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
       ),
       child: Row(
         children: [
@@ -2427,7 +2449,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: _activeSubTab == 0 ? Colors.black : Colors.white70,
+                    color: _activeSubTab == 0 ? Colors.black : (isDark ? Colors.white70 : const Color(0xFF6B7280)),
                   ),
                 ),
               ),
@@ -2457,7 +2479,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: _activeSubTab == 1 ? Colors.black : Colors.white70,
+                        color: _activeSubTab == 1 ? Colors.black : (isDark ? Colors.white70 : const Color(0xFF6B7280)),
                       ),
                     ),
                   ],
@@ -2472,12 +2494,14 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     if (_activeSubTab == 1) {
       return Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: _buildSubTabSwitcher(),
+            child: _buildSubTabSwitcher(isDark),
           ),
           const Expanded(
             child: CheryServiceCentresScreen(isEmbedded: true),
@@ -2501,7 +2525,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _buildSubTabSwitcher(),
+        _buildSubTabSwitcher(isDark),
         const SizedBox(height: 14),
 
         // Title Header
@@ -2513,7 +2537,10 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
               children: [
                 const Text('Service Schedule & Pricing', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 2),
-                Text('Chery Tiggo 7 PHEV CSH • ${widget.settings.carPlateNumber} • ${widget.settings.ownerName}', style: const TextStyle(fontSize: 11, color: Colors.white54)),
+                Text(
+                  'Chery Tiggo 7 PHEV CSH • ${widget.settings.carPlateNumber} • ${widget.settings.ownerName}',
+                  style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF6B7280)),
+                ),
               ],
             ),
             Container(
@@ -2532,9 +2559,11 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFFF1B343).withValues(alpha: 0.08),
+            color: isDark ? const Color(0xFFF1B343).withValues(alpha: 0.08) : const Color(0xFFFEF3C7),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFF1B343).withValues(alpha: 0.3)),
+            border: Border.all(
+              color: isDark ? const Color(0xFFF1B343).withValues(alpha: 0.3) : const Color(0xFFF59E0B).withValues(alpha: 0.4),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2542,30 +2571,54 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('1,000 km / 1-Month Inspection', style: TextStyle(color: Color(0xFFF1B343), fontWeight: FontWeight.bold, fontSize: 14.5)),
+                  Text(
+                    '1,000 km / 1-Month Inspection',
+                    style: TextStyle(
+                      color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14.5,
+                    ),
+                  ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF1B343),
+                      color: isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706),
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: const Text('160 km Left', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 10)),
+                    child: Text(
+                      '160 km Left',
+                      style: TextStyle(
+                        color: isDark ? Colors.black87 : Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10,
+                      ),
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 6),
-              const Text('Current Odometer: 840 km • Due soon at 1,000 km', style: TextStyle(color: Colors.white70, fontSize: 11.5)),
+              Text(
+                'Current Odometer: 840 km • Due soon at 1,000 km',
+                style: TextStyle(color: isDark ? Colors.white70 : const Color(0xFF4B5563), fontSize: 11.5),
+              ),
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 '• Dealer DMS telematics pairing & CarLinko activation\n• 3DHT hybrid transmission & battery management diagnostic scan\n• High-voltage orange harness torque check\n• Factory tyre torque & cold pressure verification (230 kPa)',
-                style: TextStyle(color: Colors.white60, fontSize: 11.5, height: 1.5),
+                style: TextStyle(
+                  color: isDark ? Colors.white60 : const Color(0xFF4B5563),
+                  fontSize: 11.5,
+                  height: 1.5,
+                ),
               ),
               const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text('Compulsory Cost: FREE (FOC)', style: TextStyle(color: Color(0xFF00D2AA), fontSize: 12, fontWeight: FontWeight.bold)),
-                  Text('Next: 10,000 km (RM 407.50)', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                children: [
+                  const Text('Compulsory Cost: FREE (FOC)', style: TextStyle(color: Color(0xFF00D2AA), fontSize: 12, fontWeight: FontWeight.bold)),
+                  Text(
+                    'Next: 10,000 km (RM 407.50)',
+                    style: TextStyle(color: isDark ? Colors.white54 : const Color(0xFF6B7280), fontSize: 11),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -2573,13 +2626,17 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () => setState(() => _activeSubTab = 1),
-                  icon: const Icon(Icons.location_on, size: 14, color: Color(0xFFF1B343)),
-                  label: const Text(
+                  icon: Icon(Icons.location_on, size: 14, color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309)),
+                  label: Text(
                     'Find 3S/4S Service Centre for 1,000 km Activation',
-                    style: TextStyle(fontSize: 11.5, color: Color(0xFFF1B343), fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309),
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFF1B343)),
+                    side: BorderSide(color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309)),
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
@@ -2593,11 +2650,11 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
         // Filter Chips
         Row(
           children: [
-            _buildFilterChip('All (16)', 0),
+            _buildFilterChip('All (16)', 0, isDark),
             const SizedBox(width: 8),
-            _buildFilterChip('Free Labour (6 FOC)', 1),
+            _buildFilterChip('Free Labour (6 FOC)', 1, isDark),
             const SizedBox(width: 8),
-            _buildFilterChip('Major Services (4)', 2),
+            _buildFilterChip('Major Services (4)', 2, isDark),
           ],
         ),
         const SizedBox(height: 12),
@@ -2621,10 +2678,14 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                   width: 124,
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFF00D2AA).withValues(alpha: 0.15) : const Color(0xFF131922),
+                    color: isSelected
+                        ? const Color(0xFF00D2AA).withValues(alpha: isDark ? 0.15 : 0.12)
+                        : (isDark ? const Color(0xFF131922) : Colors.white),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isSelected ? const Color(0xFF00D2AA) : const Color(0xFF232D3D),
+                      color: isSelected
+                          ? const Color(0xFF00D2AA)
+                          : (isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
                       width: isSelected ? 1.5 : 1.0,
                     ),
                   ),
@@ -2642,7 +2703,9 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                               style: TextStyle(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.bold,
-                                color: isSelected ? const Color(0xFF00D2AA) : Colors.white,
+                                color: isSelected
+                                    ? const Color(0xFF00D2AA)
+                                    : (isDark ? Colors.white : const Color(0xFF111827)),
                               ),
                             ),
                           ),
@@ -2658,14 +2721,16 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                         ],
                       ),
                       const SizedBox(height: 2),
-                      Text('Mth ${m.month}', style: const TextStyle(fontSize: 10, color: Colors.white38)),
+                      Text('Mth ${m.month}', style: TextStyle(fontSize: 10, color: isDark ? Colors.white38 : const Color(0xFF9CA3AF))),
                       const SizedBox(height: 2),
                       Text(
                         m.compulsoryFee == 0 ? 'FOC' : 'RM ${m.compulsoryFee.toStringAsFixed(2)}',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: isSelected ? Colors.white : Colors.white70,
+                          color: isSelected
+                              ? (isDark ? Colors.white : const Color(0xFF0F766E))
+                              : (isDark ? Colors.white70 : const Color(0xFF4B5563)),
                         ),
                       ),
                     ],
@@ -2698,7 +2763,10 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                             style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 2),
-                          Text('Month ${selected.month} • ${selected.title}', style: const TextStyle(fontSize: 11.5, color: Colors.white54)),
+                          Text(
+                            'Month ${selected.month} • ${selected.title}',
+                            style: TextStyle(fontSize: 11.5, color: isDark ? Colors.white54 : const Color(0xFF6B7280)),
+                          ),
                         ],
                       ),
                     ),
@@ -2730,9 +2798,9 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF090D12),
+                    color: isDark ? const Color(0xFF090D12) : const Color(0xFFF9FAFB),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF232D3D)),
+                    border: Border.all(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
                   ),
                   child: Row(
                     children: [
@@ -2740,7 +2808,10 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('COMPULSORY FEE', style: TextStyle(fontSize: 9.5, color: Colors.white54, fontWeight: FontWeight.bold)),
+                            Text(
+                              'COMPULSORY FEE',
+                              style: TextStyle(fontSize: 9.5, color: isDark ? Colors.white54 : const Color(0xFF6B7280), fontWeight: FontWeight.bold),
+                            ),
                             const SizedBox(height: 2),
                             Text(
                               selected.compulsoryFee == 0 ? 'FOC' : 'RM ${selected.compulsoryFee.toStringAsFixed(2)}',
@@ -2748,24 +2819,34 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                             ),
                             Text(
                               selected.isLabourFoc ? 'Labour FOC (Included)' : 'Labour: RM ${selected.labourFee.toStringAsFixed(2)}',
-                              style: const TextStyle(fontSize: 10, color: Colors.white38),
+                              style: TextStyle(fontSize: 10, color: isDark ? Colors.white38 : const Color(0xFF9CA3AF)),
                             ),
                           ],
                         ),
                       ),
-                      Container(width: 1, height: 42, color: const Color(0xFF232D3D)),
+                      Container(width: 1, height: 42, color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('RECOMMENDED TOTAL', style: TextStyle(fontSize: 9.5, color: Colors.white54, fontWeight: FontWeight.bold)),
+                            Text(
+                              'RECOMMENDED TOTAL',
+                              style: TextStyle(fontSize: 9.5, color: isDark ? Colors.white54 : const Color(0xFF6B7280), fontWeight: FontWeight.bold),
+                            ),
                             const SizedBox(height: 2),
                             Text(
                               selected.recommendedFee == 0 ? 'FOC' : 'RM ${selected.recommendedFee.toStringAsFixed(2)}',
-                              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white),
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : const Color(0xFF111827),
+                              ),
                             ),
-                            const Text('Includes optional wear items', style: TextStyle(fontSize: 10, color: Colors.white38)),
+                            Text(
+                              'Includes optional wear items',
+                              style: TextStyle(fontSize: 10, color: isDark ? Colors.white38 : const Color(0xFF9CA3AF)),
+                            ),
                           ],
                         ),
                       ),
@@ -2775,15 +2856,31 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                 const SizedBox(height: 16),
 
                 // Compulsory Parts Breakdown
-                const Text('COMPULSORY PARTS & SERVICES', style: TextStyle(fontSize: 11, color: Colors.white54, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                Text(
+                  'COMPULSORY PARTS & SERVICES',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.white54 : const Color(0xFF6B7280),
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
                 const SizedBox(height: 8),
-                ...selected.compulsoryParts.map((p) => _buildPartRow(p["name"], p["price"] as double, isCompulsory: true)),
+                ...selected.compulsoryParts.map((p) => _buildPartRow(p["name"], p["price"] as double, isCompulsory: true, isDark: isDark)),
 
                 if (selected.recommendedParts.isNotEmpty) ...[
                   const SizedBox(height: 14),
-                  const Text('RECOMMENDED ADDITIONAL ITEMS', style: TextStyle(fontSize: 11, color: Colors.white54, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                  Text(
+                    'RECOMMENDED ADDITIONAL ITEMS',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark ? Colors.white54 : const Color(0xFF6B7280),
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
                   const SizedBox(height: 8),
-                  ...selected.recommendedParts.map((p) => _buildPartRow(p["name"], p["price"] as double, isCompulsory: false)),
+                  ...selected.recommendedParts.map((p) => _buildPartRow(p["name"], p["price"] as double, isCompulsory: false, isDark: isDark)),
                 ],
               ],
             ),
@@ -2798,7 +2895,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
           label: Text(_showFullTable ? 'Hide 150,000 km Schedule Table' : 'View Full 150,000 km Schedule Table (16 Milestones)'),
           style: OutlinedButton.styleFrom(
             foregroundColor: const Color(0xFF00D2AA),
-            side: const BorderSide(color: Color(0xFF232D3D)),
+            side: BorderSide(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
             padding: const EdgeInsets.symmetric(vertical: 12),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -2815,19 +2912,52 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                   Container(
                     padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF090D12),
+                      color: isDark ? const Color(0xFF090D12) : const Color(0xFFF3F4F6),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
-                      children: const [
-                        Expanded(flex: 3, child: Text('Milestone', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white70))),
-                        Expanded(flex: 2, child: Text('Labour', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white70))),
-                        Expanded(flex: 3, child: Text('Compulsory', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF00D2AA)))),
-                        Expanded(flex: 3, child: Text('Recommended', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white70))),
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            'Milestone',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white70 : const Color(0xFF374151),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            'Labour',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white70 : const Color(0xFF374151),
+                            ),
+                          ),
+                        ),
+                        const Expanded(
+                          flex: 3,
+                          child: Text('Compulsory', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF00D2AA))),
+                        ),
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            'Recommended',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white70 : const Color(0xFF374151),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                  const Divider(height: 1, color: Color(0xFF232D3D)),
+                  Divider(height: 1, color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
                   // Rows
                   ..._milestones.map((m) {
                     final isHighlighted = _milestones.indexOf(m) == _selectedMilestoneIndex;
@@ -2843,7 +2973,14 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                           children: [
                             Expanded(
                               flex: 3,
-                              child: Text('${m.km ~/ 1000}k km (M${m.month})', style: TextStyle(fontSize: 11, fontWeight: isHighlighted ? FontWeight.bold : FontWeight.normal)),
+                              child: Text(
+                                '${m.km ~/ 1000}k km (M${m.month})',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: isHighlighted ? FontWeight.bold : FontWeight.normal,
+                                  color: isDark ? Colors.white : const Color(0xFF111827),
+                                ),
+                              ),
                             ),
                             Expanded(
                               flex: 2,
@@ -2851,7 +2988,9 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                                 m.isLabourFoc ? 'FOC' : 'RM ${m.labourFee.toInt()}',
                                 style: TextStyle(
                                   fontSize: 10.5,
-                                  color: m.isLabourFoc ? const Color(0xFF00D2AA) : Colors.white60,
+                                  color: m.isLabourFoc
+                                      ? const Color(0xFF00D2AA)
+                                      : (isDark ? Colors.white60 : const Color(0xFF4B5563)),
                                   fontWeight: m.isLabourFoc ? FontWeight.bold : FontWeight.normal,
                                 ),
                               ),
@@ -2867,7 +3006,10 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                               flex: 3,
                               child: Text(
                                 m.recommendedFee == 0 ? 'FOC' : 'RM ${m.recommendedFee.toStringAsFixed(2)}',
-                                style: const TextStyle(fontSize: 11, color: Colors.white70),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isDark ? Colors.white70 : const Color(0xFF4B5563),
+                                ),
                               ),
                             ),
                           ],
@@ -2888,20 +3030,28 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text('OFFICIAL CHERY SERVICE GUIDELINES', style: TextStyle(fontSize: 11, color: Colors.white54, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                SizedBox(height: 10),
-                Text('• Price reference as of 27 August 2026.', style: TextStyle(fontSize: 11.5, color: Colors.white70, height: 1.4)),
-                SizedBox(height: 4),
-                Text('• Replacement item is based on month or mileage, whichever comes first.', style: TextStyle(fontSize: 11.5, color: Colors.white70, height: 1.4)),
-                SizedBox(height: 4),
-                Text('• Free Labour (FOC): Month 1 (1k km), Month 12 (20k km), Month 24 (40k km), Month 36 (60k km), Month 48 (80k km), and Month 60 (100k km).', style: TextStyle(fontSize: 11.5, color: Color(0xFF00D2AA), height: 1.4, fontWeight: FontWeight.w600)),
-                SizedBox(height: 4),
-                Text('• Wheel alignment and balancing is recommended every 10,000 km.', style: TextStyle(fontSize: 11.5, color: Colors.white70, height: 1.4)),
-                SizedBox(height: 4),
-                Text('• Complimentary car wash is carried out after the service/repair process.', style: TextStyle(fontSize: 11.5, color: Colors.white70, height: 1.4)),
-                SizedBox(height: 4),
-                Text('• Free service offers exclude recommended wear items and wear labour.', style: TextStyle(fontSize: 11.5, color: Colors.white70, height: 1.4)),
+              children: [
+                Text(
+                  'OFFICIAL CHERY SERVICE GUIDELINES',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.white54 : const Color(0xFF6B7280),
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text('• Price reference as of 27 August 2026.', style: TextStyle(fontSize: 11.5, color: isDark ? Colors.white70 : const Color(0xFF374151), height: 1.4)),
+                const SizedBox(height: 4),
+                Text('• Replacement item is based on month or mileage, whichever comes first.', style: TextStyle(fontSize: 11.5, color: isDark ? Colors.white70 : const Color(0xFF374151), height: 1.4)),
+                const SizedBox(height: 4),
+                const Text('• Free Labour (FOC): Month 1 (1k km), Month 12 (20k km), Month 24 (40k km), Month 36 (60k km), Month 48 (80k km), and Month 60 (100k km).', style: TextStyle(fontSize: 11.5, color: Color(0xFF00D2AA), height: 1.4, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Text('• Wheel alignment and balancing is recommended every 10,000 km.', style: TextStyle(fontSize: 11.5, color: isDark ? Colors.white70 : const Color(0xFF374151), height: 1.4)),
+                const SizedBox(height: 4),
+                Text('• Complimentary car wash is carried out after the service/repair process.', style: TextStyle(fontSize: 11.5, color: isDark ? Colors.white70 : const Color(0xFF374151), height: 1.4)),
+                const SizedBox(height: 4),
+                Text('• Free service offers exclude recommended wear items and wear labour.', style: TextStyle(fontSize: 11.5, color: isDark ? Colors.white70 : const Color(0xFF374151), height: 1.4)),
               ],
             ),
           ),
@@ -2915,18 +3065,26 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('OFFICIAL VEHICLE SPECIFICATIONS', style: TextStyle(fontSize: 11, color: Colors.white54, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                Text(
+                  'OFFICIAL VEHICLE SPECIFICATIONS',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.white54 : const Color(0xFF6B7280),
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
                 const SizedBox(height: 12),
-                _buildSpecRow('Model', 'Chery Tiggo 7 PHEV CSH (RHD)'),
-                _buildSpecRow('Powertrain', '1.5L Turbo + Dual Motors (CSH)'),
-                _buildSpecRow('System Output', '240 kW (326 PS) / 545 Nm'),
-                _buildSpecRow('Transmission', '3-speed Dedicated Hybrid (3DHT)'),
-                _buildSpecRow('Battery Capacity', '19.27 kWh (usable ~18.3 kWh)'),
-                _buildSpecRow('Electric Range', '80–100 km (NEDC rated 100 km)'),
-                _buildSpecRow('Fuel Tank', '51 Litres (RON95 compatible)'),
-                _buildSpecRow('Target Cold Tyre Pressure', '230 kPa (2.3 bar / 33.4 psi)'),
-                _buildSpecRow('Vehicle Warranty', '7 Years / 150,000 km'),
-                _buildSpecRow('Battery Warranty', '8 Years / 160,000 km'),
+                _buildSpecRow('Model', 'Chery Tiggo 7 PHEV CSH (RHD)', isDark),
+                _buildSpecRow('Powertrain', '1.5L Turbo + Dual Motors (CSH)', isDark),
+                _buildSpecRow('System Output', '240 kW (326 PS) / 545 Nm', isDark),
+                _buildSpecRow('Transmission', '3-speed Dedicated Hybrid (3DHT)', isDark),
+                _buildSpecRow('Battery Capacity', '19.27 kWh (usable ~18.3 kWh)', isDark),
+                _buildSpecRow('Electric Range', '80–100 km (NEDC rated 100 km)', isDark),
+                _buildSpecRow('Fuel Tank', '51 Litres (RON95 compatible)', isDark),
+                _buildSpecRow('Target Cold Tyre Pressure', '230 kPa (2.3 bar / 33.4 psi)', isDark),
+                _buildSpecRow('Vehicle Warranty', '7 Years / 150,000 km', isDark),
+                _buildSpecRow('Battery Warranty', '8 Years / 160,000 km', isDark),
               ],
             ),
           ),
@@ -2935,20 +3093,32 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
     );
   }
 
-  Widget _buildFilterChip(String label, int index) {
+  Widget _buildFilterChip(String label, int index, bool isDark) {
     final isSelected = _filterIndex == index;
     return ChoiceChip(
-      label: Text(label, style: TextStyle(fontSize: 11, color: isSelected ? const Color(0xFF00D2AA) : Colors.white70)),
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          color: isSelected
+              ? const Color(0xFF00D2AA)
+              : (isDark ? Colors.white70 : const Color(0xFF4B5563)),
+        ),
+      ),
       selected: isSelected,
-      selectedColor: const Color(0xFF00D2AA).withValues(alpha: 0.15),
-      backgroundColor: const Color(0xFF131922),
-      side: BorderSide(color: isSelected ? const Color(0xFF00D2AA) : const Color(0xFF232D3D)),
+      selectedColor: const Color(0xFF00D2AA).withValues(alpha: isDark ? 0.15 : 0.12),
+      backgroundColor: isDark ? const Color(0xFF131922) : const Color(0xFFF3F4F6),
+      side: BorderSide(
+        color: isSelected
+            ? const Color(0xFF00D2AA)
+            : (isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
+      ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       onSelected: (_) => setState(() => _filterIndex = index),
     );
   }
 
-  Widget _buildPartRow(String name, double price, {required bool isCompulsory}) {
+  Widget _buildPartRow(String name, double price, {required bool isCompulsory, required bool isDark}) {
     final isFoc = price == 0.00;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -2961,7 +3131,9 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                 Icon(
                   isCompulsory ? Icons.check_circle_outline : Icons.add_circle_outline,
                   size: 14,
-                  color: isCompulsory ? const Color(0xFF00D2AA) : Colors.white38,
+                  color: isCompulsory
+                      ? const Color(0xFF00D2AA)
+                      : (isDark ? Colors.white38 : const Color(0xFF9CA3AF)),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -2969,7 +3141,9 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                     name,
                     style: TextStyle(
                       fontSize: 12,
-                      color: isCompulsory ? Colors.white : Colors.white70,
+                      color: isCompulsory
+                          ? (isDark ? Colors.white : const Color(0xFF111827))
+                          : (isDark ? Colors.white70 : const Color(0xFF4B5563)),
                     ),
                   ),
                 ),
@@ -2981,7 +3155,11 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: isFoc ? const Color(0xFF00D2AA) : (isCompulsory ? Colors.white : Colors.white70),
+              color: isFoc
+                  ? const Color(0xFF00D2AA)
+                  : (isCompulsory
+                      ? (isDark ? Colors.white : const Color(0xFF111827))
+                      : (isDark ? Colors.white70 : const Color(0xFF4B5563))),
             ),
           ),
         ],
@@ -2989,14 +3167,21 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
     );
   }
 
-  Widget _buildSpecRow(String label, String val) {
+  Widget _buildSpecRow(String label, String val, bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.white60)),
-          Text(val, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          Text(label, style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : const Color(0xFF6B7280))),
+          Text(
+            val,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : const Color(0xFF111827),
+            ),
+          ),
         ],
       ),
     );

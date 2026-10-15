@@ -971,17 +971,38 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         return Stack(
                           alignment: Alignment.center,
                           children: [
-                            // Ambient radial background glow
-                            Positioned.fill(
-                              child: DecoratedBox(
+                            // Ambient radial background glow (Obsidian dark mode only)
+                            if (colors.isDark)
+                              Positioned.fill(
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: RadialGradient(
+                                      center: Alignment.center,
+                                      radius: 0.75,
+                                      colors: [
+                                        colors.evTeal.withValues(alpha: 0.09),
+                                        Colors.transparent,
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                            // Floor shadow reflection (soft radial gradient)
+                            Positioned(
+                              bottom: 12,
+                              child: Container(
+                                width: constraints.maxWidth * 0.75,
+                                height: 16,
                                 decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.all(
+                                    Radius.elliptical(constraints.maxWidth * 0.75, 16),
+                                  ),
                                   gradient: RadialGradient(
-                                    center: Alignment.center,
-                                    radius: 0.75,
                                     colors: [
                                       colors.isDark
-                                          ? colors.evTeal.withValues(alpha: 0.09)
-                                          : const Color(0xFFE2E8F0).withValues(alpha: 0.6),
+                                          ? Colors.black.withValues(alpha: 0.75)
+                                          : Colors.black.withValues(alpha: 0.22),
                                       Colors.transparent,
                                     ],
                                   ),
@@ -999,27 +1020,6 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                                 errorBuilder: (context, error, stackTrace) {
                                   return Icon(Icons.directions_car, size: 100, color: colors.textMuted);
                                 },
-                              ),
-                            ),
-
-                            // Floor shadow reflection
-                            Positioned(
-                              bottom: 12,
-                              child: Container(
-                                width: constraints.maxWidth * 0.78,
-                                height: 14,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(100),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: colors.isDark
-                                          ? Colors.black.withValues(alpha: 0.7)
-                                          : Colors.black.withValues(alpha: 0.16),
-                                      blurRadius: 18,
-                                      spreadRadius: 4,
-                                    ),
-                                  ],
-                                ),
                               ),
                             ),
 
@@ -1264,174 +1264,174 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
         else ...[
           // ---------------- 5. SMART CHARGING & BATTERY MODULE ----------------
           Card(
-          elevation: 0,
-          color: const Color(0xFF0D1219),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-            side: const BorderSide(color: Color(0xFF1F2937)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: const [
-                        Icon(Icons.bolt, size: 18, color: Color(0xFF00D2AA)),
-                        SizedBox(width: 8),
-                        Text(
-                          'Smart Charging Management',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      _telemetry.isCharging ? '3.3 kW AC' : 'Standby',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: _telemetry.isCharging ? const Color(0xFF00D2AA) : Colors.white54,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-
-                // 3-Stat Metric Row inside Charging Card
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF131922),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFF232D3D)),
-                  ),
-                  child: Row(
+            elevation: 0,
+            color: colors.cardBg,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+              side: BorderSide(color: colors.border),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('SESSION COST', style: TextStyle(fontSize: 9, color: Colors.white54, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 2),
-                            Text(
-                              _telemetry.isCharging ? 'RM 7.87' : 'RM 0.00',
-                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF00D2AA)),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(width: 1, height: 28, color: const Color(0xFF232D3D)),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('TIME REMAINING', style: TextStyle(fontSize: 9, color: Colors.white54, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 2),
-                              Text(
-                                _telemetry.isCharging ? '1h 45m' : 'Full / Ready',
-                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
-                              ),
-                            ],
+                      Row(
+                        children: [
+                          Icon(Icons.bolt, size: 18, color: colors.evTeal),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Smart Charging Management',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: colors.textPrimary),
                           ),
-                        ),
+                        ],
                       ),
-                      Container(width: 1, height: 28, color: const Color(0xFF232D3D)),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            const Text('PLUG STATUS', style: TextStyle(fontSize: 9, color: Colors.white54, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 2),
-                            Text(
-                              _telemetry.isCharging ? 'Connected' : 'Ready',
-                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white70),
-                            ),
-                          ],
+                      Text(
+                        _telemetry.isCharging ? '3.3 kW AC' : 'Standby',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: _telemetry.isCharging ? colors.evTeal : colors.textMuted,
                         ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 12),
+                  const SizedBox(height: 14),
 
-                // Scheduled Charging Switch
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: const [
-                        Icon(Icons.schedule, size: 15, color: Colors.white60),
-                        SizedBox(width: 8),
-                        Text('Scheduled Charging', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  // 3-Stat Metric Row inside Charging Card
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: colors.tileBg,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: colors.border),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('SESSION COST', style: TextStyle(fontSize: 9, color: colors.textMuted, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 2),
+                              Text(
+                                _telemetry.isCharging ? 'RM 7.87' : 'RM 0.00',
+                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colors.evTeal),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(width: 1, height: 28, color: colors.border),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('TIME REMAINING', style: TextStyle(fontSize: 9, color: colors.textMuted, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _telemetry.isCharging ? '1h 45m' : 'Full / Ready',
+                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colors.textPrimary),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Container(width: 1, height: 28, color: colors.border),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text('PLUG STATUS', style: TextStyle(fontSize: 9, color: colors.textMuted, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 2),
+                              Text(
+                                _telemetry.isCharging ? 'Connected' : 'Ready',
+                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colors.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
-                    Switch(
-                      value: _scheduledCharging,
-                      activeThumbColor: const Color(0xFF00D2AA),
-                      onChanged: (val) => setState(() => _scheduledCharging = val),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
+                  ),
+                  const SizedBox(height: 12),
 
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          if (widget.repository is MockVehicleRepository) {
-                            (widget.repository as MockVehicleRepository).toggleCharging(!_telemetry.isCharging);
-                          }
-                        },
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFF232D3D)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        child: Text(
-                          _telemetry.isCharging ? 'Pause Charging' : 'Start AC Charge',
-                          style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
+                  // Scheduled Charging Switch
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.schedule, size: 15, color: colors.textMuted),
+                          const SizedBox(width: 8),
+                          Text('Scheduled Charging', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colors.textPrimary)),
+                        ],
+                      ),
+                      Switch(
+                        value: _scheduledCharging,
+                        activeThumbColor: colors.evTeal,
+                        onChanged: (val) => setState(() => _scheduledCharging = val),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            if (widget.repository is MockVehicleRepository) {
+                              (widget.repository as MockVehicleRepository).toggleCharging(!_telemetry.isCharging);
+                            }
+                          },
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: colors.border),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: Text(
+                            _telemetry.isCharging ? 'Pause Charging' : 'Start AC Charge',
+                            style: TextStyle(color: colors.textPrimary, fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Off-Peak TNB charging timer scheduled: 10:00 PM – 06:00 AM.')),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black87,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Off-Peak TNB charging timer scheduled: 10:00 PM – 06:00 AM.')),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: colors.isDark ? Colors.white : const Color(0xFF111827),
+                            foregroundColor: colors.isDark ? Colors.black87 : Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          icon: Icon(Icons.calendar_today, size: 15, color: colors.isDark ? Colors.black87 : Colors.white),
+                          label: const Text('Set Schedule', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                         ),
-                        icon: const Icon(Icons.calendar_today, size: 15, color: Colors.black87),
-                        label: const Text('Set Schedule', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
         const SizedBox(height: 16),
 
         // ---------------- 6. VEHICLE HEALTH & DIRECT TPMS CARD ----------------
         Card(
           elevation: 0,
-          color: const Color(0xFF0D1219),
+          color: colors.cardBg,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
-            side: const BorderSide(color: Color(0xFF1F2937)),
+            side: BorderSide(color: colors.border),
           ),
           child: Padding(
             padding: const EdgeInsets.all(18),
@@ -1442,18 +1442,18 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Row(
-                      children: const [
-                        Icon(Icons.health_and_safety_outlined, size: 18, color: Color(0xFF00D2AA)),
-                        SizedBox(width: 8),
-                        Text('Vehicle Health & TPMS', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                      children: [
+                        Icon(Icons.health_and_safety_outlined, size: 18, color: colors.evTeal),
+                        const SizedBox(width: 8),
+                        Text('Vehicle Health & TPMS', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: colors.textPrimary)),
                       ],
                     ),
                     InkWell(
                       onTap: () => _showTyreModal('Front-Left (FL)', 'FL Tire Pressure', _telemetry.tyreFlPressureKpa, _telemetry.tyreFlTempC),
                       child: Row(
-                        children: const [
-                          Text('Tyres', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF00D2AA))),
-                          Icon(Icons.chevron_right, size: 16, color: Color(0xFF00D2AA)),
+                        children: [
+                          Text('Tyres', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colors.evTeal)),
+                          Icon(Icons.chevron_right, size: 16, color: colors.evTeal),
                         ],
                       ),
                     ),
@@ -1465,9 +1465,9 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF131922),
+                    color: colors.tileBg,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF232D3D)),
+                    border: Border.all(color: colors.border),
                   ),
                   child: Row(
                     children: [
@@ -1505,25 +1505,25 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                                 'assets/images/car_top.png',
                                 height: 140,
                                 fit: BoxFit.contain,
-                                errorBuilder: (context, error, stackTrace) => const Icon(Icons.directions_car, size: 80, color: Colors.white24),
+                                errorBuilder: (context, error, stackTrace) => Icon(Icons.directions_car, size: 80, color: colors.textMuted),
                               ),
                               Positioned(
                                 bottom: 6,
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.8),
+                                    color: colors.isDark ? Colors.black.withValues(alpha: 0.8) : Colors.white.withValues(alpha: 0.9),
                                     borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: 0.4)),
+                                    border: Border.all(color: colors.evTeal.withValues(alpha: 0.4)),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(_isDoorsLocked ? Icons.lock : Icons.lock_open, size: 10, color: const Color(0xFF00D2AA)),
+                                      Icon(_isDoorsLocked ? Icons.lock : Icons.lock_open, size: 10, color: colors.evTeal),
                                       const SizedBox(width: 4),
                                       Text(
                                         _isDoorsLocked ? 'SECURED' : 'UNLOCKED',
-                                        style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: Color(0xFF00D2AA)),
+                                        style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: colors.evTeal),
                                       ),
                                     ],
                                   ),
@@ -1564,24 +1564,25 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF131922),
+                    color: colors.tileBg,
                     borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: colors.border),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.battery_charging_full, size: 16, color: Color(0xFF00D2AA)),
+                          Icon(Icons.battery_charging_full, size: 16, color: colors.evTeal),
                           const SizedBox(width: 6),
-                          Text('12V Aux: ${_telemetry.volt12.toStringAsFixed(2)}V (Healthy)', style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                          Text('12V Aux: ${_telemetry.volt12.toStringAsFixed(2)}V (Healthy)', style: TextStyle(fontSize: 12, color: colors.textSecondary)),
                         ],
                       ),
                       Row(
                         children: [
-                          const Icon(Icons.speed, size: 16, color: Colors.white60),
+                          Icon(Icons.speed, size: 16, color: colors.textMuted),
                           const SizedBox(width: 6),
-                          Text('Odo: ${_telemetry.odometerKm} km', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+                          Text('Odo: ${_telemetry.odometerKm} km', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colors.textPrimary)),
                         ],
                       ),
                     ],
@@ -1596,10 +1597,10 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
         // ---------------- 7. HYBRID ECONOMICS & SPENDING ACCORDION ----------------
         Card(
           elevation: 0,
-          color: const Color(0xFF0D1219),
+          color: colors.cardBg,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
-            side: const BorderSide(color: Color(0xFF1F2937)),
+            side: BorderSide(color: colors.border),
           ),
           child: Padding(
             padding: const EdgeInsets.all(18),
@@ -1612,17 +1613,17 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Row(
-                        children: const [
-                          Icon(Icons.pie_chart_outline, size: 18, color: Color(0xFF00D2AA)),
-                          SizedBox(width: 8),
-                          Text('Monthly Spending Breakdown', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                        children: [
+                          Icon(Icons.pie_chart_outline, size: 18, color: colors.evTeal),
+                          const SizedBox(width: 8),
+                          Text('Monthly Spending Breakdown', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: colors.textPrimary)),
                         ],
                       ),
                       Row(
                         children: [
-                          Text('RM ${totalSpend.toStringAsFixed(0)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF00D2AA))),
+                          Text('RM ${totalSpend.toStringAsFixed(0)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: colors.evTeal)),
                           const SizedBox(width: 4),
-                          Icon(_spendingExpanded ? Icons.expand_less : Icons.expand_more, size: 18, color: Colors.white60),
+                          Icon(_spendingExpanded ? Icons.expand_less : Icons.expand_more, size: 18, color: colors.textMuted),
                         ],
                       ),
                     ],
@@ -1649,8 +1650,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                             Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text('RM ${totalSpend.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                const Text('Total', style: TextStyle(fontSize: 9, color: Colors.white54)),
+                                Text('RM ${totalSpend.toStringAsFixed(0)}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: colors.textPrimary)),
+                                Text('Total', style: TextStyle(fontSize: 9, color: colors.textMuted)),
                               ],
                             ),
                           ],
@@ -1671,14 +1672,14 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       ),
                     ],
                   ),
-                  const Divider(height: 20, color: Color(0xFF1F2937)),
+                  Divider(height: 20, color: colors.border),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Expanded(
-                        child: Text('Hybrid Efficiency Savings', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF00D2AA))),
+                      Expanded(
+                        child: Text('Hybrid Efficiency Savings', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colors.evTeal)),
                       ),
-                      Text('RM ${savings.toStringAsFixed(2)} saved', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF00D2AA))),
+                      Text('RM ${savings.toStringAsFixed(2)} saved', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: colors.evTeal)),
                     ],
                   ),
                 ],
@@ -1701,6 +1702,23 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     required VoidCallback onTap,
   }) {
     final colors = AppColors(context);
+    final isLockedBtn = label == 'Locked';
+    final bool useNeutralLocked = isLockedBtn && !colors.isDark;
+    final Color buttonColor = useNeutralLocked
+        ? colors.dockBtnBg
+        : (isActive
+            ? activeColor.withValues(alpha: colors.isDark ? 0.2 : 0.15)
+            : colors.dockBtnBg);
+    final Color borderColor = useNeutralLocked
+        ? colors.border
+        : (isActive ? activeColor : colors.border);
+    final Color iconColor = useNeutralLocked
+        ? colors.textPrimary
+        : (isActive ? activeColor : colors.dockBtnIcon);
+    final Color labelColor = useNeutralLocked
+        ? colors.textPrimary
+        : (isActive ? activeColor : colors.textPrimary);
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(30),
@@ -1712,14 +1730,12 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             height: 48,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isActive
-                  ? activeColor.withValues(alpha: colors.isDark ? 0.2 : 0.15)
-                  : colors.dockBtnBg,
+              color: buttonColor,
               border: Border.all(
-                color: isActive ? activeColor : colors.border,
+                color: borderColor,
                 width: 1.5,
               ),
-              boxShadow: isActive
+              boxShadow: (isActive && !useNeutralLocked)
                   ? [
                       BoxShadow(
                         color: activeColor.withValues(alpha: colors.isDark ? 0.35 : 0.2),
@@ -1740,7 +1756,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
               child: Icon(
                 icon,
                 size: 22,
-                color: isActive ? activeColor : colors.dockBtnIcon,
+                color: iconColor,
               ),
             ),
           ),
@@ -1750,7 +1766,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
-              color: isActive ? activeColor : colors.textPrimary,
+              color: labelColor,
             ),
           ),
           Text(

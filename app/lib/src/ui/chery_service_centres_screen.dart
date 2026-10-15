@@ -585,6 +585,8 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
       return matchesRegion && matchesType && matchesQuery;
     }).toList();
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     Widget content = Column(
       children: [
         // 24/7 Roadside Assistance Banner
@@ -593,13 +595,15 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
           child: Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF1B2A32), Color(0xFF131922)],
+              gradient: LinearGradient(
+                colors: isDark
+                    ? const [Color(0xFF1B2A32), Color(0xFF131922)]
+                    : const [Color(0xFFE6FFFA), Color(0xFFF0FDF4)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: 0.3)),
+              border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: isDark ? 0.3 : 0.5)),
             ),
             child: Row(
               children: [
@@ -615,15 +619,15 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
                         'Chery 24/7 Roadside Careline',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Colors.white),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: isDark ? Colors.white : const Color(0xFF111827)),
                       ),
-                      SizedBox(height: 2),
+                      const SizedBox(height: 2),
                       Text(
                         'Toll-Free Nationwide • High Voltage PHEV Rescue',
-                        style: TextStyle(fontSize: 11, color: Colors.white54),
+                        style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF4B5563)),
                       ),
                     ],
                   ),
@@ -650,13 +654,14 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
           child: TextField(
             controller: _searchController,
             onChanged: (val) => setState(() {}),
+            style: TextStyle(color: isDark ? Colors.white : const Color(0xFF111827), fontSize: 13),
             decoration: InputDecoration(
               hintText: 'Search city, dealer, or location (e.g. Puchong, Tampoi, Ipoh)...',
-              hintStyle: const TextStyle(fontSize: 12.5, color: Colors.white38),
+              hintStyle: TextStyle(fontSize: 12.5, color: isDark ? Colors.white38 : const Color(0xFF9CA3AF)),
               prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF00D2AA)),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.clear, size: 18),
+                      icon: Icon(Icons.clear, size: 18, color: isDark ? Colors.white60 : const Color(0xFF6B7280)),
                       onPressed: () {
                         _searchController.clear();
                         setState(() {});
@@ -664,15 +669,15 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                     )
                   : null,
               filled: true,
-              fillColor: const Color(0xFF131922),
+              fillColor: isDark ? const Color(0xFF131922) : Colors.white,
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: Color(0xFF232D3D)),
+                borderSide: BorderSide(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0)),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: Color(0xFF232D3D)),
+                borderSide: BorderSide(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
@@ -693,12 +698,19 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                 return Padding(
                   padding: const EdgeInsets.only(right: 6),
                   child: FilterChip(
-                    label: Text(reg, style: TextStyle(fontSize: 11.5, color: isSelected ? Colors.black : Colors.white70, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                    label: Text(
+                      reg,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: isSelected ? Colors.black : (isDark ? Colors.white70 : const Color(0xFF4B5563)),
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
                     selected: isSelected,
                     onSelected: (val) => setState(() => _selectedRegion = reg),
-                    backgroundColor: const Color(0xFF131922),
+                    backgroundColor: isDark ? const Color(0xFF131922) : const Color(0xFFF1F5F9),
                     selectedColor: const Color(0xFF00D2AA),
-                    side: BorderSide(color: isSelected ? const Color(0xFF00D2AA) : const Color(0xFF232D3D)),
+                    side: BorderSide(color: isSelected ? const Color(0xFF00D2AA) : (isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0))),
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   ),
                 );
@@ -710,12 +722,19 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                 return Padding(
                   padding: const EdgeInsets.only(right: 6),
                   child: FilterChip(
-                    label: Text(tp == 'All' ? 'All Types' : '$tp Only', style: TextStyle(fontSize: 11, color: isSelected ? Colors.black : Colors.white60)),
+                    label: Text(
+                      tp == 'All' ? 'All Types' : '$tp Only',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isSelected ? Colors.white : (isDark ? Colors.white60 : const Color(0xFF4B5563)),
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
                     selected: isSelected,
                     onSelected: (val) => setState(() => _selectedType = tp),
-                    backgroundColor: const Color(0xFF131922),
+                    backgroundColor: isDark ? const Color(0xFF131922) : const Color(0xFFF1F5F9),
                     selectedColor: const Color(0xFF2F81F7),
-                    side: BorderSide(color: isSelected ? const Color(0xFF2F81F7) : const Color(0xFF232D3D)),
+                    side: BorderSide(color: isSelected ? const Color(0xFF2F81F7) : (isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0))),
                     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                   ),
                 );
@@ -732,7 +751,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
             children: [
               Text(
                 'Showing ${filtered.length} authorised centres',
-                style: const TextStyle(fontSize: 11.5, color: Colors.white54, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 11.5, color: isDark ? Colors.white54 : const Color(0xFF6B7280), fontWeight: FontWeight.w600),
               ),
               InkWell(
                 onTap: () async {
@@ -805,6 +824,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
 
   Widget _buildCentreCard(CheryServiceCentre centre) {
     final is4S = centre.type == '4S';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -823,12 +843,12 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                     children: [
                       Text(
                         centre.name,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF111827)),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         centre.dealerName,
-                        style: const TextStyle(fontSize: 12, color: Colors.white60),
+                        style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : const Color(0xFF6B7280)),
                       ),
                     ],
                   ),
@@ -868,7 +888,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                 _buildCapabilityBadge(Icons.bolt, 'PHEV / HV Diagnostic Ready', const Color(0xFF00D2AA)),
                 if (centre.hasBodyPaint)
                   _buildCapabilityBadge(Icons.format_paint, 'Body & Paint (B&P)', const Color(0xFF2F81F7)),
-                _buildCapabilityBadge(Icons.location_on_outlined, centre.state, Colors.white54),
+                _buildCapabilityBadge(Icons.location_on_outlined, centre.state, isDark ? Colors.white54 : const Color(0xFF6B7280)),
               ],
             ),
             const SizedBox(height: 10),
@@ -877,12 +897,12 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.place, size: 15, color: Colors.white38),
+                Icon(Icons.place, size: 15, color: isDark ? Colors.white38 : const Color(0xFF9CA3AF)),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     centre.address,
-                    style: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.35),
+                    style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : const Color(0xFF4B5563), height: 1.35),
                   ),
                 ),
               ],
@@ -892,17 +912,17 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
             // Hours Row
             Row(
               children: [
-                const Icon(Icons.schedule, size: 14, color: Colors.white38),
+                Icon(Icons.schedule, size: 14, color: isDark ? Colors.white38 : const Color(0xFF9CA3AF)),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     centre.operatingHours,
-                    style: const TextStyle(fontSize: 11, color: Colors.white38),
+                    style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : const Color(0xFF9CA3AF)),
                   ),
                 ),
               ],
             ),
-            const Divider(height: 20, color: Color(0xFF232D3D)),
+            Divider(height: 20, color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0)),
 
             // Action Row
             Row(
@@ -915,7 +935,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                       const SizedBox(width: 6),
                       Text(
                         centre.phone,
-                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Colors.white),
+                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF111827)),
                       ),
                     ],
                   ),
