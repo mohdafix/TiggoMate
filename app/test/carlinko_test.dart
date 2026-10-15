@@ -1,0 +1,113 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:tiggomate_app/src/carlinko/carlinko_api.dart';
+import 'package:tiggomate_app/src/carlinko/vehicle_repository.dart';
+import 'package:tiggomate_app/src/carlinko/vehicle_telemetry.dart';
+
+void main() {
+  const String sampleHexBlob =
+      '77000000000200000000FF7F056800600000000372000101B80201003100F8B8'
+      '000000000000000000000000FFFFFFFFFFFFFFFF00000071000003FF00000000'
+      '000000FF00E000F802';
+
+  group('CarLinko API HMAC Signing Tests (ha-carlinko compatibility)', () {
+    test('sign normalizes null and empty string identically', () {
+      const ts = '1700000000000';
+      final s1 = CarLinkoClient.sign({'a': null}, ts);
+      final s2 = CarLinkoClient.sign({'a': ''}, ts);
+      expect(s1, equals(s2));
+    });
+
+    test('sign ignores parameter key insertion order', () {
+      const ts = '1700000000000';
+      final s1 = CarLinkoClient.sign({'a': 1, 'b': 2}, ts);
+      final s2 = CarLinkoClient.sign({'b': 2, 'a': 1}, ts);
+      expect(s1, equals(s2));
+    });
+
+    test('sign produces consistent base64 digest with CarLinko sign key', () {
+      const ts = '1700000000000';
+      final sig = CarLinkoClient.sign({'vehicleId': '12345'}, ts);
+      expect(sig, isNotEmpty);
+      expect(sig.length, greaterThan(20));
+    });
+  });
+
+  group('CarLinko 73-Byte Telemetry Blob Parsing Tests', () {
+    test('parseBlob parses valid telemetry sample matching reference', () {
+      final parsed = CarLinkoClient.parseBlob(sampleHexBlob);
+
+      expect(parsed['hv_state'], equals(2));
+      expect(parsed['doors'], equals(0));
+      expect(parsed['unlocked'], equals(0));
+      expect(parsed['ac_on'], equals(true));
+      expect(parsed['charge_remain_min'], isNull); // 0x3FF sentinel
+      expect(parsed['charge_power_kw'], isNull);
+      expect(parsed['tyre_fl_pressure'], isNull); // 0xFF = no reading
+    });
+
+    test('parseBlob handles short/malformed hex gracefully without throwing', () {
+      final shortParsed = CarLinkoClient.parseBlob('7700');
+      expect(shortParsed['battery_pct'], isNull);
+      expect(shortParsed['range_km'], isNull);
+
+      final invalidParsed = CarLinkoClient.parseBlob('not_a_hex_string');
+      expect(invalidParsed, isEmpty);
+
+      final emptyParsed = CarLinkoClient.parseBlob('');
+      expect(emptyParsed, isEmpty);
+    });
+
+    test('VehicleTelemetry.fromBlobMap generates valid telemetry model', () {
+      final parsed = CarLinkoClient.parseBlob(sampleHexBlob);
+      final telemetry = VehicleTelemetry.fromBlobMap(parsed, isSimulated: false);
+
+      expect(telemetry.isSimulated, isFalse);
+      expect(telemetry.dataSourceLabel, contains('LIVE CARLINKO'));
+      expect(telemetry.fuelRangeKm, equals(838));
+      expect(telemetry.totalRangeKm, greaterThanOrEqualTo(838));
+    });
+  });
+
+  group('VehicleRepository Mock and State Tests', () {
+    test('MockVehicleRepository provides verified Malaysian Tiggo 7 PHEV initial state', () {
+      final repo = MockVehicleRepository();
+      expect(repo.connectionStatus, equals(VehicleConnectionStatus.connected));
+
+      final t = repo.currentTelemetry;
+      expect(t.isSimulated, isTrue);
+      expect(t.batteryPct, equals(78));
+      expect(t.electricRangeKm, equals(82));
+      expect(t.totalRangeKm, equals(920));
+      expect(t.volt12, closeTo(12.82, 0.01));
+      expect(t.tyreFlPressureKpa, equals(235.0));
+
+      repo.dispose();
+    });
+
+    test('MockVehicleRepository toggleCharging updates telemetry reactively', () async {
+      final repo = MockVehicleRepository();
+
+      expect(repo.currentTelemetry.isCharging, isFalse);
+
+      repo.toggleCharging(true);
+      expect(repo.currentTelemetry.isCharging, isTrue);
+      expect(repo.currentTelemetry.chargePowerKw, equals(6.6));
+      expect(repo.currentTelemetry.chargeRemainMin, equals(38));
+
+      repo.toggleCharging(false);
+      expect(repo.currentTelemetry.isCharging, isFalse);
+      expect(repo.currentTelemetry.chargePowerKw, equals(0.0));
+
+      repo.dispose();
+    });
+
+    test('LiveCarLinkoRepository starts disconnected and handles disconnect', () async {
+      final liveRepo = LiveCarLinkoRepository();
+      expect(liveRepo.connectionStatus, equals(VehicleConnectionStatus.disconnected));
+
+      await liveRepo.disconnect();
+      expect(liveRepo.connectionStatus, equals(VehicleConnectionStatus.disconnected));
+      liveRepo.dispose();
+    });
+  });
+}
