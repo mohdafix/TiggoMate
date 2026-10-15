@@ -518,148 +518,178 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       children: [
         // ---------------- 1. HEADER: VEHICLE & STATUS ----------------
+        // Top Utility Bar: Driver Profile & Quick Actions
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      // CarLinko Status Pill
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF00D2AA).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: 0.4)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Color(0xFF00D2AA),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              _telemetry.isCharging ? 'Charging 3.3 kW' : 'Connected',
-                              style: const TextStyle(
-                                color: Color(0xFF00D2AA),
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
+            // Left: Driver & Connectivity Pill
+            GestureDetector(
+              onTap: _openAuthSheet,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF131922),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: AuthService().currentUser.isAuthenticated
+                        ? const Color(0xFF00D2AA).withValues(alpha: 0.5)
+                        : const Color(0xFF2F81F7).withValues(alpha: 0.5),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _telemetry.isCharging
+                            ? const Color(0xFF00D2AA)
+                            : (AuthService().currentUser.isAuthenticated ? const Color(0xFF00D2AA) : const Color(0xFF2F81F7)),
                       ),
-                      const SizedBox(width: 8),
-                      // Plug / Paused Pill
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _telemetry.isCharging
-                              ? const Color(0xFF00D2AA).withValues(alpha: 0.2)
-                              : Colors.orange.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          _telemetry.isCharging ? 'AC Plugged' : 'Paused',
-                          style: TextStyle(
-                            color: _telemetry.isCharging ? const Color(0xFF00D2AA) : Colors.orangeAccent,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    widget.vehicleNickname.isNotEmpty ? widget.vehicleNickname : 'Tiggo Grey Wolf',
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 0.2),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    '${widget.carPlateNumber} • ${widget.ownerName} • Chery Tiggo 7 PHEV CSH',
-                    style: const TextStyle(fontSize: 11.5, color: Colors.white54),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            Row(
-              children: [
-                GestureDetector(
-                  onTap: _openAuthSheet,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
+                    ),
+                    const SizedBox(width: 6),
+                    Icon(
+                      AuthService().currentUser.isAuthenticated
+                          ? Icons.account_circle_outlined
+                          : Icons.login_rounded,
+                      size: 15,
                       color: AuthService().currentUser.isAuthenticated
-                          ? const Color(0xFF00D2AA).withValues(alpha: 0.15)
-                          : const Color(0xFF2F81F7).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
+                          ? const Color(0xFF00D2AA)
+                          : const Color(0xFF2F81F7),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      AuthService().currentUser.isAuthenticated
+                          ? AuthService().currentUser.displayName
+                          : 'Log In',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
                         color: AuthService().currentUser.isAuthenticated
                             ? const Color(0xFF00D2AA)
                             : const Color(0xFF2F81F7),
                       ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          AuthService().currentUser.isAuthenticated
-                              ? Icons.account_circle
-                              : Icons.login_rounded,
-                          size: 16,
-                          color: AuthService().currentUser.isAuthenticated
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: _telemetry.isCharging
+                            ? const Color(0xFF00D2AA).withValues(alpha: 0.2)
+                            : (!_telemetry.isSimulated ? const Color(0xFF00D2AA).withValues(alpha: 0.15) : Colors.orange.withValues(alpha: 0.15)),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        _telemetry.isCharging
+                            ? '⚡ 3.3kW'
+                            : (_telemetry.isSimulated ? 'Simulated' : 'Connected'),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: _telemetry.isCharging
                               ? const Color(0xFF00D2AA)
-                              : const Color(0xFF2F81F7),
+                              : (!_telemetry.isSimulated ? const Color(0xFF00D2AA) : Colors.orangeAccent),
                         ),
-                        const SizedBox(width: 5),
-                        Text(
-                          AuthService().currentUser.isAuthenticated
-                              ? AuthService().currentUser.displayName
-                              : 'Log In',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.bold,
-                            color: AuthService().currentUser.isAuthenticated
-                                ? const Color(0xFF00D2AA)
-                                : const Color(0xFF2F81F7),
-                          ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Right: Action Icons Dock (Location, Telematics, Settings)
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF131922),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFF232D3D)),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.all(6),
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    tooltip: 'Chery Service Centres',
+                    icon: const Icon(Icons.location_on_outlined, size: 18, color: Colors.white70),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const CheryServiceCentresScreen(),
                         ),
-                      ],
+                      );
+                    },
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.all(6),
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    tooltip: 'CarLinko Cloud Sync',
+                    icon: const Icon(Icons.cell_tower, size: 18, color: Color(0xFF00D2AA)),
+                    onPressed: _openCarlinkoConnect,
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.all(6),
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    tooltip: 'Settings',
+                    icon: const Icon(Icons.settings_outlined, size: 18, color: Colors.white70),
+                    onPressed: widget.onOpenSettings,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // Vehicle Title & Identification Row (Full Width - No Truncation)
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.vehicleNickname.isNotEmpty ? widget.vehicleNickname : 'Chery Tiggo 7 PHEV CSH',
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.2,
+                color: Colors.white,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 5),
+            Row(
+              children: [
+                // Car Plate Badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF090D12),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFF2F81F7).withValues(alpha: 0.6)),
+                  ),
+                  child: Text(
+                    widget.carPlateNumber.isNotEmpty ? widget.carPlateNumber : 'VRT 3342',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.0,
+                      color: Colors.white,
                     ),
                   ),
                 ),
-                const SizedBox(width: 4),
-                IconButton(
-                  tooltip: 'Chery Service Centres',
-                  icon: const Icon(Icons.location_on_outlined, color: Colors.white70),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const CheryServiceCentresScreen(),
-                      ),
-                    );
-                  },
-                ),
-                IconButton(
-                  tooltip: 'CarLinko Cloud Sync',
-                  icon: const Icon(Icons.cell_tower, color: Color(0xFF00D2AA)),
-                  onPressed: _openCarlinkoConnect,
-                ),
-                IconButton(
-                  tooltip: 'Settings',
-                  icon: const Icon(Icons.settings_outlined, color: Colors.white70),
-                  onPressed: widget.onOpenSettings,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${widget.ownerName} • Chery Tiggo 7 PHEV CSH • 1.5T DHT',
+                    style: const TextStyle(fontSize: 12, color: Colors.white60),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
