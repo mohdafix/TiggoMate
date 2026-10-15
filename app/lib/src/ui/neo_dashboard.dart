@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:model_viewer_plus/model_viewer_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../carlinko/vehicle_repository.dart';
 import '../carlinko/vehicle_telemetry.dart';
+import 'auth_sheet.dart';
 import 'carlinko_connect_dialog.dart';
 import 'chery_service_centres_screen.dart';
 
@@ -34,6 +36,7 @@ class NeoDashboard extends StatefulWidget {
 class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderStateMixin {
   late VehicleTelemetry _telemetry;
   bool _scheduledCharging = true;
+  bool _isAdvancedView = false;
   bool _is3DView = false;
   bool _isDoorsLocked = true;
   bool _isAcActive = false;
@@ -52,6 +55,14 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     _isAcActive = _telemetry.acOn;
     _isTrunkOpen = _telemetry.trunkOpen;
     _isWindowsVented = _telemetry.windowsOpen;
+
+    SharedPreferences.getInstance().then((prefs) {
+      if (mounted) {
+        setState(() {
+          _isAdvancedView = prefs.getBool('tiggomate_ui_mode_advanced') ?? false;
+        });
+      }
+    });
 
     widget.repository.telemetryStream.listen((data) {
       if (mounted) {
@@ -422,6 +433,19 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     );
   }
 
+  void _toggleUiMode(bool advanced) {
+    setState(() => _isAdvancedView = advanced);
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setBool('tiggomate_ui_mode_advanced', advanced);
+    });
+  }
+
+  void _openAuthSheet() {
+    AuthSheet.show(context, onProfileUpdated: () {
+      if (mounted) setState(() {});
+    });
+  }
+
   void _openCarlinkoConnect() {
     showDialog(
       context: context,
@@ -571,6 +595,11 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             Row(
               children: [
                 IconButton(
+                  tooltip: 'Firebase Account & Cloud Sync',
+                  icon: const Icon(Icons.account_circle_outlined, color: Color(0xFF00D2AA)),
+                  onPressed: _openAuthSheet,
+                ),
+                IconButton(
                   tooltip: 'Chery Service Centres',
                   icon: const Icon(Icons.location_on_outlined, color: Colors.white70),
                   onPressed: () {
@@ -630,7 +659,11 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
               ),
             ),
           ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
+
+        // ---------------- 1.5 DUAL UI MODE SWITCHER (BASIC vs ADVANCED) ----------------
+        _buildModeSwitcher(),
+        const SizedBox(height: 10),
 
         // ---------------- 2. HERO VEHICLE STAGE (2D Studio or 3D Orbit) ----------------
         Card(
@@ -644,8 +677,9 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                // Top Stage Header: View Switcher (2D Studio vs 3D Orbit)
-                Row(
+                if (_isAdvancedView) ...[
+                  // Top Stage Header: View Switcher (2D Studio vs 3D Orbit)
+                  Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Row(
@@ -741,9 +775,10 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                   ],
                 ),
                 const SizedBox(height: 12),
+              ],
 
-                // Canvas Area: 3D ModelViewer OR 2D Studio Hotspot Stack
-                if (_is3DView)
+              // Canvas Area: 3D ModelViewer OR 2D Studio Hotspot Stack
+              if (_isAdvancedView && _is3DView)
                   SizedBox(
                     height: 240,
                     child: ClipRRect(
@@ -890,49 +925,51 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                               ),
                             ),
 
-                            // 1. Front-Left Wheel Hotspot
-                            Positioned(
-                              left: constraints.maxWidth * 0.48,
-                              bottom: 26,
-                              child: _buildRadarPin(
-                                'FL Tyre',
-                                () => _handleComponentTap('fl_tyre'),
+                            if (_isAdvancedView) ...[
+                              // 1. Front-Left Wheel Hotspot
+                              Positioned(
+                                left: constraints.maxWidth * 0.48,
+                                bottom: 26,
+                                child: _buildRadarPin(
+                                  'FL Tyre',
+                                  () => _handleComponentTap('fl_tyre'),
+                                ),
                               ),
-                            ),
 
-                            // 2. Rear-Left Wheel Hotspot
-                            Positioned(
-                              right: constraints.maxWidth * 0.17,
-                              bottom: 40,
-                              child: _buildRadarPin(
-                                'RL Tyre',
-                                () => _handleComponentTap('rl_tyre'),
+                              // 2. Rear-Left Wheel Hotspot
+                              Positioned(
+                                right: constraints.maxWidth * 0.17,
+                                bottom: 40,
+                                child: _buildRadarPin(
+                                  'RL Tyre',
+                                  () => _handleComponentTap('rl_tyre'),
+                                ),
                               ),
-                            ),
 
-                            // 3. Charging Port Hotspot
-                            Positioned(
-                              right: constraints.maxWidth * 0.15,
-                              top: 52,
-                              child: _buildRadarPin(
-                                'AC Port',
-                                () => _handleComponentTap('charging_port'),
-                                accentColor: const Color(0xFF00D2AA),
-                                icon: Icons.electrical_services,
+                              // 3. Charging Port Hotspot
+                              Positioned(
+                                right: constraints.maxWidth * 0.15,
+                                top: 52,
+                                child: _buildRadarPin(
+                                  'AC Port',
+                                  () => _handleComponentTap('charging_port'),
+                                  accentColor: const Color(0xFF00D2AA),
+                                  icon: Icons.electrical_services,
+                                ),
                               ),
-                            ),
 
-                            // 4. Front Hybrid Engine Hotspot
-                            Positioned(
-                              left: constraints.maxWidth * 0.22,
-                              top: 60,
-                              child: _buildRadarPin(
-                                '1.5T CSH',
-                                () => _handleComponentTap('engine'),
-                                accentColor: const Color(0xFF2F81F7),
-                                icon: Icons.bolt,
+                              // 4. Front Hybrid Engine Hotspot
+                              Positioned(
+                                left: constraints.maxWidth * 0.22,
+                                top: 60,
+                                child: _buildRadarPin(
+                                  '1.5T CSH',
+                                  () => _handleComponentTap('engine'),
+                                  accentColor: const Color(0xFF2F81F7),
+                                  icon: Icons.bolt,
+                                ),
                               ),
-                            ),
+                            ],
                           ],
                         );
                       },
@@ -1124,8 +1161,11 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
         ),
         const SizedBox(height: 16),
 
-        // ---------------- 5. SMART CHARGING & BATTERY MODULE ----------------
-        Card(
+        if (!_isAdvancedView)
+          _buildBasicStatusSummaryCard()
+        else ...[
+          // ---------------- 5. SMART CHARGING & BATTERY MODULE ----------------
+          Card(
           elevation: 0,
           color: const Color(0xFF0D1219),
           shape: RoundedRectangleBorder(
@@ -1548,6 +1588,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             ),
           ),
         ),
+        ],
         const SizedBox(height: 24),
       ],
     );
@@ -1691,6 +1732,243 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
         ),
         Text(val, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
       ],
+    );
+  }
+
+  Widget _buildModeSwitcher() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D1219),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF1F2937)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => _toggleUiMode(false),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: !_isAdvancedView ? const Color(0xFF00D2AA).withValues(alpha: 0.15) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: !_isAdvancedView ? const Color(0xFF00D2AA).withValues(alpha: 0.5) : Colors.transparent,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.dashboard_outlined,
+                      size: 15,
+                      color: !_isAdvancedView ? const Color(0xFF00D2AA) : Colors.white54,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Basic Glance',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: !_isAdvancedView ? FontWeight.bold : FontWeight.normal,
+                        color: !_isAdvancedView ? const Color(0xFF00D2AA) : Colors.white54,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => _toggleUiMode(true),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: _isAdvancedView ? const Color(0xFF2F81F7).withValues(alpha: 0.15) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _isAdvancedView ? const Color(0xFF2F81F7).withValues(alpha: 0.5) : Colors.transparent,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.tune,
+                      size: 15,
+                      color: _isAdvancedView ? const Color(0xFF2F81F7) : Colors.white54,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Advanced Telemetry',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: _isAdvancedView ? FontWeight.bold : FontWeight.normal,
+                        color: _isAdvancedView ? const Color(0xFF2F81F7) : Colors.white54,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBasicStatusSummaryCard() {
+    return Card(
+      elevation: 0,
+      color: const Color(0xFF0D1219),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: const BorderSide(color: Color(0xFF1F2937)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.verified_outlined, size: 18, color: Color(0xFF00D2AA)),
+                    SizedBox(width: 8),
+                    Text('Vehicle Quick Status', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00D2AA).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Text('ALL OPTIMAL', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF00D2AA))),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            // Row 1: TPMS
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => _showTyreModal('Tyres', 'Tire Pressure (TPMS)', _telemetry.tyreFlPressureKpa, _telemetry.tyreFlTempC),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF131922),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF232D3D)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.speed, size: 18, color: Color(0xFF00D2AA)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text('Direct TPMS Tire Pressures', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          Text('All 4 tyres optimal at ~230 kPa (Cold)', style: TextStyle(fontSize: 10.5, color: Colors.white54)),
+                        ],
+                      ),
+                    ),
+                    const Text('230 kPa', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF00D2AA))),
+                    const Icon(Icons.chevron_right, size: 16, color: Colors.white38),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Row 2: Traction Battery
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: _showChargingPortModal,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF131922),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF232D3D)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.battery_charging_full, size: 18, color: Color(0xFF00D2AA)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('19.27 kWh LFP Traction Battery', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          Text('${_telemetry.batteryPct}% SoC • ${_telemetry.electricRangeKm} km EV Range • AC Type 2', style: const TextStyle(fontSize: 10.5, color: Colors.white54)),
+                        ],
+                      ),
+                    ),
+                    Text(_telemetry.isCharging ? 'Charging' : 'Ready', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _telemetry.isCharging ? const Color(0xFF00D2AA) : Colors.white70)),
+                    const Icon(Icons.chevron_right, size: 16, color: Colors.white38),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Row 3: 1,000 km Service Due
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const CheryServiceCentresScreen()),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF131922),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF232D3D)),
+                ),
+                child: Row(
+                  children: const [
+                    Icon(Icons.build_outlined, size: 18, color: Color(0xFFFF9F1C)),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('First Service Milestone: 1,000 km', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          Text('Labour & Inspection FOC • Chery Authorised 3S/4S', style: TextStyle(fontSize: 10.5, color: Colors.white54)),
+                        ],
+                      ),
+                    ),
+                    Text('FOC', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFFF9F1C))),
+                    Icon(Icons.chevron_right, size: 16, color: Colors.white38),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            // Switch to Advanced Mode Button
+            SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                onPressed: () => _toggleUiMode(true),
+                icon: const Icon(Icons.tune, size: 15, color: Color(0xFF2F81F7)),
+                label: const Text(
+                  'Show Advanced Telemetry, Graphs & Sensor Diagnostics ➔',
+                  style: TextStyle(fontSize: 11.5, color: Color(0xFF2F81F7), fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

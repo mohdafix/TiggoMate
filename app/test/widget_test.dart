@@ -139,18 +139,18 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Tiggo Grey Wolf'), findsOneWidget);
-    expect(find.text('SESSION COST'), findsOneWidget);
-    expect(find.text('TIME REMAINING'), findsOneWidget);
+    expect(find.text('Basic Glance'), findsOneWidget);
+    expect(find.text('Advanced Telemetry'), findsOneWidget);
+    expect(find.text('Vehicle Quick Status'), findsOneWidget);
+    expect(find.text('Direct TPMS Tire Pressures'), findsOneWidget);
     expect(find.text('EV RANGE'), findsOneWidget);
-    expect(find.text('Scheduled Charging'), findsOneWidget);
-    expect(find.text('Monthly Spending Breakdown'), findsOneWidget);
 
     // Verify CarLinko Dual-Energy glance banner
     expect(find.text('78% EV'), findsOneWidget);
     expect(find.text('82% Fuel'), findsOneWidget);
     expect(find.text('TOTAL RANGE'), findsOneWidget);
 
-    // Verify CarLinko 5-button circular remote deck
+    // Verify CarLinko circular remote deck
     expect(find.text('Doors'), findsOneWidget);
     expect(find.text('Climate'), findsOneWidget);
     expect(find.text('Windows'), findsOneWidget);
@@ -167,7 +167,16 @@ void main() {
     await tester.pump();
     expect(find.text('22°C ON'), findsOneWidget);
 
-    // Tap the 'Tyres' quick action button
+    // Test switching to Advanced Telemetry mode
+    await tester.tap(find.text('Advanced Telemetry'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('SESSION COST'), findsOneWidget);
+    expect(find.text('Scheduled Charging'), findsOneWidget);
+    expect(find.text('Monthly Spending Breakdown'), findsOneWidget);
+
+    // Tap the 'Tyres' quick action button in Advanced mode
     await tester.tap(find.text('Tyres'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
