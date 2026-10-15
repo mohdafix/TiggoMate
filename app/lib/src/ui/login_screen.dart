@@ -90,8 +90,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF131922) : Colors.white;
+    final inputBg = isDark ? const Color(0xFF090D12) : const Color(0xFFF3F4F6);
+    final border = isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB);
+    final textPrimary = isDark ? Colors.white : const Color(0xFF111827);
+    final textSec = isDark ? Colors.white60 : const Color(0xFF6B7280);
+
     return Scaffold(
-      backgroundColor: const Color(0xFF090D12),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -109,11 +116,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       height: 80,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: const Color(0xFF131922),
+                        color: cardBg,
                         border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: 0.4), width: 2),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF00D2AA).withValues(alpha: 0.15),
+                            color: const Color(0xFF00D2AA).withValues(alpha: isDark ? 0.15 : 0.2),
                             blurRadius: 24,
                             spreadRadius: 4,
                           ),
@@ -125,30 +132,39 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
+                  Text(
                     'TiggoMate',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.5,
-                      color: Colors.white,
+                      color: textPrimary,
                     ),
                   ),
                   const SizedBox(height: 6),
-                  const Text(
+                  Text(
                     'Chery Tiggo 7 PHEV CSH • Smart Cloud Telemetry',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12.5, color: Colors.white60),
+                    style: TextStyle(fontSize: 12.5, color: textSec),
                   ),
                   const SizedBox(height: 28),
 
                   // Auth Card Container
                   Container(
                     decoration: BoxDecoration(
-                      color: const Color(0xFF131922),
+                      color: cardBg,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFF232D3D)),
+                      border: Border.all(color: border),
+                      boxShadow: isDark
+                          ? null
+                          : [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.05),
+                                blurRadius: 16,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                     ),
                     padding: const EdgeInsets.all(22),
                     child: Column(
@@ -158,9 +174,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         Container(
                           padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF090D12),
+                            color: inputBg,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFF232D3D)),
+                            border: Border.all(color: border),
                           ),
                           child: Row(
                             children: [
@@ -183,7 +199,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       style: TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.bold,
-                                        color: !_isSignUp ? const Color(0xFF00D2AA) : Colors.white60,
+                                        color: !_isSignUp ? const Color(0xFF00D2AA) : textSec,
                                       ),
                                     ),
                                   ),
@@ -209,7 +225,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       style: TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.bold,
-                                        color: _isSignUp ? const Color(0xFF00D2AA) : Colors.white60,
+                                        color: _isSignUp ? const Color(0xFF00D2AA) : textSec,
                                       ),
                                     ),
                                   ),
@@ -253,9 +269,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               labelText: 'Driver Name',
                               prefixIcon: const Icon(Icons.person_outline, size: 20, color: Color(0xFF00D2AA)),
                               filled: true,
-                              fillColor: const Color(0xFF090D12),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF232D3D))),
-                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF232D3D))),
+                              fillColor: inputBg,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
                               focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF00D2AA))),
                             ),
                           ),
@@ -267,9 +283,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               labelText: 'Car Plate Number',
                               prefixIcon: const Icon(Icons.directions_car_outlined, size: 20, color: Color(0xFF00D2AA)),
                               filled: true,
-                              fillColor: const Color(0xFF090D12),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF232D3D))),
-                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF232D3D))),
+                              fillColor: inputBg,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
                               focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF00D2AA))),
                             ),
                           ),
@@ -285,9 +301,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             hintText: 'e.g. driver@tiggomate.my',
                             prefixIcon: const Icon(Icons.email_outlined, size: 20, color: Color(0xFF00D2AA)),
                             filled: true,
-                            fillColor: const Color(0xFF090D12),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF232D3D))),
-                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF232D3D))),
+                            fillColor: inputBg,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
                             focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF00D2AA))),
                           ),
                         ),
@@ -301,13 +317,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             labelText: 'Password',
                             prefixIcon: const Icon(Icons.lock_outline, size: 20, color: Color(0xFF00D2AA)),
                             suffixIcon: IconButton(
-                              icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, size: 18, color: Colors.white54),
+                              icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, size: 18, color: textSec),
                               onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                             ),
                             filled: true,
-                            fillColor: const Color(0xFF090D12),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF232D3D))),
-                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF232D3D))),
+                            fillColor: inputBg,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
                             focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF00D2AA))),
                           ),
                         ),
@@ -335,10 +351,17 @@ class _LoginScreenState extends State<LoginScreen> {
                         // Google Sign-In Button
                         OutlinedButton.icon(
                           onPressed: _loading ? null : _handleGoogleSignIn,
-                          icon: const Icon(Icons.g_mobiledata, size: 24, color: Colors.white),
-                          label: const Text('Continue with Google', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                          icon: Icon(Icons.g_mobiledata, size: 24, color: isDark ? Colors.white : const Color(0xFF2563EB)),
+                          label: Text(
+                            'Continue with Google',
+                            style: TextStyle(
+                              color: isDark ? Colors.white : const Color(0xFF1E40AF),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Color(0xFF232D3D)),
+                            side: BorderSide(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFCBD5E1)),
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
@@ -351,17 +374,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Continue as Guest Option
                   TextButton.icon(
                     onPressed: _loading ? null : _handleGuestMode,
-                    icon: const Icon(Icons.arrow_forward, size: 16, color: Colors.white60),
-                    label: const Text(
+                    icon: Icon(Icons.arrow_forward, size: 16, color: textSec),
+                    label: Text(
                       'Continue as Guest Driver (Offline Mode)',
-                      style: TextStyle(color: Colors.white70, fontSize: 13),
+                      style: TextStyle(color: textSec, fontSize: 13),
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Firebase Firestore Database (Singapore • asia-southeast1)\nSyncs PHEV telemetry, trips, smart charging & service schedule across devices.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 10.5, color: Colors.white38, height: 1.4),
+                    style: TextStyle(fontSize: 10.5, color: isDark ? Colors.white38 : const Color(0xFF9CA3AF), height: 1.4),
                   ),
                 ],
               ),

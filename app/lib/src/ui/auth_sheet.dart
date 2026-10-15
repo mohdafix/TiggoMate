@@ -109,12 +109,17 @@ class _AuthSheetState extends State<AuthSheet> {
   @override
   Widget build(BuildContext context) {
     final user = _authService.currentUser;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF0D1219) : Colors.white;
+    final tileBg = isDark ? const Color(0xFF131922) : const Color(0xFFF3F4F6);
+    final border = isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB);
+    final textSec = isDark ? Colors.white54 : const Color(0xFF6B7280);
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF0D1219),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        border: Border(top: BorderSide(color: Color(0xFF1F2937), width: 1.5)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        border: Border(top: BorderSide(color: border, width: 1.5)),
       ),
       padding: EdgeInsets.fromLTRB(
         24,
@@ -133,7 +138,7 @@ class _AuthSheetState extends State<AuthSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white24,
+                  color: isDark ? Colors.white24 : Colors.black26,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -157,15 +162,15 @@ class _AuthSheetState extends State<AuthSheet> {
                     const SizedBox(width: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text('TiggoMate Cloud Sync', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-                        Text('Firebase Authentication & Storage', style: TextStyle(fontSize: 11, color: Colors.white54)),
+                      children: [
+                        const Text('TiggoMate Cloud Sync', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                        Text('Firebase Authentication & Storage', style: TextStyle(fontSize: 11, color: textSec)),
                       ],
                     ),
                   ],
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white54, size: 20),
+                  icon: Icon(Icons.close, color: textSec, size: 20),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -177,9 +182,9 @@ class _AuthSheetState extends State<AuthSheet> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF131922),
+                  color: tileBg,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFF232D3D)),
+                  border: Border.all(color: border),
                 ),
                 child: Column(
                   children: [
@@ -199,7 +204,7 @@ class _AuthSheetState extends State<AuthSheet> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(user.displayName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                              Text(user.email, style: const TextStyle(fontSize: 12, color: Colors.white60)),
+                              Text(user.email, style: TextStyle(fontSize: 12, color: textSec)),
                               const SizedBox(height: 4),
                               Row(
                                 children: [
@@ -216,7 +221,7 @@ class _AuthSheetState extends State<AuthSheet> {
                         ),
                       ],
                     ),
-                    const Divider(height: 24, color: Color(0xFF232D3D)),
+                    Divider(height: 24, color: border),
                     Row(
                       children: [
                         Expanded(
@@ -224,8 +229,8 @@ class _AuthSheetState extends State<AuthSheet> {
                             icon: const Icon(Icons.logout, size: 16),
                             label: const Text('Switch Account'),
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.white70,
-                              side: const BorderSide(color: Color(0xFF232D3D)),
+                              foregroundColor: isDark ? Colors.white70 : const Color(0xFF374151),
+                              side: BorderSide(color: border),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                             onPressed: () async {
@@ -247,15 +252,19 @@ class _AuthSheetState extends State<AuthSheet> {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: _loading ? null : _handleGoogleSignIn,
-                  icon: const Icon(Icons.g_mobiledata, size: 26, color: Colors.white),
-                  label: const Text(
+                  icon: Icon(Icons.g_mobiledata, size: 26, color: isDark ? Colors.white : const Color(0xFF2563EB)),
+                  label: Text(
                     'Continue with Google',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF1E40AF),
+                    ),
                   ),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 13),
                     side: const BorderSide(color: Color(0xFF2F81F7), width: 1.2),
-                    backgroundColor: const Color(0xFF2F81F7).withValues(alpha: 0.12),
+                    backgroundColor: const Color(0xFF2F81F7).withValues(alpha: isDark ? 0.12 : 0.08),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                 ),
@@ -263,13 +272,13 @@ class _AuthSheetState extends State<AuthSheet> {
               const SizedBox(height: 14),
 
               Row(
-                children: const [
-                  Expanded(child: Divider(color: Color(0xFF232D3D))),
+                children: [
+                  Expanded(child: Divider(color: border)),
                   Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 12),
-                    child: Text('OR EMAIL', style: TextStyle(fontSize: 10, color: Colors.white38, fontWeight: FontWeight.bold)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text('OR EMAIL', style: TextStyle(fontSize: 10, color: textSec, fontWeight: FontWeight.bold)),
                   ),
-                  Expanded(child: Divider(color: Color(0xFF232D3D))),
+                  Expanded(child: Divider(color: border)),
                 ],
               ),
               const SizedBox(height: 14),
@@ -362,7 +371,7 @@ class _AuthSheetState extends State<AuthSheet> {
                   }),
                   child: Text(
                     _isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Register",
-                    style: const TextStyle(fontSize: 12.5, color: Colors.white70),
+                    style: TextStyle(fontSize: 12.5, color: textSec),
                   ),
                 ),
               ),

@@ -14,6 +14,7 @@ import 'src/ui/trips_logbook_screen.dart';
 import 'src/auth/auth_service.dart';
 import 'src/ui/login_screen.dart';
 import 'src/ui/auth_sheet.dart';
+import 'src/theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,6 +25,7 @@ void main() async {
   } catch (e) {
     debugPrint('Firebase.initializeApp warning (offline fallback active): $e');
   }
+  await AppThemeController.instance.init();
   runApp(const TiggoMateApp());
 }
 
@@ -32,29 +34,18 @@ class TiggoMateApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'TiggoMate',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF090D12),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF00D2AA),
-          secondary: Color(0xFF2F81F7),
-          surface: Color(0xFF131922),
-          error: Color(0xFFF85149),
-        ),
-        cardTheme: CardThemeData(
-          color: const Color(0xFF131922),
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: Color(0xFF232D3D)),
-          ),
-        ),
-      ),
-      home: const AppRootGate(),
+    return ListenableBuilder(
+      listenable: AppThemeController.instance,
+      builder: (context, _) {
+        return MaterialApp(
+          title: 'TiggoMate',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: AppThemeController.instance.themeMode,
+          home: const AppRootGate(),
+        );
+      },
     );
   }
 }
@@ -98,10 +89,10 @@ class _AppRootGateState extends State<AppRootGate> {
   @override
   Widget build(BuildContext context) {
     if (!_initialized) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF090D12),
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Center(
-          child: CircularProgressIndicator(color: Color(0xFF00D2AA)),
+          child: CircularProgressIndicator(color: Theme.of(context).colorScheme.secondary),
         ),
       );
     }
@@ -413,6 +404,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           _buildFirebaseAccountCard(),
+          _buildThemeAppearanceCard(),
 
           // Section 1: Vehicle & Owner Profile
           _buildSectionHeader('VEHICLE & OWNER PROFILE', Icons.directions_car_outlined),
@@ -831,13 +823,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'FIREBASE CLOUD ACCOUNT',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white54, letterSpacing: 0.5),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white54 : const Color(0xFF6B7280),
+                            letterSpacing: 0.5,
+                          ),
                         ),
                         Text(
                           isAuth ? user.displayName : 'Guest Driver',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
@@ -865,16 +862,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFF090D12),
+                color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF090D12) : const Color(0xFFF3F4F6),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF232D3D)),
+                border: Border.all(
+                  color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB),
+                ),
               ),
               child: Row(
                 children: [
                   Icon(
                     isAuth ? Icons.check_circle_outline : Icons.info_outline,
                     size: 16,
-                    color: isAuth ? const Color(0xFF00D2AA) : Colors.white38,
+                    color: isAuth ? const Color(0xFF00D2AA) : (Theme.of(context).brightness == Brightness.dark ? Colors.white38 : const Color(0xFF9CA3AF)),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -882,7 +881,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       isAuth
                           ? '${user.email} • Firestore Singapore (asia-southeast1)'
                           : 'Browsing as Guest. Log in to sync vehicle settings, trips, and smart charging across devices.',
-                      style: const TextStyle(fontSize: 11.5, color: Colors.white70),
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : const Color(0xFF4B5563),
+                      ),
                     ),
                   ),
                 ],
@@ -935,6 +937,97 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildThemeAppearanceCard() {
+    final themeCtrl = AppThemeController.instance;
+    final currentMode = themeCtrl.themeMode;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader('APPEARANCE & THEME (TESLA / OBSIDIAN)', Icons.palette_outlined),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: (isDark ? const Color(0xFF00D2AA) : const Color(0xFF111827)).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+                        color: isDark ? const Color(0xFF00D2AA) : const Color(0xFF111827),
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            currentMode == ThemeMode.light
+                                ? 'Tesla Light Theme'
+                                : (currentMode == ThemeMode.dark ? 'Obsidian Dark Theme' : 'System Auto Schedule'),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            currentMode == ThemeMode.light
+                                ? 'Minimalist white studio aesthetic with crisp daylight contrast'
+                                : (currentMode == ThemeMode.dark
+                                    ? 'High-contrast dark cockpit with neon teal & amber telemetry'
+                                    : 'Automatically mirrors your Android system appearance'),
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: isDark ? Colors.white60 : const Color(0xFF6B7280),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SegmentedButton<ThemeMode>(
+                  segments: const [
+                    ButtonSegment<ThemeMode>(
+                      value: ThemeMode.light,
+                      label: Text('Tesla Light'),
+                      icon: Icon(Icons.wb_sunny_outlined, size: 16),
+                    ),
+                    ButtonSegment<ThemeMode>(
+                      value: ThemeMode.dark,
+                      label: Text('Obsidian Dark'),
+                      icon: Icon(Icons.nightlight_round_outlined, size: 16),
+                    ),
+                    ButtonSegment<ThemeMode>(
+                      value: ThemeMode.system,
+                      label: Text('Auto'),
+                      icon: Icon(Icons.brightness_auto_outlined, size: 16),
+                    ),
+                  ],
+                  selected: {currentMode},
+                  onSelectionChanged: (Set<ThemeMode> newSelection) {
+                    setState(() {
+                      themeCtrl.setThemeMode(newSelection.first);
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1042,27 +1135,37 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (idx) => setState(() => _currentIndex = idx),
-        backgroundColor: const Color(0xFF0D1117),
-        indicatorColor: const Color(0xFF00D2AA).withValues(alpha: 0.2),
-        destinations: const [
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.directions_car_outlined),
-            selectedIcon: Icon(Icons.directions_car, color: Color(0xFF00D2AA)),
+            icon: const Icon(Icons.directions_car_outlined),
+            selectedIcon: Icon(
+              Icons.directions_car,
+              color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF00D2AA) : const Color(0xFF111827),
+            ),
             label: 'Vehicle',
           ),
           NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
-            selectedIcon: Icon(Icons.chat_bubble, color: Color(0xFF00D2AA)),
+            icon: const Icon(Icons.chat_bubble_outline),
+            selectedIcon: Icon(
+              Icons.chat_bubble,
+              color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF00D2AA) : const Color(0xFF111827),
+            ),
             label: 'Assistant',
           ),
           NavigationDestination(
-            icon: Icon(Icons.route_outlined),
-            selectedIcon: Icon(Icons.route, color: Color(0xFF00D2AA)),
+            icon: const Icon(Icons.route_outlined),
+            selectedIcon: Icon(
+              Icons.route,
+              color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF00D2AA) : const Color(0xFF111827),
+            ),
             label: 'Trips & Log',
           ),
           NavigationDestination(
-            icon: Icon(Icons.build_outlined),
-            selectedIcon: Icon(Icons.build, color: Color(0xFF00D2AA)),
+            icon: const Icon(Icons.build_outlined),
+            selectedIcon: Icon(
+              Icons.build,
+              color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF00D2AA) : const Color(0xFF111827),
+            ),
             label: 'Service',
           ),
         ],
