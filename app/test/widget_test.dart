@@ -20,7 +20,36 @@ void main() {
       'tm_carlinko_status': 'Connected (Demo Telematics)',
       'tm_tnb_tariff': 0.57,
       'tm_fuel_price': 2.05,
+      'tiggomate_has_chosen_auth': true,
+      'tiggomate_auth_uid': 'test_user_1',
+      'tiggomate_auth_is_guest': false,
+      'tiggomate_auth_name': 'Ahmad Razak',
+      'tiggomate_auth_plate': 'VAG 7777',
+      'tiggomate_auth_nickname': 'Tiggo Grey Wolf',
     });
+  });
+
+  testWidgets('LoginScreen renders on first launch when not authenticated and allows guest entry', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'tiggomate_has_chosen_auth': false,
+    });
+
+    await tester.pumpWidget(const TiggoMateApp());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('TiggoMate'), findsWidgets);
+    expect(find.text('Sign In with Firebase'), findsOneWidget);
+    expect(find.text('Continue with Google'), findsOneWidget);
+    expect(find.text('Continue as Guest Driver (Offline Mode)'), findsOneWidget);
+
+    // Ensure visible and tap Continue as Guest
+    await tester.ensureVisible(find.text('Continue as Guest Driver (Offline Mode)'));
+    await tester.tap(find.text('Continue as Guest Driver (Offline Mode)'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.textContaining('Chery Tiggo 7 PHEV CSH'), findsWidgets);
   });
 
   testWidgets('TiggoMate smoke test', (WidgetTester tester) async {

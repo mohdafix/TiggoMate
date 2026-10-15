@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// User profile representing an authenticated TiggoMate user.
 class UserProfile {
@@ -107,8 +108,19 @@ class AuthService {
   static const String _prefKeyPlate = 'tiggomate_auth_plate';
   static const String _prefKeyNickname = 'tiggomate_auth_nickname';
   static const String _prefKeyIsGuest = 'tiggomate_auth_is_guest';
+  static const String _prefKeyHasChosenAuth = 'tiggomate_has_chosen_auth';
 
-  /// Initialize and restore user from local storage or Firebase
+  Future<bool> hasChosenAuth() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_prefKeyHasChosenAuth) ?? false;
+  }
+
+  Future<void> setHasChosenAuth(bool val) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_prefKeyHasChosenAuth, val);
+  }
+
+  /// Initialize and restore user from local storage or Firebase Firestore
   Future<UserProfile> initialize({String defaultName = 'AFiX', String defaultPlate = 'VRT 3342'}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -117,6 +129,15 @@ class AuthService {
       try {
         final fbUser = fb.FirebaseAuth.instance.currentUser;
         if (fbUser != null) {
+          // Attempt to pull latest cloud profile from Firestore
+          final cloudProfile = await _fetchFromFirestore(fbUser.uid);
+          if (cloudProfile != null) {
+            _currentUser = cloudProfile;
+            await _persistSession();
+            _authController.add(_currentUser);
+            return _currentUser;
+          }
+
           _currentUser = UserProfile(
             uid: fbUser.uid,
             email: fbUser.email ?? prefs.getString(_prefKeyEmail) ?? 'driver@tiggomate.my',
@@ -329,6 +350,7 @@ class AuthService {
     await prefs.remove(_prefKeyPlate);
     await prefs.remove(_prefKeyNickname);
     await prefs.remove(_prefKeyIsGuest);
+    await prefs.setBool(_prefKeyHasChosenAuth, false);
 
     _currentUser = UserProfile.defaultGuest();
     _authController.add(_currentUser);
@@ -359,5 +381,51 @@ class AuthService {
     await prefs.setString(_prefKeyPlate, _currentUser.carPlate);
     await prefs.setString(_prefKeyNickname, _currentUser.vehicleNickname);
     await prefs.setBool(_prefKeyIsGuest, _currentUser.isGuest);
+    await prefs.setBool(_prefKeyHasChosenAuth, true);
+
+    // Sync to Firestore Cloud Database
+    await _syncToFirestore(_currentUser);
+  }
+
+  Future<void> _syncToFirestore(UserProfile profile) async {
+    if (profile.isGuest || profile.uid.isEmpty) return;
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(profile.uid).set({
+        'uid': profile.uid,
+        'email': profile.email,
+        'displayName': profile.displayName,
+        'carPlate': profile.carPlate,
+        'vehicleNickname': profile.vehicleNickname,
+        'photoUrl': profile.photoUrl,
+        'lastSyncedAt': FieldValue.serverTimestamp(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      }, SetOptions(merge: true));
+      debugPrint('Synced profile to Firestore: ${profile.displayName}');
+    } catch (e) {
+      debugPrint('Firestore sync warning: $e');
+    }
+  }
+
+  Future<UserProfile?> _fetchFromFirestore(String uid) async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        return UserProfile(
+          uid: uid,
+          email: data['email'] as String? ?? '',
+          displayName: data['displayName'] as String? ?? 'Driver',
+          carPlate: data['carPlate'] as String? ?? 'VRT 3342',
+          vehicleNickname: data['vehicleNickname'] as String? ?? 'Chery Tiggo 7 PHEV CSH',
+          photoUrl: data['photoUrl'] as String?,
+          isGuest: false,
+          lastSyncedAt: DateTime.now(),
+        );
+      }
+    } catch (e) {
+      debugPrint('Firestore fetch warning: $e');
+    }
+    return null;
   }
 }
+

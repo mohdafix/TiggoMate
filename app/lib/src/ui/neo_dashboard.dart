@@ -3,6 +3,7 @@ import 'package:model_viewer_plus/model_viewer_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../carlinko/vehicle_repository.dart';
 import '../carlinko/vehicle_telemetry.dart';
+import '../auth/auth_service.dart';
 import 'auth_sheet.dart';
 import 'carlinko_connect_dialog.dart';
 import 'chery_service_centres_screen.dart';
@@ -594,11 +595,51 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             ),
             Row(
               children: [
-                IconButton(
-                  tooltip: 'Firebase Account & Cloud Sync',
-                  icon: const Icon(Icons.account_circle_outlined, color: Color(0xFF00D2AA)),
-                  onPressed: _openAuthSheet,
+                GestureDetector(
+                  onTap: _openAuthSheet,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AuthService().currentUser.isAuthenticated
+                          ? const Color(0xFF00D2AA).withValues(alpha: 0.15)
+                          : const Color(0xFF2F81F7).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: AuthService().currentUser.isAuthenticated
+                            ? const Color(0xFF00D2AA)
+                            : const Color(0xFF2F81F7),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          AuthService().currentUser.isAuthenticated
+                              ? Icons.account_circle
+                              : Icons.login_rounded,
+                          size: 16,
+                          color: AuthService().currentUser.isAuthenticated
+                              ? const Color(0xFF00D2AA)
+                              : const Color(0xFF2F81F7),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          AuthService().currentUser.isAuthenticated
+                              ? AuthService().currentUser.displayName
+                              : 'Log In',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: AuthService().currentUser.isAuthenticated
+                                ? const Color(0xFF00D2AA)
+                                : const Color(0xFF2F81F7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
+                const SizedBox(width: 4),
                 IconButton(
                   tooltip: 'Chery Service Centres',
                   icon: const Icon(Icons.location_on_outlined, color: Colors.white70),

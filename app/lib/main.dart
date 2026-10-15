@@ -11,6 +11,9 @@ import 'src/ui/mytnb_connect_dialog.dart';
 import 'src/ui/neo_dashboard.dart';
 import 'src/ui/chery_service_centres_screen.dart';
 import 'src/ui/trips_logbook_screen.dart';
+import 'src/auth/auth_service.dart';
+import 'src/ui/login_screen.dart';
+import 'src/ui/auth_sheet.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,8 +54,69 @@ class TiggoMateApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const MainNavigationScreen(),
+      home: const AppRootGate(),
     );
+  }
+}
+
+class AppRootGate extends StatefulWidget {
+  const AppRootGate({super.key});
+
+  @override
+  State<AppRootGate> createState() => _AppRootGateState();
+}
+
+class _AppRootGateState extends State<AppRootGate> {
+  final _authService = AuthService();
+  bool _initialized = false;
+  bool _hasChosenAuth = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initGate();
+    _authService.authStateChanges.listen((user) {
+      if (mounted) {
+        setState(() {
+          _hasChosenAuth = user.isAuthenticated || !user.isGuest;
+        });
+      }
+    });
+  }
+
+  Future<void> _initGate() async {
+    await _authService.initialize();
+    final chosen = await _authService.hasChosenAuth();
+    if (mounted) {
+      setState(() {
+        _hasChosenAuth = chosen;
+        _initialized = true;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_initialized) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF090D12),
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFF00D2AA)),
+        ),
+      );
+    }
+
+    if (!_hasChosenAuth) {
+      return LoginScreen(
+        onAuthenticated: () {
+          setState(() {
+            _hasChosenAuth = true;
+          });
+        },
+      );
+    }
+
+    return const MainNavigationScreen();
   }
 }
 
@@ -348,6 +412,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          _buildFirebaseAccountCard(),
+
           // Section 1: Vehicle & Owner Profile
           _buildSectionHeader('VEHICLE & OWNER PROFILE', Icons.directions_car_outlined),
           Card(
@@ -733,6 +799,141 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFirebaseAccountCard() {
+    final user = AuthService().currentUser;
+    final isAuth = user.isAuthenticated;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 20),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00D2AA).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.cloud_done_outlined, size: 20, color: Color(0xFF00D2AA)),
+                    ),
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'FIREBASE CLOUD ACCOUNT',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white54, letterSpacing: 0.5),
+                        ),
+                        Text(
+                          isAuth ? user.displayName : 'Guest Driver',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: (isAuth ? const Color(0xFF00D2AA) : Colors.orangeAccent).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: isAuth ? const Color(0xFF00D2AA) : Colors.orangeAccent),
+                  ),
+                  child: Text(
+                    isAuth ? 'SYNCED' : 'OFFLINE',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: isAuth ? const Color(0xFF00D2AA) : Colors.orangeAccent,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF090D12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF232D3D)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    isAuth ? Icons.check_circle_outline : Icons.info_outline,
+                    size: 16,
+                    color: isAuth ? const Color(0xFF00D2AA) : Colors.white38,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      isAuth
+                          ? '${user.email} • Firestore Singapore (asia-southeast1)'
+                          : 'Browsing as Guest. Log in to sync vehicle settings, trips, and smart charging across devices.',
+                      style: const TextStyle(fontSize: 11.5, color: Colors.white70),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: isAuth
+                      ? OutlinedButton.icon(
+                          onPressed: () async {
+                            await AuthService().signOut();
+                            if (mounted) {
+                              Navigator.of(context).pop();
+                            }
+                          },
+                          icon: const Icon(Icons.logout, size: 16, color: Color(0xFFF85149)),
+                          label: const Text('Sign Out / Switch Driver', style: TextStyle(color: Color(0xFFF85149), fontSize: 12)),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFFF85149)),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        )
+                      : ElevatedButton.icon(
+                          onPressed: () {
+                            AuthSheet.show(
+                              context,
+                              onProfileUpdated: () {
+                                setState(() {
+                                  final u = AuthService().currentUser;
+                                  _ownerController.text = u.displayName;
+                                  _plateController.text = u.carPlate;
+                                });
+                              },
+                            );
+                          },
+                          icon: const Icon(Icons.login, size: 16, color: Colors.black),
+                          label: const Text('Sign In or Register with Firebase', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF00D2AA),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
