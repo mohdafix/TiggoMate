@@ -562,7 +562,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(message),
+          content: Text(message, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
           backgroundColor: const Color(0xFF00D2AA),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),

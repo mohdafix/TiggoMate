@@ -162,6 +162,20 @@ class AppTheme {
         color: border,
         thickness: 1,
       ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: cardBg,
+        contentTextStyle: const TextStyle(
+          color: textPrimary,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: border),
+        ),
+        elevation: 3,
+      ),
     );
   }
 
@@ -262,6 +276,20 @@ class AppTheme {
       dividerTheme: const DividerThemeData(
         color: border,
         thickness: 1,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: cardBg,
+        contentTextStyle: const TextStyle(
+          color: textPrimary,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: border),
+        ),
+        elevation: 4,
       ),
     );
   }

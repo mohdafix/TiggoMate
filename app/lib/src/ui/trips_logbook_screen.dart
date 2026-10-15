@@ -525,7 +525,7 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
           ScaffoldMessenger.of(context).hideCurrentSnackBar();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Added Trip: ${newTrip.title} (${newTrip.distanceKm} km)'),
+              content: Text('Added Trip: ${newTrip.title} (${newTrip.distanceKm} km)', style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
               backgroundColor: const Color(0xFF00D2AA),
               behavior: SnackBarBehavior.floating,
             ),
@@ -555,7 +555,7 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
           ScaffoldMessenger.of(context).hideCurrentSnackBar();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Logged ${rec.title} (RM ${rec.amountRm.toStringAsFixed(2)})'),
+              content: Text('Logged ${rec.title} (RM ${rec.amountRm.toStringAsFixed(2)})', style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
               backgroundColor: const Color(0xFF00D2AA),
               behavior: SnackBarBehavior.floating,
             ),

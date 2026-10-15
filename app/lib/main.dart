@@ -299,7 +299,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Navigator.of(context).pop(updated);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Settings saved successfully!'),
+        content: Text('Settings saved successfully!', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
         backgroundColor: Color(0xFF00D2AA),
         behavior: SnackBarBehavior.floating,
       ),
@@ -328,7 +328,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (key.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter an AI API Key first.'),
+          content: Text('Please enter an AI API Key first.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           backgroundColor: Color(0xFFF85149),
           behavior: SnackBarBehavior.floating,
         ),
@@ -350,7 +350,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (res.ok) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('✅ ${res.message} (${res.latencyMs}ms)'),
+          content: Text('✅ ${res.message} (${res.latencyMs}ms)', style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
           backgroundColor: const Color(0xFF00D2AA),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 4),

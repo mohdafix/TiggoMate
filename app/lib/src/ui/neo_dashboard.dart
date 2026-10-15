@@ -459,51 +459,47 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     );
   }
 
+  void _showNotification(String message) {
+    final colors = AppColors(context);
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: colors.textPrimary,
+          ),
+        ),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: colors.cardBg,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: colors.border),
+        ),
+        elevation: colors.isDark ? 4 : 2,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   void _handleRemoteCommand(String action) {
     if (action == 'lock') {
       setState(() => _isDoorsLocked = !_isDoorsLocked);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_isDoorsLocked ? '🔒 CarLinko: Doors Locked' : '🔓 CarLinko: Doors Unlocked'),
-          backgroundColor: const Color(0xFF131922),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      _showNotification(_isDoorsLocked ? '🔒 CarLinko: Doors Locked' : '🔓 CarLinko: Doors Unlocked');
     } else if (action == 'climate') {
       setState(() => _isAcActive = !_isAcActive);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_isAcActive ? '❄️ Cabin Pre-cooling started (22°C)' : '❄️ Climate Pre-conditioning OFF'),
-          backgroundColor: const Color(0xFF131922),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      _showNotification(_isAcActive ? '❄️ Cabin Pre-cooling started (22°C)' : '❄️ Climate Pre-conditioning OFF');
     } else if (action == 'windows') {
       setState(() => _isWindowsVented = !_isWindowsVented);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_isWindowsVented ? '🪟 Windows vented (20mm)' : '🪟 All Windows closed'),
-          backgroundColor: const Color(0xFF131922),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      _showNotification(_isWindowsVented ? '🪟 Windows vented (20mm)' : '🪟 All Windows closed');
     } else if (action == 'trunk') {
       setState(() => _isTrunkOpen = !_isTrunkOpen);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_isTrunkOpen ? '🚗 Power Tailgate opened' : '🚗 Tailgate closed'),
-          backgroundColor: const Color(0xFF131922),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      _showNotification(_isTrunkOpen ? '🚗 Power Tailgate opened' : '🚗 Tailgate closed');
     } else if (action == 'locate') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('📢 Find My Car: Lights flashing & horn sounding'),
-          backgroundColor: Color(0xFF131922),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      _showNotification('📢 Find My Car: Lights flashing & horn sounding');
     }
   }
 
@@ -732,23 +728,41 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
               );
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
               decoration: BoxDecoration(
-                color: const Color(0xFFF1B343).withValues(alpha: 0.1),
+                color: colors.isDark
+                    ? const Color(0xFFF1B343).withValues(alpha: 0.12)
+                    : const Color(0xFFFEF3C7),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFF1B343).withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: colors.isDark
+                      ? const Color(0xFFF1B343).withValues(alpha: 0.35)
+                      : const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                ),
               ),
               child: Row(
-                children: const [
-                  Icon(Icons.info_outline, size: 14, color: Color(0xFFF1B343)),
-                  SizedBox(width: 8),
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 14,
+                    color: colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFB45309),
+                  ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'SIMULATED DATA (CarLinko activates at 1,000 km service • Tap to find centres)',
-                      style: TextStyle(fontSize: 10.5, color: Color(0xFFE5B56A)),
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
+                        color: colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFB45309),
+                      ),
                     ),
                   ),
-                  Icon(Icons.chevron_right, size: 16, color: Color(0xFFE5B56A)),
+                  Icon(
+                    Icons.chevron_right,
+                    size: 16,
+                    color: colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFB45309),
+                  ),
                 ],
               ),
             ),
@@ -1403,9 +1417,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Off-Peak TNB charging timer scheduled: 10:00 PM – 06:00 AM.')),
-                            );
+                            _showNotification('⏰ Off-Peak TNB charging timer scheduled: 10:00 PM – 06:00 AM.');
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: colors.isDark ? Colors.white : const Color(0xFF111827),
