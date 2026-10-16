@@ -337,6 +337,33 @@ void main() {
     await tester.ensureVisible(expenseSection);
     expect(expenseSection, findsOneWidget);
     expect(find.text('Petronas Primax 95'), findsWidgets);
+
+    // 3. Test Trip Filter Chips
+    expect(find.textContaining('All Drives'), findsOneWidget);
+    expect(find.text('⚡ Pure EV (≥95%)'), findsOneWidget);
+    expect(find.textContaining('Hybrid / Highway'), findsOneWidget);
+
+    // Filter to Pure EV only
+    await tester.tap(find.text('⚡ Pure EV (≥95%)'));
+    await tester.pumpAndSettle();
+
+    // 4. Test Export Modal
+    await tester.tap(find.text('Export'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Export Logbook & Expenses'), findsOneWidget);
+    expect(find.text('WhatsApp / Summary'), findsOneWidget);
+    expect(find.text('CSV Spreadsheet'), findsOneWidget);
+    expect(find.text('Copy WhatsApp Message'), findsOneWidget);
+
+    // Copy action
+    await tester.tap(find.text('Copy WhatsApp Message'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Executive summary copied to clipboard!'), findsOneWidget);
+
+    // Close export modal
+    await tester.tap(find.byIcon(Icons.close));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('VehicleRadarSheet renders circular radar HUD and navigation actions', (WidgetTester tester) async {
