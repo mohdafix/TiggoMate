@@ -3,9 +3,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tiggomate_app/main.dart';
 import 'package:tiggomate_app/src/carlinko/vehicle_repository.dart';
+import 'package:tiggomate_app/src/carlinko/vehicle_telemetry.dart';
 import 'package:tiggomate_app/src/mytnb/mytnb_api.dart';
+import 'package:tiggomate_app/src/theme/app_theme.dart';
 import 'package:tiggomate_app/src/ui/neo_dashboard.dart';
 import 'package:tiggomate_app/src/ui/trips_logbook_screen.dart';
+import 'package:tiggomate_app/src/ui/vehicle_radar_sheet.dart';
 
 void main() {
   setUp(() {
@@ -333,6 +336,50 @@ void main() {
     await tester.ensureVisible(expenseSection);
     expect(expenseSection, findsOneWidget);
     expect(find.text('Petronas Primax 95'), findsWidgets);
+  });
+
+  testWidgets('VehicleRadarSheet renders circular radar HUD and navigation actions', (WidgetTester tester) async {
+    final telemetry = VehicleTelemetry(
+      lastUpdated: DateTime.now(),
+      latitude: 3.1189,
+      longitude: 101.6672,
+      headingDegrees: 38.0,
+      locationName: 'The Sphere, Bangsar South, KL',
+      isParked: true,
+      parkedDurationText: 'Parked 42m ago',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.lightTheme,
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () {
+                VehicleRadarSheet.show(
+                  context,
+                  telemetry: telemetry,
+                  onHornFlash: () {},
+                );
+              },
+              child: const Text('Open Radar'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open Radar'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('Vehicle Radar & Finder'), findsOneWidget);
+    expect(find.text('Circular Radar HUD'), findsOneWidget);
+    expect(find.text('Nearby Chargers'), findsOneWidget);
+    expect(find.text('The Sphere, Bangsar South, KL'), findsOneWidget);
+    expect(find.text('Waze Route'), findsOneWidget);
+    expect(find.text('Google Maps'), findsOneWidget);
+    expect(find.text('Horn & Flash'), findsOneWidget);
   });
 }
 

@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import 'auth_sheet.dart';
 import 'carlinko_connect_dialog.dart';
 import 'chery_service_centres_screen.dart';
+import 'vehicle_radar_sheet.dart';
 
 class NeoDashboard extends StatefulWidget {
   final VehicleRepository repository;
@@ -499,7 +500,13 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       setState(() => _isTrunkOpen = !_isTrunkOpen);
       _showNotification(_isTrunkOpen ? '🚗 Power Tailgate opened' : '🚗 Tailgate closed');
     } else if (action == 'locate') {
-      _showNotification('📢 Find My Car: Lights flashing & horn sounding');
+      VehicleRadarSheet.show(
+        context,
+        telemetry: _telemetry,
+        onHornFlash: () {
+          _showNotification('📢 CarLinko: Lights flashing & horn sounding');
+        },
+      );
     }
   }
 
@@ -1260,7 +1267,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                   onTap: () => _handleRemoteCommand('trunk'),
                 ),
                 _buildCircularRemoteButton(
-                  icon: Icons.notifications_active_outlined,
+                  icon: Icons.radar,
                   label: 'Find Car',
                   sublabel: 'Locate',
                   isActive: false,
@@ -1271,7 +1278,11 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
+
+        // ---------------- 4.5 LIVE VEHICLE LOCATION & RADAR GLANCE ----------------
+        _buildVehicleLocationRadarCard(),
+        const SizedBox(height: 14),
 
         if (!_isAdvancedView)
           _buildBasicStatusSummaryCard()
@@ -1962,6 +1973,153 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildVehicleLocationRadarCard() {
+    final colors = AppColors(context);
+    final isDark = colors.isDark;
+
+    return Card(
+      elevation: isDark ? 0 : 0.5,
+      color: colors.cardBg,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: colors.border),
+      ),
+      child: InkWell(
+        onTap: () => _handleRemoteCommand('locate'),
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              // Mini Circular Radar Badge Preview
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isDark ? const Color(0xFF1E2632) : const Color(0xFFE2E4E8),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF4B5563) : const Color(0xFF6B7280),
+                    width: 2,
+                  ),
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Faint radar concentric ring
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: colors.evTeal.withValues(alpha: 0.35),
+                          width: 1,
+                        ),
+                      ),
+                    ),
+                    // Directional Vehicle Pointer
+                    Transform.rotate(
+                      angle: _telemetry.headingDegrees * (3.141592653589793 / 180),
+                      child: const Icon(
+                        Icons.navigation,
+                        size: 18,
+                        color: Color(0xFFFFA000),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+
+              // Location Telemetry Details
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'VEHICLE LOCATION',
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                            color: colors.textMuted,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          width: 5,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: colors.evTeal,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'GPS Locked',
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.bold,
+                            color: colors.evTeal,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _telemetry.locationName,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: colors.textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      '120 m away • ${_telemetry.parkedDurationText}',
+                      style: TextStyle(fontSize: 11, color: colors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Radar Action Pill Button
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: colors.evTeal.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: colors.evTeal.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.radar, size: 14, color: colors.evTeal),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Radar',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        color: colors.evTeal,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Icon(Icons.chevron_right, size: 14, color: colors.evTeal),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

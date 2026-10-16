@@ -33,6 +33,14 @@ class VehicleTelemetry {
   final double tyreRlTempC;
   final double tyreRrTempC;
 
+  // GPS & Positioning (CarLinko Find My Car)
+  final double latitude;
+  final double longitude;
+  final double headingDegrees;
+  final String locationName;
+  final bool isParked;
+  final String parkedDurationText;
+
   final DateTime lastUpdated;
   final bool isSimulated;
   final String dataSourceLabel;
@@ -61,6 +69,12 @@ class VehicleTelemetry {
     this.tyreFrTempC = 33.0,
     this.tyreRlTempC = 31.0,
     this.tyreRrTempC = 31.0,
+    this.latitude = 3.1189,
+    this.longitude = 101.6672,
+    this.headingDegrees = 38.0,
+    this.locationName = 'The Sphere, Bangsar South, KL',
+    this.isParked = true,
+    this.parkedDurationText = 'Parked 42m ago',
     required this.lastUpdated,
     this.isSimulated = true,
     this.dataSourceLabel = 'SIMULATED DATA (CarLinko Not Activated)',
@@ -115,6 +129,12 @@ class VehicleTelemetry {
       tyreFrTempC: frT,
       tyreRlTempC: rlT,
       tyreRrTempC: rrT,
+      latitude: (m['lat'] as num?)?.toDouble() ?? 3.1189,
+      longitude: (m['lon'] as num?)?.toDouble() ?? 101.6672,
+      headingDegrees: (m['heading'] as num?)?.toDouble() ?? 38.0,
+      locationName: (m['location_name'] as String?) ?? 'The Sphere, Bangsar South, KL',
+      isParked: (m['is_parked'] as bool?) ?? true,
+      parkedDurationText: (m['parked_duration'] as String?) ?? 'Parked 42m ago',
       lastUpdated: DateTime.now(),
       isSimulated: isSimulated,
       dataSourceLabel: isSimulated ? 'SIMULATED DATA (CarLinko Not Activated)' : 'LIVE CARLINKO TELEMATICS',
