@@ -9,6 +9,7 @@ import 'package:tiggomate_app/src/theme/app_theme.dart';
 import 'package:tiggomate_app/src/ui/neo_dashboard.dart';
 import 'package:tiggomate_app/src/ui/trips_logbook_screen.dart';
 import 'package:tiggomate_app/src/ui/vehicle_radar_sheet.dart';
+import 'package:tiggomate_app/src/ui/smart_charging_sheet.dart';
 
 void main() {
   setUp(() {
@@ -380,6 +381,82 @@ void main() {
     expect(find.text('Waze Route'), findsOneWidget);
     expect(find.text('Google Maps'), findsOneWidget);
     expect(find.text('Horn & Flash'), findsOneWidget);
+  });
+
+  testWidgets('SmartChargingSheet renders optimizer, SoC slider, and saves schedule', (WidgetTester tester) async {
+    final telemetry = VehicleTelemetry(
+      lastUpdated: DateTime.now(),
+      batteryPct: 78,
+      electricRangeKm: 95,
+      fuelRangeKm: 870,
+      totalRangeKm: 965,
+      isCharging: false,
+      latitude: 3.1189,
+      longitude: 101.6672,
+      headingDegrees: 38.0,
+      locationName: 'The Sphere, Bangsar South, KL',
+      isParked: true,
+      parkedDurationText: '42m ago',
+    );
+
+    bool saved = false;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () {
+                SmartChargingSheet.show(
+                  context,
+                  telemetry: telemetry,
+                  isCharging: false,
+                  scheduledCharging: true,
+                  onToggleCharge: (_) {},
+                  onSaveSchedule: (isSched, start, end, soc, kw) {
+                    saved = true;
+                  },
+                );
+              },
+              child: const Text('Open Optimizer'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open Optimizer'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Smart Charging & TNB Optimizer'), findsOneWidget);
+    expect(find.text('Target Charge Limit'), findsOneWidget);
+    expect(find.text('TNB Off-Peak Scheduler'), findsOneWidget);
+    expect(find.text('AC Charging Power / Charger Rate'), findsOneWidget);
+    expect(find.text('80% (Daily Saver)'), findsOneWidget);
+    expect(find.text('Apply & Save'), findsOneWidget);
+
+    // Switch to Power Curve & SOH tab
+    await tester.tap(find.text('Power Curve & SOH'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Simulated AC Charging Curve'), findsOneWidget);
+    expect(find.text('Battery Health & Diagnostics (SOH)'), findsOneWidget);
+    expect(find.text('99.2%'), findsOneWidget);
+
+    // Switch to TNB Tariff tab
+    await tester.tap(find.text('TNB Tariff'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('TNB Domestic Tariff A (Malaysia)'), findsOneWidget);
+    expect(find.text('TNB EV Off-Peak (10 PM – 8 AM)'), findsOneWidget);
+    expect(find.text('RON95 Petrol Equivalent'), findsOneWidget);
+
+    // Tap Apply & Save
+    await tester.tap(find.text('Apply & Save'));
+    await tester.pumpAndSettle();
+
+    expect(saved, isTrue);
   });
 }
 

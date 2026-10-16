@@ -9,6 +9,7 @@ import 'auth_sheet.dart';
 import 'carlinko_connect_dialog.dart';
 import 'chery_service_centres_screen.dart';
 import 'vehicle_radar_sheet.dart';
+import 'smart_charging_sheet.dart';
 
 class NeoDashboard extends StatefulWidget {
   final VehicleRepository repository;
@@ -508,6 +509,41 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
         },
       );
     }
+  }
+
+  void _openSmartChargingSheet() {
+    SmartChargingSheet.show(
+      context,
+      telemetry: _telemetry,
+      isCharging: _telemetry.isCharging,
+      scheduledCharging: _scheduledCharging,
+      onToggleCharge: (newChargingState) {
+        if (widget.repository is MockVehicleRepository) {
+          (widget.repository as MockVehicleRepository).toggleCharging(newChargingState);
+        }
+        _showNotification(newChargingState
+            ? '⚡ AC Charging initiated (3.3 kW).'
+            : '⏸ Charging paused.');
+      },
+      onSaveSchedule: (isScheduled, startTime, endTime, targetSoc, powerKw) {
+        setState(() {
+          _scheduledCharging = isScheduled;
+        });
+        final startHour = startTime.hourOfPeriod == 0 ? 12 : startTime.hourOfPeriod;
+        final startMin = startTime.minute.toString().padLeft(2, '0');
+        final startP = startTime.period == DayPeriod.am ? 'AM' : 'PM';
+        final endHour = endTime.hourOfPeriod == 0 ? 12 : endTime.hourOfPeriod;
+        final endMin = endTime.minute.toString().padLeft(2, '0');
+        final endP = endTime.period == DayPeriod.am ? 'AM' : 'PM';
+        if (isScheduled) {
+          _showNotification(
+            '⏰ Smart Charging active: $startHour:$startMin $startP – $endHour:$endMin $endP (Target: $targetSoc% SoC at ${powerKw.toStringAsFixed(1)} kW)',
+          );
+        } else {
+          _showNotification('ℹ️ Scheduled charging turned off.');
+        }
+      },
+    );
   }
 
   @override
@@ -1303,22 +1339,39 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Icon(Icons.bolt, size: 18, color: colors.evTeal),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Smart Charging Management',
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: colors.textPrimary),
-                          ),
-                        ],
+                      InkWell(
+                        onTap: _openSmartChargingSheet,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Row(
+                          children: [
+                            Icon(Icons.bolt, size: 18, color: colors.evTeal),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Smart Charging Management',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: colors.textPrimary),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(Icons.chevron_right, size: 16, color: colors.textMuted),
+                          ],
+                        ),
                       ),
-                      Text(
-                        _telemetry.isCharging ? '3.3 kW AC' : 'Standby',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: _telemetry.isCharging ? colors.evTeal : colors.textMuted,
+                      GestureDetector(
+                        onTap: _openSmartChargingSheet,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: _telemetry.isCharging ? colors.evTeal.withValues(alpha: 0.15) : colors.tileBg,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: _telemetry.isCharging ? colors.evTeal : colors.border),
+                          ),
+                          child: Text(
+                            _telemetry.isCharging ? '3.3 kW AC' : 'Standby',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: _telemetry.isCharging ? colors.evTeal : colors.textMuted,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -1398,7 +1451,14 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       Switch(
                         value: _scheduledCharging,
                         activeThumbColor: colors.evTeal,
-                        onChanged: (val) => setState(() => _scheduledCharging = val),
+                        onChanged: (val) {
+                          setState(() => _scheduledCharging = val);
+                          if (val) {
+                            _openSmartChargingSheet();
+                          } else {
+                            _showNotification('ℹ️ Scheduled charging turned off.');
+                          }
+                        },
                       ),
                     ],
                   ),
@@ -1427,16 +1487,14 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       const SizedBox(width: 10),
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: () {
-                            _showNotification('⏰ Off-Peak TNB charging timer scheduled: 10:00 PM – 06:00 AM.');
-                          },
+                          onPressed: _openSmartChargingSheet,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: colors.isDark ? Colors.white : const Color(0xFF111827),
                             foregroundColor: colors.isDark ? Colors.black87 : Colors.white,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
-                          icon: Icon(Icons.calendar_today, size: 15, color: colors.isDark ? Colors.black87 : Colors.white),
+                          icon: Icon(Icons.tune, size: 15, color: colors.isDark ? Colors.black87 : Colors.white),
                           label: const Text('Set Schedule', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                         ),
                       ),
