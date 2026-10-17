@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:model_viewer_plus/model_viewer_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../carlinko/vehicle_repository.dart';
 import '../carlinko/vehicle_telemetry.dart';
+import '../carlinko/vehicle_skin.dart';
 import '../auth/auth_service.dart';
 import '../theme/app_theme.dart';
 import 'auth_sheet.dart';
@@ -47,6 +49,9 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
   bool _isWindowsVented = false;
   bool _isTrunkOpen = false;
   bool _spendingExpanded = false;
+  String _selectedVehicleColorKey = 'khaki_white';
+
+  VehicleSkinOption get _selectedSkin => getVehicleSkinByKey(_selectedVehicleColorKey);
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -64,6 +69,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       if (mounted) {
         setState(() {
           _isAdvancedView = prefs.getBool('tiggomate_ui_mode_advanced') ?? false;
+          _selectedVehicleColorKey = prefs.getString('tm_vehicle_color_skin') ?? 'khaki_white';
         });
       }
     });
@@ -110,6 +116,31 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     } else if (part == 'engine') {
       _showPowertrainModal();
     }
+  }
+
+  Future<void> _updateVehicleColor(String key) async {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _selectedVehicleColorKey = key;
+    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('tm_vehicle_color_skin', key);
+    } catch (_) {}
+  }
+
+  void _showVehicleSkinStudioModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _VehicleSkinStudioSheet(
+        selectedSkinKey: _selectedVehicleColorKey,
+        onSkinSelected: (key) {
+          _updateVehicleColor(key);
+        },
+      ),
+    );
   }
 
   void _showTyreModal(String position, String name, double kpa, double tempC) {
@@ -828,105 +859,162 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                if (_isAdvancedView) ...[
-                  // Top Stage Header: View Switcher (2D Studio vs 3D Orbit)
-                  Row(
+                // Top Stage Header: View Switcher & Dynamic Vehicle Skin Customizer
+                Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Icon(
-                          _is3DView ? Icons.view_in_ar : Icons.radar,
-                          size: 15,
-                          color: const Color(0xFF00D2AA),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          _is3DView ? '3D INTERACTIVE ORBIT' : '2D STUDIO RADAR',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.1,
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Container(
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF161E2E),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFF283548)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                    if (_isAdvancedView)
+                      Row(
                         children: [
-                          InkWell(
-                            borderRadius: BorderRadius.circular(20),
-                            onTap: () => setState(() => _is3DView = false),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: !_is3DView ? const Color(0xFF00D2AA) : Colors.transparent,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.photo_size_select_actual_outlined,
-                                    size: 13,
-                                    color: !_is3DView ? Colors.black : Colors.white60,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '2D',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: !_is3DView ? Colors.black : Colors.white60,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                          Icon(
+                            _is3DView ? Icons.view_in_ar : Icons.radar,
+                            size: 15,
+                            color: const Color(0xFF00D2AA),
                           ),
-                          InkWell(
-                            borderRadius: BorderRadius.circular(20),
-                            onTap: () => setState(() => _is3DView = true),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: _is3DView ? const Color(0xFF00D2AA) : Colors.transparent,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.view_in_ar,
-                                    size: 13,
-                                    color: _is3DView ? Colors.black : Colors.white60,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '3D',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: _is3DView ? Colors.black : Colors.white60,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                          const SizedBox(width: 6),
+                          Text(
+                            _is3DView ? '3D INTERACTIVE ORBIT' : '2D STUDIO RADAR',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.1,
+                              color: Colors.white70,
                             ),
                           ),
                         ],
+                      )
+                    else
+                      // In Basic view, show interactive color name pill
+                      InkWell(
+                        onTap: _showVehicleSkinStudioModal,
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: colors.isDark ? const Color(0xFF131922) : const Color(0xFFF3F4F6),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: colors.border),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.palette_outlined, size: 13, color: Color(0xFF00D2AA)),
+                              const SizedBox(width: 5),
+                              Text(
+                                _selectedSkin.name,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: colors.isDark ? Colors.white : const Color(0xFF111827),
+                                ),
+                              ),
+                              if (_selectedSkin.isDualTone) ...[
+                                const SizedBox(width: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text(
+                                    'BLACK ROOF',
+                                    style: TextStyle(fontSize: 7.5, fontWeight: FontWeight.bold, color: Colors.white),
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(width: 2),
+                              Icon(Icons.arrow_drop_down, size: 14, color: colors.textMuted),
+                            ],
+                          ),
+                        ),
                       ),
+
+                    // Right Side: Quick 3-Color Swatches & 2D/3D toggle
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Quick 3-Color Swatches Pill
+                        _buildQuickColorSwatches(colors),
+
+                        if (_isAdvancedView) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF161E2E),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: const Color(0xFF283548)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(20),
+                                  onTap: () => setState(() => _is3DView = false),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: !_is3DView ? const Color(0xFF00D2AA) : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.photo_size_select_actual_outlined,
+                                          size: 13,
+                                          color: !_is3DView ? Colors.black : Colors.white60,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '2D',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: !_is3DView ? Colors.black : Colors.white60,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(20),
+                                  onTap: () => setState(() => _is3DView = true),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: _is3DView ? const Color(0xFF00D2AA) : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.view_in_ar,
+                                          size: 13,
+                                          color: _is3DView ? Colors.black : Colors.white60,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '3D',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: _is3DView ? Colors.black : Colors.white60,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-              ],
 
               // Canvas Area: 3D ModelViewer OR 2D Studio Hotspot Stack
               if (_isAdvancedView && _is3DView)
@@ -1067,16 +1155,21 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                               ),
                             ),
 
-                            // Vehicle Render (Lunar White Tiggo 7 PHEV CSH)
+                            // Vehicle Render (Chery Tiggo 7 PHEV CSH with dynamic skin)
                             Positioned(
                               top: 8,
                               bottom: 20,
-                              child: Image.asset(
-                                'assets/images/car_hero.png',
-                                fit: BoxFit.contain,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Icon(Icons.directions_car, size: 100, color: colors.textMuted);
-                                },
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 300),
+                                transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
+                                child: Image.asset(
+                                  _selectedSkin.assetPath,
+                                  key: ValueKey(_selectedSkin.key),
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Icon(Icons.directions_car, size: 100, color: colors.textMuted);
+                                  },
+                                ),
                               ),
                             ),
 
@@ -2328,6 +2421,388 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildQuickColorSwatches(AppColors colors) {
+    return Container(
+      height: 32,
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+      decoration: BoxDecoration(
+        color: colors.isDark ? const Color(0xFF161E2E) : const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: kOfficialVehicleSkins.map((skin) {
+          final isSelected = skin.key == _selectedVehicleColorKey;
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            child: InkWell(
+              onTap: () => _updateVehicleColor(skin.key),
+              borderRadius: BorderRadius.circular(14),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: isSelected ? 22 : 18,
+                height: isSelected ? 22 : 18,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isSelected ? const Color(0xFF00D2AA) : (colors.isDark ? Colors.white24 : Colors.black12),
+                    width: isSelected ? 2 : 1,
+                  ),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFF00D2AA).withValues(alpha: 0.45),
+                            blurRadius: 5,
+                          ),
+                        ]
+                      : null,
+                ),
+                child: ClipOval(
+                  child: skin.isDualTone
+                      ? Stack(
+                          children: [
+                            Container(color: skin.primaryColor),
+                            Align(
+                              alignment: Alignment.topCenter,
+                              child: Container(
+                                height: isSelected ? 10 : 8,
+                                color: skin.secondaryColor,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Container(color: skin.primaryColor),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+/// -------------------------------------------------------------
+/// OFFICIAL VEHICLE PAINT & SKIN STUDIO SHEET
+/// -------------------------------------------------------------
+class _VehicleSkinStudioSheet extends StatefulWidget {
+  final String selectedSkinKey;
+  final ValueChanged<String> onSkinSelected;
+
+  const _VehicleSkinStudioSheet({
+    required this.selectedSkinKey,
+    required this.onSkinSelected,
+  });
+
+  @override
+  State<_VehicleSkinStudioSheet> createState() => _VehicleSkinStudioSheetState();
+}
+
+class _VehicleSkinStudioSheetState extends State<_VehicleSkinStudioSheet> {
+  late String _activeKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _activeKey = widget.selectedSkinKey;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors(context);
+    final activeSkin = getVehicleSkinByKey(_activeKey);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.isDark ? const Color(0xFF0D1219) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: colors.isDark ? Colors.white24 : Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00D2AA).withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.palette, color: Color(0xFF00D2AA), size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Vehicle Paint & Skin Studio',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: colors.isDark ? Colors.white : const Color(0xFF111827),
+                        ),
+                      ),
+                      Text(
+                        'Chery Tiggo 7 PHEV Malaysian Exterior Colors',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              IconButton(
+                icon: Icon(Icons.close, color: colors.textMuted),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Live Vehicle Preview Stage
+          Container(
+            height: 170,
+            decoration: BoxDecoration(
+              color: colors.isDark ? const Color(0xFF131922) : const Color(0xFFF9FAFB),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: colors.border),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Floor shadow
+                Positioned(
+                  bottom: 14,
+                  child: Container(
+                    width: 240,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      borderRadius: const BorderRadius.all(Radius.elliptical(240, 12)),
+                      gradient: RadialGradient(
+                        colors: [
+                          colors.isDark ? Colors.black.withValues(alpha: 0.75) : Colors.black.withValues(alpha: 0.22),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 10,
+                  bottom: 18,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
+                    child: Image.asset(
+                      activeSkin.assetPath,
+                      key: ValueKey(activeSkin.key),
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => Icon(Icons.directions_car, size: 80, color: colors.textMuted),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 8,
+                  left: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: colors.isDark ? Colors.black.withValues(alpha: 0.65) : Colors.white.withValues(alpha: 0.85),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '${activeSkin.name} • ${activeSkin.tag}',
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colors.isDark ? Colors.white70 : const Color(0xFF374151)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // 3 Official Color Cards
+          ...kOfficialVehicleSkins.map((skin) {
+            final isSelected = skin.key == _activeKey;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: InkWell(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() => _activeKey = skin.key);
+                  widget.onSkinSelected(skin.key);
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? (colors.isDark ? const Color(0xFF131D2A) : const Color(0xFFF0FDF4))
+                        : (colors.isDark ? const Color(0xFF131922) : const Color(0xFFF9FAFB)),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isSelected ? const Color(0xFF00D2AA) : colors.border,
+                      width: isSelected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      // Swatch
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected ? const Color(0xFF00D2AA) : (colors.isDark ? Colors.white30 : Colors.black12),
+                            width: isSelected ? 2 : 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: skin.primaryColor.withValues(alpha: 0.3),
+                              blurRadius: 6,
+                            ),
+                          ],
+                        ),
+                        child: ClipOval(
+                          child: skin.isDualTone
+                              ? Stack(
+                                  children: [
+                                    Container(color: skin.primaryColor),
+                                    Align(
+                                      alignment: Alignment.topCenter,
+                                      child: Container(
+                                        height: 18,
+                                        color: skin.secondaryColor,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Container(color: skin.primaryColor),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+
+                      // Details
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  skin.name,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: colors.isDark ? Colors.white : const Color(0xFF111827),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: isSelected ? const Color(0xFF00D2AA).withValues(alpha: 0.15) : (colors.isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    skin.priceInfo,
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: isSelected ? const Color(0xFF00D2AA) : colors.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              skin.description,
+                              style: TextStyle(fontSize: 10.5, color: colors.textSecondary, height: 1.3),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+
+                      // Selection Indicator
+                      Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isSelected ? const Color(0xFF00D2AA) : Colors.transparent,
+                          border: Border.all(
+                            color: isSelected ? const Color(0xFF00D2AA) : colors.textMuted,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: isSelected ? const Icon(Icons.check, size: 14, color: Colors.black) : null,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 10),
+
+          // Confirm Button
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Chery Tiggo 7 PHEV skin set to ${activeSkin.name}${activeSkin.isDualTone ? " (Dual Tone)" : ""}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                  ),
+                  backgroundColor: const Color(0xFF00D2AA),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00D2AA),
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              padding: const EdgeInsets.symmetric(vertical: 13),
+            ),
+            child: Text(
+              'Set as Vehicle Skin (${activeSkin.name})',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+          ),
+        ],
       ),
     );
   }

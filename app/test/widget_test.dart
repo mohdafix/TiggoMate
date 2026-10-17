@@ -200,6 +200,31 @@ void main() {
     await tester.pump();
     expect(find.text('22°C ON'), findsOneWidget);
 
+    // Test Dynamic 2D Vehicle Skin Customizer
+    expect(find.text('Khaki White'), findsOneWidget);
+    await tester.tap(find.text('Khaki White'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Verify Vehicle Paint & Skin Studio sheet
+    expect(find.text('Vehicle Paint & Skin Studio'), findsOneWidget);
+    expect(find.text('Phantom Grey'), findsWidgets);
+    expect(find.text('Bloodstone Red'), findsWidgets);
+    expect(find.textContaining('Dual-Tone'), findsWidgets);
+
+    // Select Bloodstone Red with contrasting black roof
+    await tester.tap(find.text('Bloodstone Red').first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Tap Confirm button
+    await tester.tap(find.textContaining('Set as Vehicle Skin'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Verify confirmation toast
+    expect(find.textContaining('Chery Tiggo 7 PHEV skin set to Bloodstone Red'), findsOneWidget);
+
     // Test switching to Advanced Telemetry mode
     await tester.tap(find.text('Advanced Telemetry'));
     await tester.pump();

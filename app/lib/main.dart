@@ -15,6 +15,7 @@ import 'src/auth/auth_service.dart';
 import 'src/ui/login_screen.dart';
 import 'src/ui/auth_sheet.dart';
 import 'src/theme/app_theme.dart';
+import 'src/carlinko/vehicle_skin.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -243,6 +244,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _fuelController;
   late String _provider;
   late String _carLinkoStatus;
+  String _vehicleSkinKey = 'khaki_white';
   bool _obscureApiKey = true;
 
   final List<String> _popularModels = [
@@ -266,6 +268,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _fuelController = TextEditingController(text: widget.settings.fuelPrice.toStringAsFixed(2));
     _provider = widget.settings.aiProvider;
     _carLinkoStatus = widget.settings.carLinkoStatus;
+
+    SharedPreferences.getInstance().then((prefs) {
+      if (mounted) {
+        setState(() {
+          _vehicleSkinKey = prefs.getString('tm_vehicle_color_skin') ?? 'khaki_white';
+        });
+      }
+    });
   }
 
   @override
@@ -439,6 +449,97 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       hintText: 'e.g. VAG 7777',
                       prefixIcon: Icon(Icons.badge_outlined, size: 20),
                       helperText: 'Displayed on Home card and included in AI context',
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Vehicle Exterior Paint Skin Selector
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFF131922)
+                          : const Color(0xFFF9FAFB),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? const Color(0xFF232D3D)
+                            : const Color(0xFFE5E7EB),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.palette_outlined, size: 20, color: Color(0xFF00D2AA)),
+                            const SizedBox(width: 10),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Exterior Paint Skin', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                                Text(
+                                  getVehicleSkinByKey(_vehicleSkinKey).name + (getVehicleSkinByKey(_vehicleSkinKey).isDualTone ? ' (Dual-Tone)' : ''),
+                                  style: const TextStyle(fontSize: 10.5, color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: kOfficialVehicleSkins.map((skin) {
+                            final isSel = skin.key == _vehicleSkinKey;
+                            return Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: InkWell(
+                                onTap: () async {
+                                  setState(() => _vehicleSkinKey = skin.key);
+                                  try {
+                                    final prefs = await SharedPreferences.getInstance();
+                                    await prefs.setString('tm_vehicle_color_skin', skin.key);
+                                  } catch (_) {}
+                                },
+                                borderRadius: BorderRadius.circular(14),
+                                child: Container(
+                                  width: isSel ? 26 : 22,
+                                  height: isSel ? 26 : 22,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: isSel ? const Color(0xFF00D2AA) : Colors.grey.withValues(alpha: 0.5),
+                                      width: isSel ? 2 : 1,
+                                    ),
+                                    boxShadow: isSel
+                                        ? [
+                                            BoxShadow(
+                                              color: const Color(0xFF00D2AA).withValues(alpha: 0.4),
+                                              blurRadius: 5,
+                                            ),
+                                          ]
+                                        : null,
+                                  ),
+                                  child: ClipOval(
+                                    child: skin.isDualTone
+                                        ? Stack(
+                                            children: [
+                                              Container(color: skin.primaryColor),
+                                              Align(
+                                                alignment: Alignment.topCenter,
+                                                child: Container(
+                                                  height: isSel ? 12 : 10,
+                                                  color: skin.secondaryColor,
+                                                ),
+                                              ),
+                                            ],
+                                          )
+                                        : Container(color: skin.primaryColor),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
                     ),
                   ),
                 ],
