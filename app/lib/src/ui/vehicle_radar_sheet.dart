@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../carlinko/vehicle_telemetry.dart';
 import '../theme/app_theme.dart';
+import 'app_notification.dart';
 
 /// Interactive Circular Radar HUD & Vehicle Locator Sheet (Phase 1)
 /// Inspired by tactical automotive radar and official Chery CarLinko Find My Car.
@@ -98,13 +99,11 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
   }
 
   void _showToast(String msg) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
+    AppNotification.show(
+      context,
+      message: msg,
+      type: NotificationType.info,
+      icon: Icons.radar_rounded,
     );
   }
 

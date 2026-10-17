@@ -12,6 +12,7 @@ import 'carlinko_connect_dialog.dart';
 import 'chery_service_centres_screen.dart';
 import 'vehicle_radar_sheet.dart';
 import 'smart_charging_sheet.dart';
+import 'app_notification.dart';
 
 class NeoDashboard extends StatefulWidget {
   final VehicleRepository repository;
@@ -492,29 +493,12 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     );
   }
 
-  void _showNotification(String message) {
-    final colors = AppColors(context);
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: colors.textPrimary,
-          ),
-        ),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: colors.cardBg,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: BorderSide(color: colors.border),
-        ),
-        elevation: colors.isDark ? 4 : 2,
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        duration: const Duration(seconds: 2),
-      ),
+  void _showNotification(String message, {NotificationType type = NotificationType.info, IconData? icon}) {
+    AppNotification.show(
+      context,
+      message: message,
+      type: type,
+      icon: icon,
     );
   }
 
@@ -710,6 +694,39 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     tooltip: 'CarLinko Cloud Sync',
                     icon: Icon(Icons.cell_tower, size: 18, color: colors.evTeal),
                     onPressed: _openCarlinkoConnect,
+                  ),
+                  ListenableBuilder(
+                    listenable: VehicleAlertsManager.instance,
+                    builder: (context, _) {
+                      final unread = VehicleAlertsManager.instance.unreadCount;
+                      return Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.all(6),
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            tooltip: 'Vehicle Alerts & History',
+                            icon: Icon(Icons.notifications_outlined, size: 18, color: colors.dockBtnIcon),
+                            onPressed: () => VehicleAlertsSheet.show(context),
+                          ),
+                          if (unread > 0)
+                            Positioned(
+                              top: 5,
+                              right: 5,
+                              child: Container(
+                                width: 7,
+                                height: 7,
+                                decoration: BoxDecoration(
+                                  color: colors.evTeal,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: colors.cardBg, width: 1.5),
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
                   ),
                   IconButton(
                     visualDensity: VisualDensity.compact,
@@ -2779,16 +2796,11 @@ class _VehicleSkinStudioSheetState extends State<_VehicleSkinStudioSheet> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).hideCurrentSnackBar();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Chery Tiggo 7 PHEV skin set to ${activeSkin.name}${activeSkin.isDualTone ? " (Dual Tone)" : ""}',
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
-                  ),
-                  backgroundColor: const Color(0xFF00D2AA),
-                  behavior: SnackBarBehavior.floating,
-                ),
+              AppNotification.show(
+                context,
+                message: 'Chery Tiggo 7 PHEV skin set to ${activeSkin.name}${activeSkin.isDualTone ? " (Dual Tone)" : ""}',
+                type: NotificationType.success,
+                icon: Icons.palette_outlined,
               );
             },
             style: ElevatedButton.styleFrom(

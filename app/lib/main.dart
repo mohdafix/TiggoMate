@@ -16,6 +16,7 @@ import 'src/ui/login_screen.dart';
 import 'src/ui/auth_sheet.dart';
 import 'src/theme/app_theme.dart';
 import 'src/carlinko/vehicle_skin.dart';
+import 'src/ui/app_notification.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +28,7 @@ void main() async {
     debugPrint('Firebase.initializeApp warning (offline fallback active): $e');
   }
   await AppThemeController.instance.init();
+  await VehicleAlertsManager.instance.init();
   runApp(const TiggoMateApp());
 }
 
@@ -307,12 +309,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     widget.onSave(updated);
     Navigator.of(context).pop(updated);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Settings saved successfully!', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
-        backgroundColor: Color(0xFF00D2AA),
-        behavior: SnackBarBehavior.floating,
-      ),
+    AppNotification.show(
+      context,
+      message: 'Settings saved successfully!',
+      type: NotificationType.success,
+      icon: Icons.check_circle_rounded,
     );
   }
 
@@ -336,12 +337,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _testAiConnection() async {
     final key = _apiKeyController.text.trim();
     if (key.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter an AI API Key first.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          backgroundColor: Color(0xFFF85149),
-          behavior: SnackBarBehavior.floating,
-        ),
+      AppNotification.show(
+        context,
+        message: 'Please enter an AI API Key first.',
+        type: NotificationType.warning,
+        icon: Icons.warning_amber_rounded,
       );
       return;
     }
@@ -358,13 +358,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _isTestingAi = false);
 
     if (res.ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('✅ ${res.message} (${res.latencyMs}ms)', style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
-          backgroundColor: const Color(0xFF00D2AA),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 4),
-        ),
+      AppNotification.show(
+        context,
+        message: 'AI Connected: ${res.message} (${res.latencyMs}ms)',
+        type: NotificationType.success,
+        icon: Icons.auto_awesome_rounded,
       );
     } else {
       showDialog(

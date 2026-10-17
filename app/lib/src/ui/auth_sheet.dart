@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../auth/auth_service.dart';
+import 'app_notification.dart';
 
 class AuthSheet extends StatefulWidget {
   final VoidCallback onProfileUpdated;
@@ -59,11 +60,11 @@ class _AuthSheetState extends State<AuthSheet> {
       if (res.success) {
         widget.onProfileUpdated();
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(res.message),
-            backgroundColor: const Color(0xFF00D2AA),
-          ),
+        AppNotification.show(
+          context,
+          message: res.message,
+          type: NotificationType.success,
+          icon: Icons.check_circle_rounded,
         );
       } else {
         setState(() => _errorMessage = res.message);
@@ -94,11 +95,11 @@ class _AuthSheetState extends State<AuthSheet> {
       if (res.success) {
         widget.onProfileUpdated();
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(res.message),
-            backgroundColor: const Color(0xFF00D2AA),
-          ),
+        AppNotification.show(
+          context,
+          message: res.message,
+          type: NotificationType.success,
+          icon: Icons.check_circle_rounded,
         );
       } else {
         setState(() => _errorMessage = res.message);

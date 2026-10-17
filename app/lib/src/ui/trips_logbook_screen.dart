@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../mytnb/mytnb_api.dart';
 import 'mytnb_connect_dialog.dart';
+import 'app_notification.dart';
 
 /// Model representing a completed PHEV trip.
 class TripRecord {
@@ -533,13 +534,11 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
             evPointCount: preset.evPointCount,
           );
           _saveTrip(newTrip);
-          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Added Trip: ${newTrip.title} (${newTrip.distanceKm} km)', style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
-              backgroundColor: const Color(0xFF00D2AA),
-              behavior: SnackBarBehavior.floating,
-            ),
+          AppNotification.show(
+            context,
+            message: 'Added Trip: ${newTrip.title} (${newTrip.distanceKm} km)',
+            type: NotificationType.success,
+            icon: Icons.add_road_rounded,
           );
         },
       ),
@@ -563,13 +562,11 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
         myTnbRepo: widget.myTnbRepo,
         onSave: (rec) {
           _saveExpense(rec);
-          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Logged ${rec.title} (RM ${rec.amountRm.toStringAsFixed(2)})', style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
-              backgroundColor: const Color(0xFF00D2AA),
-              behavior: SnackBarBehavior.floating,
-            ),
+          AppNotification.show(
+            context,
+            message: 'Logged ${rec.title} (RM ${rec.amountRm.toStringAsFixed(2)})',
+            type: NotificationType.success,
+            icon: Icons.receipt_long_rounded,
           );
         },
       ),
@@ -2383,13 +2380,11 @@ class _ExportLogbookModalState extends State<_ExportLogbookModal> with SingleTic
   void _copyToClipboard(String text, String label) {
     Clipboard.setData(ClipboardData(text: text));
     HapticFeedback.mediumImpact();
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$label copied to clipboard!', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
-        backgroundColor: const Color(0xFF00D2AA),
-        behavior: SnackBarBehavior.floating,
-      ),
+    AppNotification.show(
+      context,
+      message: '$label copied to clipboard!',
+      type: NotificationType.success,
+      icon: Icons.copy_rounded,
     );
   }
 

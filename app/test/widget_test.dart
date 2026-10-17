@@ -10,6 +10,7 @@ import 'package:tiggomate_app/src/ui/neo_dashboard.dart';
 import 'package:tiggomate_app/src/ui/trips_logbook_screen.dart';
 import 'package:tiggomate_app/src/ui/vehicle_radar_sheet.dart';
 import 'package:tiggomate_app/src/ui/smart_charging_sheet.dart';
+import 'package:tiggomate_app/src/ui/app_notification.dart';
 
 void main() {
   setUp(() {
@@ -339,6 +340,10 @@ void main() {
     expect(find.textContaining('Added Trip: ✈️ Airport Run'), findsOneWidget);
     expect(find.text('58.0 km'), findsOneWidget);
 
+    // Dismiss notification banner so top bar button is hit-testable
+    AppNotification.dismiss();
+    await tester.pumpAndSettle();
+
     // 2. Test 1-Tap Log Fuel/Charge (Zero Typing)
     await tester.tap(find.text('Log Fuel/Charge'));
     await tester.pumpAndSettle();
@@ -373,6 +378,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // 4. Test Export Modal
+    AppNotification.dismiss();
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Export'));
     await tester.pumpAndSettle();
 

@@ -81,6 +81,8 @@ class AppTheme {
         secondary: evTealLight,
         surface: cardBg,
         onSurface: textPrimary,
+        inverseSurface: Color(0xFF111827),
+        onInverseSurface: Colors.white,
         error: Color(0xFFDC2626),
       ),
       cardTheme: CardThemeData(
@@ -164,17 +166,17 @@ class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: cardBg,
+        backgroundColor: Colors.white,
         contentTextStyle: const TextStyle(
-          color: textPrimary,
+          color: Color(0xFF0F172A),
           fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: border),
+          side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.2),
         ),
-        elevation: 3,
+        elevation: 6,
       ),
     );
   }
@@ -196,6 +198,8 @@ class AppTheme {
         secondary: Color(0xFF2F81F7),
         surface: cardBg,
         onSurface: textPrimary,
+        inverseSurface: Color(0xFF161E2E),
+        onInverseSurface: Colors.white,
         error: Color(0xFFF85149),
       ),
       cardTheme: CardThemeData(
@@ -279,17 +283,17 @@ class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: cardBg,
+        backgroundColor: const Color(0xFF161E2E),
         contentTextStyle: const TextStyle(
-          color: textPrimary,
+          color: Colors.white,
           fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: border),
+          side: const BorderSide(color: Color(0xFF2D3A4F), width: 1.2),
         ),
-        elevation: 4,
+        elevation: 6,
       ),
     );
   }

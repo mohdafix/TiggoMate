@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'app_notification.dart';
 
 class CheryServiceCentre {
   final String id;
@@ -560,13 +561,11 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
   void _copyToClipboard(String text, String message) {
     Clipboard.setData(ClipboardData(text: text));
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
-          backgroundColor: const Color(0xFF00D2AA),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ),
+      AppNotification.show(
+        context,
+        message: message,
+        type: NotificationType.success,
+        icon: Icons.copy_rounded,
       );
     }
   }
