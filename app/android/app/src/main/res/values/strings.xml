@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TiggoMate</string>
+    <string name="widget_name">TiggoMate Vehicle Telemetry</string>
+
+    <!-- App Shortcuts -->
+    <string name="shortcut_lock_short">Lock / Unlock</string>
+    <string name="shortcut_lock_long">🔒 Lock / Unlock Chery Tiggo 7 PHEV</string>
+
+    <string name="shortcut_climate_short">Pre-cool (22°C)</string>
+    <string name="shortcut_climate_long">❄️ Turn On Cabin Pre-cooling (22.0°C)</string>
+
+    <string name="shortcut_charging_short">Smart Charging</string>
+    <string name="shortcut_charging_long">⚡ Smart Charging &amp; myTNB Optimizer</string>
+
+    <string name="shortcut_radar_short">Find My Car</string>
+    <string name="shortcut_radar_long">📍 Circular Radar HUD &amp; Vehicle Locator</string>
+
+    <string name="shortcut_drive_short">Drive Mode HUD</string>
+    <string name="shortcut_drive_long">🚗 Smart GPS Drive Mode &amp; Powertrain HUD</string>
+</resources>

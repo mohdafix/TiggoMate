@@ -12,7 +12,11 @@ import 'carlinko_connect_dialog.dart';
 import 'chery_service_centres_screen.dart';
 import 'vehicle_radar_sheet.dart';
 import 'smart_charging_sheet.dart';
+import 'dart:async';
 import 'app_notification.dart';
+import 'smart_drive_hud.dart';
+import 'widgets_shortcuts_sheet.dart';
+import '../widgets/home_widget_service.dart';
 
 class NeoDashboard extends StatefulWidget {
   final VehicleRepository repository;
@@ -56,6 +60,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+  StreamSubscription<String>? _quickActionSubscription;
 
   @override
   void initState() {
@@ -66,12 +71,19 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     _isTrunkOpen = _telemetry.trunkOpen;
     _isWindowsVented = _telemetry.windowsOpen;
 
+    // Initialize native Android Home Widget and App Shortcuts listeners
+    HomeWidgetService.instance.init();
+    _quickActionSubscription = HomeWidgetService.instance.onQuickAction.listen((uri) {
+      if (mounted) _handleQuickActionUri(uri);
+    });
+
     SharedPreferences.getInstance().then((prefs) {
       if (mounted) {
         setState(() {
           _isAdvancedView = prefs.getBool('tiggomate_ui_mode_advanced') ?? false;
           _selectedVehicleColorKey = prefs.getString('tm_vehicle_color_skin') ?? 'khaki_white';
         });
+        _syncWidgetTelemetry();
       }
     });
 
@@ -84,6 +96,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
           _isTrunkOpen = data.trunkOpen;
           _isWindowsVented = data.windowsOpen;
         });
+        _syncWidgetTelemetry();
       }
     });
 
@@ -99,6 +112,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
 
   @override
   void dispose() {
+    _quickActionSubscription?.cancel();
     _pulseController.dispose();
     super.dispose();
   }
@@ -506,9 +520,11 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     if (action == 'lock') {
       setState(() => _isDoorsLocked = !_isDoorsLocked);
       _showNotification(_isDoorsLocked ? '🔒 CarLinko: Doors Locked' : '🔓 CarLinko: Doors Unlocked');
+      _syncWidgetTelemetry();
     } else if (action == 'climate') {
       setState(() => _isAcActive = !_isAcActive);
       _showNotification(_isAcActive ? '❄️ Cabin Pre-cooling started (22°C)' : '❄️ Climate Pre-conditioning OFF');
+      _syncWidgetTelemetry();
     } else if (action == 'windows') {
       setState(() => _isWindowsVented = !_isWindowsVented);
       _showNotification(_isWindowsVented ? '🪟 Windows vented (20mm)' : '🪟 All Windows closed');
@@ -524,6 +540,51 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
         },
       );
     }
+  }
+
+  void _handleQuickActionUri(String uri) {
+    if (uri.contains('/lock')) {
+      _handleRemoteCommand('lock');
+    } else if (uri.contains('/climate')) {
+      _handleRemoteCommand('climate');
+    } else if (uri.contains('/charging')) {
+      _openSmartChargingSheet();
+    } else if (uri.contains('/radar') || uri.contains('/locate')) {
+      _handleRemoteCommand('locate');
+    } else if (uri.contains('/drive')) {
+      SmartDriveHudSheet.show(context);
+    }
+  }
+
+  void _syncWidgetTelemetry() {
+    final fuelPct = ((_telemetry.fuelRangeKm / 838.0) * 100).round().clamp(0, 100);
+    HomeWidgetService.instance.syncWidgetTelemetry(
+      vehicleName: widget.vehicleNickname.isNotEmpty ? widget.vehicleNickname : 'Tiggo 7 PHEV',
+      batterySoc: _telemetry.batteryPct,
+      batteryRange: _telemetry.electricRangeKm,
+      fuelLevel: fuelPct,
+      fuelRange: _telemetry.fuelRangeKm,
+      totalRange: _telemetry.totalRangeKm,
+      isLocked: _isDoorsLocked,
+      isCharging: _telemetry.isCharging,
+      isClimateOn: _isAcActive,
+    );
+  }
+
+  void _openWidgetsShortcutsSheet() {
+    final fuelPct = ((_telemetry.fuelRangeKm / 838.0) * 100).round().clamp(0, 100);
+    WidgetsShortcutsSheet.show(
+      context,
+      batterySoc: _telemetry.batteryPct,
+      batteryRange: _telemetry.electricRangeKm,
+      fuelLevel: fuelPct,
+      fuelRange: _telemetry.fuelRangeKm,
+      totalRange: _telemetry.totalRangeKm,
+      isLocked: _isDoorsLocked,
+      isCharging: _telemetry.isCharging,
+      isClimateOn: _isAcActive,
+      onActionTriggered: _handleQuickActionUri,
+    );
   }
 
   void _openSmartChargingSheet() {
@@ -739,6 +800,22 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       color: colors.isDark ? const Color(0xFFFF9F1C) : const Color(0xFF111827),
                     ),
                     onPressed: () => AppThemeController.instance.toggleTheme(context),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.all(6),
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    tooltip: 'Drive Mode HUD',
+                    icon: const Icon(Icons.speed, size: 18, color: Color(0xFF10B981)),
+                    onPressed: () => SmartDriveHudSheet.show(context),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.all(6),
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    tooltip: 'Widgets & Quick Actions',
+                    icon: Icon(Icons.widgets_outlined, size: 18, color: colors.evTeal),
+                    onPressed: _openWidgetsShortcutsSheet,
                   ),
                   IconButton(
                     visualDensity: VisualDensity.compact,

@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../mytnb/mytnb_api.dart';
 import 'mytnb_connect_dialog.dart';
 import 'app_notification.dart';
+import 'smart_drive_hud.dart';
 
 /// Model representing a completed PHEV trip.
 class TripRecord {
@@ -794,6 +795,32 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                           ),
                         ),
                       ),
+                      const SizedBox(width: 6),
+
+                      // Drive HUD Pill Button
+                      InkWell(
+                        onTap: () => SmartDriveHudSheet.show(context, onTripSaved: (_) => _loadStoredData()),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.15 : 0.12),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFF10B981)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(Icons.speed, size: 13, color: Color(0xFF10B981)),
+                              SizedBox(width: 4),
+                              Text(
+                                'Drive HUD',
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -955,6 +982,69 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
             ),
           ),
           const SizedBox(height: 20),
+
+          // ---------------- LIVE SMART DRIVE HUD BANNER ----------------
+          Container(
+            margin: const EdgeInsets.only(bottom: 20),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: isDark
+                    ? [const Color(0xFF0F172A), const Color(0xFF064E3B)]
+                    : [const Color(0xFFF0FDF4), const Color(0xFFDCFCE7)],
+              ),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4), width: 1.2),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.speed, color: Color(0xFF10B981), size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Smart Drive Mode HUD',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : const Color(0xFF065F46),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Live EV vs 1.5T DHT hybrid GPS tracker & digital speedometer',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF047857),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () => SmartDriveHudSheet.show(context, onTripSaved: (_) => _loadStoredData()),
+                  icon: const Icon(Icons.play_arrow_rounded, size: 16),
+                  label: const Text('Start HUD', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          ),
 
           // ---------------- FEATURED RECENT TRIP CARD WITH VECTOR MAP ----------------
           Row(

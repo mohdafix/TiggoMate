@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="shortcut_lock"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_lock"
+        android:shortcutShortLabel="@string/shortcut_lock_short"
+        android:shortcutLongLabel="@string/shortcut_lock_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.tiggomate.tiggomate_app"
+            android:targetClass="com.tiggomate.tiggomate_app.MainActivity"
+            android:data="tiggomate://action/lock" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="shortcut_climate"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_climate"
+        android:shortcutShortLabel="@string/shortcut_climate_short"
+        android:shortcutLongLabel="@string/shortcut_climate_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.tiggomate.tiggomate_app"
+            android:targetClass="com.tiggomate.tiggomate_app.MainActivity"
+            android:data="tiggomate://action/climate" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="shortcut_charging"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_charging"
+        android:shortcutShortLabel="@string/shortcut_charging_short"
+        android:shortcutLongLabel="@string/shortcut_charging_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.tiggomate.tiggomate_app"
+            android:targetClass="com.tiggomate.tiggomate_app.MainActivity"
+            android:data="tiggomate://action/charging" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="shortcut_radar"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_radar"
+        android:shortcutShortLabel="@string/shortcut_radar_short"
+        android:shortcutLongLabel="@string/shortcut_radar_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.tiggomate.tiggomate_app"
+            android:targetClass="com.tiggomate.tiggomate_app.MainActivity"
+            android:data="tiggomate://action/radar" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="shortcut_drive"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_drive"
+        android:shortcutShortLabel="@string/shortcut_drive_short"
+        android:shortcutLongLabel="@string/shortcut_drive_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.tiggomate.tiggomate_app"
+            android:targetClass="com.tiggomate.tiggomate_app.MainActivity"
+            android:data="tiggomate://action/drive" />
+    </shortcut>
+</shortcuts>
