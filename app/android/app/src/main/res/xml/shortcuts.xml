@@ -11,7 +11,6 @@
             android:targetPackage="com.tiggomate.tiggomate_app"
             android:targetClass="com.tiggomate.tiggomate_app.MainActivity"
             android:data="tiggomate://action/lock" />
-        <categories android:name="android.shortcut.conversation" />
     </shortcut>
 
     <shortcut
@@ -51,18 +50,5 @@
             android:targetPackage="com.tiggomate.tiggomate_app"
             android:targetClass="com.tiggomate.tiggomate_app.MainActivity"
             android:data="tiggomate://action/radar" />
-    </shortcut>
-
-    <shortcut
-        android:shortcutId="shortcut_drive"
-        android:enabled="true"
-        android:icon="@drawable/ic_shortcut_drive"
-        android:shortcutShortLabel="@string/shortcut_drive_short"
-        android:shortcutLongLabel="@string/shortcut_drive_long">
-        <intent
-            android:action="android.intent.action.VIEW"
-            android:targetPackage="com.tiggomate.tiggomate_app"
-            android:targetClass="com.tiggomate.tiggomate_app.MainActivity"
-            android:data="tiggomate://action/drive" />
     </shortcut>
 </shortcuts>

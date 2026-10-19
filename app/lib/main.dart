@@ -20,6 +20,12 @@ import 'src/ui/app_notification.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    debugPrint('Flutter Error: ${details.exception}');
+  };
+
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -27,8 +33,19 @@ void main() async {
   } catch (e) {
     debugPrint('Firebase.initializeApp warning (offline fallback active): $e');
   }
-  await AppThemeController.instance.init();
-  await VehicleAlertsManager.instance.init();
+
+  try {
+    await AppThemeController.instance.init();
+  } catch (e) {
+    debugPrint('AppThemeController.init warning: $e');
+  }
+
+  try {
+    await VehicleAlertsManager.instance.init();
+  } catch (e) {
+    debugPrint('VehicleAlertsManager.init warning: $e');
+  }
+
   runApp(const TiggoMateApp());
 }
 
@@ -79,13 +96,23 @@ class _AppRootGateState extends State<AppRootGate> {
   }
 
   Future<void> _initGate() async {
-    await _authService.initialize();
-    final chosen = await _authService.hasChosenAuth();
-    if (mounted) {
-      setState(() {
-        _hasChosenAuth = chosen;
-        _initialized = true;
-      });
+    try {
+      await _authService.initialize();
+      final chosen = await _authService.hasChosenAuth();
+      if (mounted) {
+        setState(() {
+          _hasChosenAuth = chosen;
+          _initialized = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Gate initialization error: $e');
+      if (mounted) {
+        setState(() {
+          _hasChosenAuth = true; // Fallback to guest mode
+          _initialized = true;
+        });
+      }
     }
   }
 

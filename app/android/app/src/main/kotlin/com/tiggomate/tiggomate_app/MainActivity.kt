@@ -29,25 +29,29 @@ class MainActivity : FlutterActivity() {
                         result.success(action)
                     }
                     "updateWidgetData" -> {
-                        val args = call.arguments as? Map<*, *>
-                        if (args != null) {
-                            val prefs = getSharedPreferences(TiggoMateWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
-                            prefs.edit().apply {
-                                (args["vehicle_name"] as? String)?.let { putString("vehicle_name", it) }
-                                (args["battery_soc"] as? Number)?.let { putInt("battery_soc", it.toInt()) }
-                                (args["battery_range"] as? Number)?.let { putInt("battery_range", it.toInt()) }
-                                (args["fuel_level"] as? Number)?.let { putInt("fuel_level", it.toInt()) }
-                                (args["fuel_range"] as? Number)?.let { putInt("fuel_range", it.toInt()) }
-                                (args["total_range"] as? Number)?.let { putInt("total_range", it.toInt()) }
-                                (args["is_locked"] as? Boolean)?.let { putBoolean("is_locked", it) }
-                                (args["is_charging"] as? Boolean)?.let { putBoolean("is_charging", it) }
-                                (args["is_climate_on"] as? Boolean)?.let { putBoolean("is_climate_on", it) }
-                                apply()
+                        try {
+                            val args = call.arguments as? Map<*, *>
+                            if (args != null) {
+                                val prefs = getSharedPreferences(TiggoMateWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
+                                prefs.edit().apply {
+                                    (args["vehicle_name"] as? String)?.let { putString("vehicle_name", it) }
+                                    (args["battery_soc"] as? Number)?.let { putInt("battery_soc", it.toInt()) }
+                                    (args["battery_range"] as? Number)?.let { putInt("battery_range", it.toInt()) }
+                                    (args["fuel_level"] as? Number)?.let { putInt("fuel_level", it.toInt()) }
+                                    (args["fuel_range"] as? Number)?.let { putInt("fuel_range", it.toInt()) }
+                                    (args["total_range"] as? Number)?.let { putInt("total_range", it.toInt()) }
+                                    (args["is_locked"] as? Boolean)?.let { putBoolean("is_locked", it) }
+                                    (args["is_charging"] as? Boolean)?.let { putBoolean("is_charging", it) }
+                                    (args["is_climate_on"] as? Boolean)?.let { putBoolean("is_climate_on", it) }
+                                    apply()
+                                }
+                                TiggoMateWidgetProvider.updateAllWidgets(this@MainActivity)
+                                result.success(true)
+                            } else {
+                                result.error("INVALID_ARGS", "Widget arguments must be a Map", null)
                             }
-                            TiggoMateWidgetProvider.updateAllWidgets(this@MainActivity)
-                            result.success(true)
-                        } else {
-                            result.error("INVALID_ARGS", "Widget arguments must be a Map", null)
+                        } catch (e: Exception) {
+                            result.error("ERROR", e.localizedMessage, null)
                         }
                     }
                     else -> result.notImplemented()

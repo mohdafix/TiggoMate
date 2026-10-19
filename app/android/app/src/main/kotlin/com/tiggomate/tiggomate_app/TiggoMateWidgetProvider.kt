@@ -93,11 +93,17 @@ class TiggoMateWidgetProvider : AppWidgetProvider() {
         }
 
         fun updateAllWidgets(context: Context) {
-            val appWidgetManager = AppWidgetManager.getInstance(context)
-            val thisWidget = ComponentName(context, TiggoMateWidgetProvider::class.java)
-            val allWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget)
-            for (widgetId in allWidgetIds) {
-                updateAppWidget(context, appWidgetManager, widgetId)
+            try {
+                val appWidgetManager = AppWidgetManager.getInstance(context) ?: return
+                val thisWidget = ComponentName(context, TiggoMateWidgetProvider::class.java)
+                val allWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget)
+                if (allWidgetIds != null && allWidgetIds.isNotEmpty()) {
+                    for (widgetId in allWidgetIds) {
+                        updateAppWidget(context, appWidgetManager, widgetId)
+                    }
+                }
+            } catch (e: Exception) {
+                // Ignore widget update errors gracefully
             }
         }
 
