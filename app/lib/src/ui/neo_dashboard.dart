@@ -594,9 +594,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       isCharging: _telemetry.isCharging,
       scheduledCharging: _scheduledCharging,
       onToggleCharge: (newChargingState) {
-        if (widget.repository is MockVehicleRepository) {
-          (widget.repository as MockVehicleRepository).toggleCharging(newChargingState);
-        }
+        widget.repository.toggleCharging(newChargingState);
         _showNotification(newChargingState
             ? '⚡ AC Charging initiated (3.3 kW).'
             : '⏸ Charging paused.');
@@ -957,22 +955,42 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    if (_isAdvancedView)
+                    if (_is3DView)
                       Row(
                         children: [
-                          Icon(
-                            _is3DView ? Icons.view_in_ar : Icons.radar,
+                          const Icon(
+                            Icons.view_in_ar,
                             size: 15,
-                            color: const Color(0xFF00D2AA),
+                            color: Color(0xFF00D2AA),
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            _is3DView ? '3D INTERACTIVE ORBIT' : '2D STUDIO RADAR',
-                            style: const TextStyle(
+                            '3D INTERACTIVE ORBIT',
+                            style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 1.1,
-                              color: Colors.white70,
+                              color: colors.isDark ? Colors.white70 : const Color(0xFF1E293B),
+                            ),
+                          ),
+                        ],
+                      )
+                    else if (_isAdvancedView)
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.radar,
+                            size: 15,
+                            color: Color(0xFF00D2AA),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '2D STUDIO RADAR',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.1,
+                              color: colors.isDark ? Colors.white70 : const Color(0xFF1E293B),
                             ),
                           ),
                         ],
@@ -1030,80 +1048,78 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         // Quick 3-Color Swatches Pill
                         _buildQuickColorSwatches(colors),
 
-                        if (_isAdvancedView) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF161E2E),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: const Color(0xFF283548)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                InkWell(
-                                  borderRadius: BorderRadius.circular(20),
-                                  onTap: () => setState(() => _is3DView = false),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: !_is3DView ? const Color(0xFF00D2AA) : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.photo_size_select_actual_outlined,
-                                          size: 13,
-                                          color: !_is3DView ? Colors.black : Colors.white60,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '2D',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: !_is3DView ? Colors.black : Colors.white60,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                InkWell(
-                                  borderRadius: BorderRadius.circular(20),
-                                  onTap: () => setState(() => _is3DView = true),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: _is3DView ? const Color(0xFF00D2AA) : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.view_in_ar,
-                                          size: 13,
-                                          color: _is3DView ? Colors.black : Colors.white60,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '3D',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: _is3DView ? Colors.black : Colors.white60,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
+                        const SizedBox(width: 8),
+                        Container(
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: colors.isDark ? const Color(0xFF161E2E) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: colors.border),
                           ),
-                        ],
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              InkWell(
+                                borderRadius: BorderRadius.circular(20),
+                                onTap: () => setState(() => _is3DView = false),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: !_is3DView ? const Color(0xFF00D2AA) : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.photo_size_select_actual_outlined,
+                                        size: 13,
+                                        color: !_is3DView ? Colors.black : (colors.isDark ? Colors.white60 : Colors.black54),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '2D',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: !_is3DView ? Colors.black : (colors.isDark ? Colors.white60 : Colors.black54),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              InkWell(
+                                borderRadius: BorderRadius.circular(20),
+                                onTap: () => setState(() => _is3DView = true),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: _is3DView ? const Color(0xFF00D2AA) : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.view_in_ar,
+                                        size: 13,
+                                        color: _is3DView ? Colors.black : (colors.isDark ? Colors.white60 : Colors.black54),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '3D',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: _is3DView ? Colors.black : (colors.isDark ? Colors.white60 : Colors.black54),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -1111,7 +1127,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 const SizedBox(height: 12),
 
               // Canvas Area: 3D ModelViewer OR 2D Studio Hotspot Stack
-              if (_isAdvancedView && _is3DView)
+              if (_is3DView)
                   SizedBox(
                     height: 240,
                     child: ClipRRect(
@@ -1123,9 +1139,16 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                             alt: 'Chery Tiggo 7 PHEV CSH 3D Model',
                             ar: false,
                             autoRotate: true,
+                            autoRotateDelay: 2000,
+                            rotationPerSecond: '20deg',
                             cameraControls: true,
-                            shadowIntensity: 1.0,
-                            backgroundColor: const Color(0xFF0D1219),
+                            minCameraOrbit: 'auto 30deg 60%',
+                            maxCameraOrbit: 'auto 90deg 200%',
+                            touchAction: TouchAction.panY,
+                            shadowIntensity: 0.8,
+                            shadowSoftness: 0.5,
+                            debugLogging: false,
+                            backgroundColor: colors.cardBg,
                             innerModelViewerHtml: '''
                               <button class="hotspot" slot="hotspot-fl" data-position="-0.0133 0.0036 0.009" data-normal="0 0 1" data-part="fl_tyre">
                                 <div class="pin-dot"></div>

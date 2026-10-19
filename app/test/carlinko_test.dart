@@ -109,5 +109,51 @@ void main() {
       expect(liveRepo.connectionStatus, equals(VehicleConnectionStatus.disconnected));
       liveRepo.dispose();
     });
+
+    test('AppVehicleRepository operates in verified pre-activation simulation mode', () {
+      final sharedRepo = AppVehicleRepository.instance;
+      expect(sharedRepo.isPreActivationMode, isTrue);
+      expect(sharedRepo.isLiveActive, isFalse);
+      expect(sharedRepo.currentTelemetry.isSimulated, isTrue);
+
+      sharedRepo.toggleCharging(true);
+      expect(sharedRepo.currentTelemetry.isCharging, isTrue);
+
+      sharedRepo.toggleCharging(false);
+      expect(sharedRepo.currentTelemetry.isCharging, isFalse);
+
+      sharedRepo.useMockMode();
+      expect(sharedRepo.isLiveActive, isFalse);
+      expect(sharedRepo.currentTelemetry.isSimulated, isTrue);
+    });
+  });
+
+  group('CarLinko Region & Parsing Improvements', () {
+    test('CarLinkoClient region normalization and configuration', () {
+      final client = CarLinkoClient();
+      expect(client.region, equals('sea'));
+
+      client.region = 'emea';
+      expect(client.region, equals('me'));
+
+      client.region = 'EU';
+      expect(client.region, equals('me'));
+
+      client.region = 'RU';
+      expect(client.region, equals('ru'));
+
+      client.region = 'AP';
+      expect(client.region, equals('ap'));
+
+      client.region = 'sea';
+      expect(client.region, equals('sea'));
+    });
+
+    test('parseBlob handles odd-length hex strings gracefully', () {
+      // 5 hex chars -> padded to 6 chars
+      final parsed = CarLinkoClient.parseBlob('77000');
+      expect(parsed, isNotNull);
+    });
   });
 }
+

@@ -1143,7 +1143,7 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
   AppSettings _settings = const AppSettings();
-  final VehicleRepository _vehicleRepo = MockVehicleRepository();
+  final VehicleRepository _vehicleRepo = AppVehicleRepository.instance;
   final MyTnbRepository _myTnbRepo = MyTnbRepository();
   bool _loading = true;
 
@@ -1274,44 +1274,32 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 }
 
 // ---------------- TAB 1: VEHICLE DASHBOARD ----------------
-class DashboardTab extends StatefulWidget {
+class DashboardTab extends StatelessWidget {
   final AppSettings settings;
   final Function(int) onNavigateToTab;
   final VoidCallback onOpenSettings;
+  final VehicleRepository? repository;
   const DashboardTab({
     required this.settings,
     required this.onNavigateToTab,
     required this.onOpenSettings,
+    this.repository,
     super.key,
   });
 
   @override
-  State<DashboardTab> createState() => _DashboardTabState();
-}
-
-class _DashboardTabState extends State<DashboardTab> {
-  final VehicleRepository _repo = MockVehicleRepository();
-
-  @override
-  void dispose() {
-    _repo.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return NeoDashboard(
-      repository: _repo,
-      ownerName: widget.settings.ownerName,
-      carPlateNumber: widget.settings.carPlateNumber,
-      vehicleNickname: widget.settings.vehicleNickname,
-      tnbTariff: widget.settings.tnbTariff,
-      fuelPrice: widget.settings.fuelPrice,
-      onOpenSettings: widget.onOpenSettings,
-      onOpenAssistant: () => widget.onNavigateToTab(1),
+      repository: repository ?? AppVehicleRepository.instance,
+      ownerName: settings.ownerName,
+      carPlateNumber: settings.carPlateNumber,
+      vehicleNickname: settings.vehicleNickname,
+      tnbTariff: settings.tnbTariff,
+      fuelPrice: settings.fuelPrice,
+      onOpenSettings: onOpenSettings,
+      onOpenAssistant: () => onNavigateToTab(1),
     );
   }
-
 }
 
 // ---------------- TAB 2: AI ASSISTANT ----------------

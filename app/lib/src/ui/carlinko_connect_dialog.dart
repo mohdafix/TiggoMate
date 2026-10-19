@@ -40,6 +40,16 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
     super.dispose();
   }
 
+  void _handleUseMock() {
+    if (widget.repository is AppVehicleRepository) {
+      (widget.repository as AppVehicleRepository).useMockMode();
+    } else {
+      widget.repository.disconnect();
+    }
+    widget.onConnected();
+    Navigator.of(context).pop();
+  }
+
   Future<void> _handleConnect() async {
     final acc = _accountController.text.trim();
     final pwd = _passwordController.text;
@@ -80,9 +90,16 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
         setState(() {
           _loading = false;
           _isError = true;
-          _statusMessage = e is CarLinkoException
-              ? 'CarLinko Error (${e.code ?? "failed"}): ${e.message}'
-              : 'Connection error: $e';
+          if (e is CarLinkoException) {
+            final isUnactivated = e.code == '10001' ||
+                e.code == 'USER_NOT_FOUND' ||
+                e.code == 'AUTH_FAILED';
+            _statusMessage = isUnactivated
+                ? 'Pre-Activation Notice: Account not active on CarLinko cloud yet. Authorised Chery centres activate telematics during the 1,000 km initial service. You can continue using Simulation Mode.'
+                : 'CarLinko Cloud Error (${e.code ?? "failed"}): ${e.message}';
+          } else {
+            _statusMessage = 'Connection error: $e';
+          }
         });
       }
     }
@@ -119,6 +136,30 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
               ],
             ),
             const SizedBox(height: 16),
+
+            // Pre-Activation Notice Banner
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF00D2AA).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Icon(Icons.verified_outlined, color: Color(0xFF00D2AA), size: 20),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Pre-Activation Mode Active: Chery CarLinko telematics is activated by your authorised Chery 3S/4S centre during the 1,000 km initial vehicle service. Until activation, TiggoMate runs in high-fidelity Simulation Mode.',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF99F6E4), height: 1.35),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
 
             // Single Session Warning Banner
             Container(
@@ -180,7 +221,8 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
               items: const [
                 DropdownMenuItem(value: 'sea', child: Text('SEA (Malaysia & Thailand)')),
                 DropdownMenuItem(value: 'ap', child: Text('Asia-Pacific (AP)')),
-                DropdownMenuItem(value: 'emea', child: Text('EMEA (Europe/Middle East)')),
+                DropdownMenuItem(value: 'me', child: Text('Middle East (ME)')),
+                DropdownMenuItem(value: 'ru', child: Text('Eurasia (RU)')),
               ],
               onChanged: (val) {
                 if (val != null) setState(() => _region = val);
@@ -209,29 +251,47 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
             ],
 
             // Action Buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 10,
               children: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton.icon(
-                  onPressed: _loading ? null : _handleConnect,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00D2AA),
-                    foregroundColor: Colors.black87,
+                OutlinedButton.icon(
+                  onPressed: _loading ? null : _handleUseMock,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF00D2AA),
+                    side: const BorderSide(color: Color(0xFF00D2AA)),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  icon: _loading
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black87),
-                        )
-                      : const Icon(Icons.login, size: 18),
-                  label: Text(_loading ? 'Connecting...' : 'Connect Cloud'),
+                  icon: const Icon(Icons.speed, size: 16),
+                  label: const Text('Use Simulation Mode'),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: _loading ? null : _handleConnect,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00D2AA),
+                        foregroundColor: Colors.black87,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: _loading
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black87),
+                            )
+                          : const Icon(Icons.login, size: 18),
+                      label: Text(_loading ? 'Connecting...' : 'Connect Cloud'),
+                    ),
+                  ],
                 ),
               ],
             ),
