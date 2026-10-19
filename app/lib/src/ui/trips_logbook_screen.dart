@@ -653,7 +653,7 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
           // ---------------- TOP HEADER ----------------
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -661,7 +661,7 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                   Text(
                     'Trips &',
                     style: TextStyle(
-                      fontSize: 24,
+                      fontSize: 22,
                       fontWeight: FontWeight.bold,
                       color: isDark ? Colors.white : const Color(0xFF111827),
                       height: 1.1,
@@ -670,7 +670,7 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                   Text(
                     'Expense Log',
                     style: TextStyle(
-                      fontSize: 24,
+                      fontSize: 22,
                       fontWeight: FontWeight.bold,
                       color: isDark ? Colors.white : const Color(0xFF111827),
                       height: 1.1,
@@ -678,157 +678,129 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                   ),
                 ],
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Month Picker Pill
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF131922) : Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _selectedMonth,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: isDark ? Colors.white70 : const Color(0xFF374151),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Icon(Icons.arrow_drop_down, size: 16, color: isDark ? Colors.white70 : const Color(0xFF374151)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-
-                      // Export Pill Button
-                      InkWell(
-                        onTap: _showExportModal,
-                        borderRadius: BorderRadius.circular(16),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF131922) : Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.ios_share, size: 13, color: isDark ? Colors.white70 : const Color(0xFF374151)),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Export',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark ? Colors.white70 : const Color(0xFF374151),
-                                ),
-                              ),
-                            ],
+                  // Month Picker Pill
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF131922) : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _selectedMonth,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white70 : const Color(0xFF374151),
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 4),
+                        Icon(Icons.arrow_drop_down, size: 16, color: isDark ? Colors.white70 : const Color(0xFF374151)),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(width: 6),
 
-                  // Quick Action Buttons Row
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // + Add Trip Pill
-                      InkWell(
-                        onTap: _showAddTripPresetModal,
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF2F81F7).withValues(alpha: isDark ? 0.15 : 0.12),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0xFF2F81F7)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              Icon(Icons.add_road, size: 13, color: Color(0xFF2F81F7)),
-                              SizedBox(width: 4),
-                              Text(
-                                'Add Trip',
-                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2F81F7)),
-                              ),
-                            ],
-                          ),
-                        ),
+                  // Export Pill Button
+                  InkWell(
+                    onTap: _showExportModal,
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF131922) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
                       ),
-                      const SizedBox(width: 6),
-
-                      // + Log Fuel/Charge Pill Button
-                      InkWell(
-                        onTap: _showLogModal,
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF00D2AA).withValues(alpha: isDark ? 0.15 : 0.12),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0xFF00D2AA)),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.ios_share, size: 13, color: isDark ? Colors.white70 : const Color(0xFF374151)),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Export',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.white70 : const Color(0xFF374151),
+                            ),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              Icon(Icons.add, size: 13, color: Color(0xFF00D2AA)),
-                              SizedBox(width: 4),
-                              Text(
-                                'Log Fuel/Charge',
-                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF00D2AA)),
-                              ),
-                            ],
-                          ),
-                        ),
+                        ],
                       ),
-                      const SizedBox(width: 6),
-
-                      // Drive HUD Pill Button
-                      InkWell(
-                        onTap: () => SmartDriveHudSheet.show(context, onTripSaved: (_) => _loadStoredData()),
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.15 : 0.12),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0xFF10B981)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              Icon(Icons.speed, size: 13, color: Color(0xFF10B981)),
-                              SizedBox(width: 4),
-                              Text(
-                                'Drive HUD',
-                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+
+          // Quick Action Buttons Row (Full-width responsive action dock)
+          Row(
+            children: [
+              // + Log Fuel/Charge Pill Button (Primary)
+              Expanded(
+                child: InkWell(
+                  onTap: _showLogModal,
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00D2AA).withValues(alpha: isDark ? 0.15 : 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFF00D2AA), width: 1.2),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.add, size: 15, color: Color(0xFF00D2AA)),
+                        SizedBox(width: 6),
+                        Text(
+                          'Log Fuel/Charge',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF00D2AA)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+
+              // + Add Trip Pill (Secondary)
+              Expanded(
+                child: InkWell(
+                  onTap: _showAddTripPresetModal,
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2F81F7).withValues(alpha: isDark ? 0.15 : 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFF2F81F7), width: 1.2),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.add_road, size: 15, color: Color(0xFF2F81F7)),
+                        SizedBox(width: 6),
+                        Text(
+                          'Add Trip',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF2F81F7)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
 
           // ---------------- MONTHLY SUMMARY CARD ----------------
           Card(

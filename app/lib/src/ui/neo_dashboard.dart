@@ -637,84 +637,90 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Left: Driver & Connectivity Pill
-            GestureDetector(
-              onTap: _openAuthSheet,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: colors.tileBg,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: AuthService().currentUser.isAuthenticated
-                        ? colors.evTeal.withValues(alpha: 0.5)
-                        : const Color(0xFF2F81F7).withValues(alpha: 0.5),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: _telemetry.isCharging
-                            ? colors.evTeal
-                            : (AuthService().currentUser.isAuthenticated ? colors.evTeal : const Color(0xFF2F81F7)),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Icon(
-                      AuthService().currentUser.isAuthenticated
-                          ? Icons.account_circle_outlined
-                          : Icons.login_rounded,
-                      size: 15,
+            // Left: Driver & Connectivity Pill (Flexible to prevent pushing right dock)
+            Flexible(
+              child: GestureDetector(
+                onTap: _openAuthSheet,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: colors.tileBg,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
                       color: AuthService().currentUser.isAuthenticated
-                          ? colors.evTeal
-                          : const Color(0xFF2F81F7),
+                          ? colors.evTeal.withValues(alpha: 0.5)
+                          : const Color(0xFF2F81F7).withValues(alpha: 0.5),
                     ),
-                    const SizedBox(width: 5),
-                    Text(
-                      AuthService().currentUser.isAuthenticated
-                          ? AuthService().currentUser.displayName
-                          : 'Log In',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _telemetry.isCharging
+                              ? colors.evTeal
+                              : (AuthService().currentUser.isAuthenticated ? colors.evTeal : const Color(0xFF2F81F7)),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(
+                        AuthService().currentUser.isAuthenticated
+                            ? Icons.account_circle_outlined
+                            : Icons.login_rounded,
+                        size: 15,
                         color: AuthService().currentUser.isAuthenticated
                             ? colors.evTeal
                             : const Color(0xFF2F81F7),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: _telemetry.isCharging
-                            ? colors.evTeal.withValues(alpha: 0.2)
-                            : (!_telemetry.isSimulated ? colors.evTeal.withValues(alpha: 0.15) : Colors.orange.withValues(alpha: 0.15)),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        _telemetry.isCharging
-                            ? '⚡ 3.3kW'
-                            : (_telemetry.isSimulated ? 'Simulated' : 'Connected'),
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: _telemetry.isCharging
-                              ? colors.evTeal
-                              : (!_telemetry.isSimulated ? colors.evTeal : Colors.orangeAccent),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          AuthService().currentUser.isAuthenticated
+                              ? AuthService().currentUser.displayName
+                              : 'Log In',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AuthService().currentUser.isAuthenticated
+                                ? colors.evTeal
+                                : const Color(0xFF2F81F7),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _telemetry.isCharging
+                              ? colors.evTeal.withValues(alpha: 0.2)
+                              : (!_telemetry.isSimulated ? colors.evTeal.withValues(alpha: 0.15) : Colors.orange.withValues(alpha: 0.15)),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          _telemetry.isCharging
+                              ? '⚡ 3.3kW'
+                              : (_telemetry.isSimulated ? 'Simulated' : 'Connected'),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: _telemetry.isCharging
+                                ? colors.evTeal
+                                : (!_telemetry.isSimulated ? colors.evTeal : Colors.orangeAccent),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
+            const SizedBox(width: 8),
 
-            // Right: Action Icons Dock (Location, Telematics, Theme Toggle, Settings)
+            // Right: Action Icons Dock (Cloud Sync, Alerts, Theme Switcher, Quick Menu)
             Container(
               decoration: BoxDecoration(
                 color: colors.dockBg,
@@ -725,20 +731,6 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.all(6),
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                    tooltip: 'Chery Service Centres',
-                    icon: Icon(Icons.location_on_outlined, size: 18, color: colors.dockBtnIcon),
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const CheryServiceCentresScreen(),
-                        ),
-                      );
-                    },
-                  ),
                   IconButton(
                     visualDensity: VisualDensity.compact,
                     padding: const EdgeInsets.all(6),
@@ -792,29 +784,78 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     ),
                     onPressed: () => AppThemeController.instance.toggleTheme(context),
                   ),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.all(6),
+                  PopupMenuButton<String>(
+                    tooltip: 'More Vehicle Tools',
+                    padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                    tooltip: 'Drive Mode HUD',
-                    icon: const Icon(Icons.speed, size: 18, color: Color(0xFF10B981)),
-                    onPressed: () => SmartDriveHudSheet.show(context),
-                  ),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.all(6),
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                    tooltip: 'Widgets & Quick Actions',
-                    icon: Icon(Icons.widgets_outlined, size: 18, color: colors.evTeal),
-                    onPressed: _openWidgetsShortcutsSheet,
-                  ),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.all(6),
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                    tooltip: 'Settings',
-                    icon: Icon(Icons.settings_outlined, size: 18, color: colors.dockBtnIcon),
-                    onPressed: widget.onOpenSettings,
+                    icon: Icon(Icons.more_horiz_rounded, size: 20, color: colors.dockBtnIcon),
+                    color: colors.cardBg,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(color: colors.borderSubtle),
+                    ),
+                    onSelected: (val) {
+                      switch (val) {
+                        case 'settings':
+                          widget.onOpenSettings();
+                          break;
+                        case 'widgets':
+                          _openWidgetsShortcutsSheet();
+                          break;
+                        case 'hud':
+                          SmartDriveHudSheet.show(context);
+                          break;
+                        case 'centres':
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const CheryServiceCentresScreen(),
+                            ),
+                          );
+                          break;
+                      }
+                    },
+                    itemBuilder: (ctx) => [
+                      PopupMenuItem(
+                        value: 'settings',
+                        child: Row(
+                          children: [
+                            Icon(Icons.settings_outlined, size: 18, color: colors.dockBtnIcon),
+                            const SizedBox(width: 10),
+                            const Text('Settings & Profile', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'widgets',
+                        child: Row(
+                          children: const [
+                            Icon(Icons.widgets_outlined, size: 18, color: Color(0xFF00D2AA)),
+                            SizedBox(width: 10),
+                            Text('Android Widgets & Shortcuts', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'hud',
+                        child: Row(
+                          children: const [
+                            Icon(Icons.speed, size: 18, color: Color(0xFF10B981)),
+                            SizedBox(width: 10),
+                            Text('Smart Drive Mode HUD', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'centres',
+                        child: Row(
+                          children: [
+                            Icon(Icons.location_on_outlined, size: 18, color: colors.dockBtnIcon),
+                            const SizedBox(width: 10),
+                            const Text('Chery Service Centres', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -990,46 +1031,51 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       )
                     else
                       // In Basic view, show interactive color name pill
-                      InkWell(
-                        onTap: _showVehicleSkinStudioModal,
-                        borderRadius: BorderRadius.circular(14),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: colors.isDark ? const Color(0xFF131922) : const Color(0xFFF3F4F6),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: colors.border),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.palette_outlined, size: 13, color: Color(0xFF00D2AA)),
-                              const SizedBox(width: 5),
-                              Text(
-                                _selectedSkin.name,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: colors.isDark ? Colors.white : const Color(0xFF111827),
-                                ),
-                              ),
-                              if (_selectedSkin.isDualTone) ...[
-                                const SizedBox(width: 4),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: const Text(
-                                    'BLACK ROOF',
-                                    style: TextStyle(fontSize: 7.5, fontWeight: FontWeight.bold, color: Colors.white),
+                      Flexible(
+                        child: InkWell(
+                          onTap: _showVehicleSkinStudioModal,
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: colors.isDark ? const Color(0xFF131922) : const Color(0xFFF3F4F6),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: colors.border),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.palette_outlined, size: 13, color: Color(0xFF00D2AA)),
+                                const SizedBox(width: 5),
+                                Flexible(
+                                  child: Text(
+                                    _selectedSkin.name,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: colors.isDark ? Colors.white : const Color(0xFF111827),
+                                    ),
                                   ),
                                 ),
+                                if (_selectedSkin.isDualTone) ...[
+                                  const SizedBox(width: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      'BLACK ROOF',
+                                      style: TextStyle(fontSize: 7.5, fontWeight: FontWeight.bold, color: Colors.white),
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(width: 2),
+                                Icon(Icons.arrow_drop_down, size: 14, color: colors.textMuted),
                               ],
-                              const SizedBox(width: 2),
-                              Icon(Icons.arrow_drop_down, size: 14, color: colors.textMuted),
-                            ],
+                            ),
                           ),
                         ),
                       ),
