@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../mytnb/mytnb_api.dart';
+import '../theme/app_theme.dart';
 import 'mytnb_connect_dialog.dart';
 import 'app_notification.dart';
 import 'smart_drive_hud.dart';
@@ -834,11 +835,14 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
             elevation: 0,
             color: isDark ? const Color(0xFF0D1219) : Colors.white,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(22),
-              side: BorderSide(color: isDark ? const Color(0xFF1F2937) : const Color(0xFFE5E7EB)),
+              borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
+              side: BorderSide(
+                color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0),
+                width: AppDesignTokens.borderWidth,
+              ),
             ),
             child: Padding(
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.all(AppDesignTokens.spaceMd),
               child: Column(
                 children: [
                   Row(
@@ -852,20 +856,13 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                           color: isDark ? Colors.white70 : const Color(0xFF6B7280),
                         ),
                       ),
-                      // Glowing Saved Badge
+                      // Saved Badge
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF00D2AA).withValues(alpha: isDark ? 0.18 : 0.15),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF00D2AA)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF00D2AA).withValues(alpha: isDark ? 0.25 : 0.15),
-                              blurRadius: 8,
-                              spreadRadius: 1,
-                            ),
-                          ],
+                          color: const Color(0xFF00D2AA).withValues(alpha: isDark ? 0.15 : 0.12),
+                          borderRadius: BorderRadius.circular(AppDesignTokens.radiusSmall),
+                          border: Border.all(color: const Color(0xFF00D2AA), width: AppDesignTokens.borderWidth),
                         ),
                         child: Text(
                           '+ RM ${_monthlySavings.toStringAsFixed(0)} Saved',
@@ -988,13 +985,12 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
             margin: const EdgeInsets.only(bottom: 20),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: isDark
-                    ? [const Color(0xFF0F172A), const Color(0xFF064E3B)]
-                    : [const Color(0xFFF0FDF4), const Color(0xFFDCFCE7)],
+              color: isDark ? const Color(0xFF0F1A17) : const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
+              border: Border.all(
+                color: isDark ? const Color(0xFF065F46) : const Color(0xFFA7F3D0),
+                width: AppDesignTokens.borderWidth,
               ),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4), width: 1.2),
             ),
             child: Row(
               children: [
@@ -1070,11 +1066,14 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
             elevation: 0,
             color: isDark ? const Color(0xFF0D1219) : Colors.white,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(22),
-              side: BorderSide(color: isDark ? const Color(0xFF1F2937) : const Color(0xFFE5E7EB)),
+              borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
+              side: BorderSide(
+                color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0),
+                width: AppDesignTokens.borderWidth,
+              ),
             ),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppDesignTokens.spaceMd),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1102,8 +1101,11 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                     width: double.infinity,
                     decoration: BoxDecoration(
                       color: isDark ? const Color(0xFF090E15) : const Color(0xFFF3F4F6),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: isDark ? const Color(0xFF1C2636) : const Color(0xFFE5E7EB)),
+                      borderRadius: BorderRadius.circular(AppDesignTokens.radiusMedium),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0),
+                        width: AppDesignTokens.borderWidth,
+                      ),
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(16),

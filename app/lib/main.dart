@@ -1231,43 +1231,65 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           children: pages,
         ),
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (idx) => setState(() => _currentIndex = idx),
-        destinations: [
-          NavigationDestination(
-            icon: const Icon(Icons.directions_car_outlined),
-            selectedIcon: Icon(
-              Icons.directions_car,
-              color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF00D2AA) : const Color(0xFF111827),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFF0D1219)
+              : Colors.white,
+          border: Border(
+            top: BorderSide(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF1E2636)
+                  : const Color(0xFFE2E8F0),
+              width: AppDesignTokens.borderWidth,
             ),
-            label: 'Vehicle',
           ),
-          NavigationDestination(
-            icon: const Icon(Icons.chat_bubble_outline),
-            selectedIcon: Icon(
-              Icons.chat_bubble,
-              color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF00D2AA) : const Color(0xFF111827),
+        ),
+        child: NavigationBar(
+          height: 64,
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          selectedIndex: _currentIndex,
+          onDestinationSelected: (idx) => setState(() => _currentIndex = idx),
+          destinations: [
+            NavigationDestination(
+              icon: const Icon(Icons.directions_car_outlined, size: 22),
+              selectedIcon: Icon(
+                Icons.directions_car,
+                size: 22,
+                color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF00D2AA) : const Color(0xFF111827),
+              ),
+              label: 'Vehicle',
             ),
-            label: 'Assistant',
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.route_outlined),
-            selectedIcon: Icon(
-              Icons.route,
-              color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF00D2AA) : const Color(0xFF111827),
+            NavigationDestination(
+              icon: const Icon(Icons.chat_bubble_outline, size: 22),
+              selectedIcon: Icon(
+                Icons.chat_bubble,
+                size: 22,
+                color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF00D2AA) : const Color(0xFF111827),
+              ),
+              label: 'Assistant',
             ),
-            label: 'Trips & Log',
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.build_outlined),
-            selectedIcon: Icon(
-              Icons.build,
-              color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF00D2AA) : const Color(0xFF111827),
+            NavigationDestination(
+              icon: const Icon(Icons.route_outlined, size: 22),
+              selectedIcon: Icon(
+                Icons.route,
+                size: 22,
+                color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF00D2AA) : const Color(0xFF111827),
+              ),
+              label: 'Trips & Log',
             ),
-            label: 'Service',
-          ),
-        ],
+            NavigationDestination(
+              icon: const Icon(Icons.build_outlined, size: 22),
+              selectedIcon: Icon(
+                Icons.build,
+                size: 22,
+                color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF00D2AA) : const Color(0xFF111827),
+              ),
+              label: 'Service',
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1930,7 +1952,7 @@ class _AssistantTabState extends State<AssistantTab> {
         Expanded(
           child: ListView.builder(
             controller: _scrollController,
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             itemCount: _messages.length,
             itemBuilder: (context, idx) {
               final msg = _messages[idx];
@@ -1945,13 +1967,18 @@ class _AssistantTabState extends State<AssistantTab> {
                   constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.85),
                   decoration: BoxDecoration(
                     color: isUser
-                        ? const Color(0xFF2F81F7)
-                        : (isDark ? const Color(0xFF182230) : const Color(0xFFF3F4F6)),
-                    borderRadius: BorderRadius.circular(16).copyWith(
-                      bottomRight: isUser ? const Radius.circular(2) : const Radius.circular(16),
-                      bottomLeft: !isUser ? const Radius.circular(2) : const Radius.circular(16),
+                        ? (isDark ? const Color(0xFF1E293B) : const Color(0xFF0F172A))
+                        : (isDark ? const Color(0xFF131922) : Colors.white),
+                    borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard).copyWith(
+                      bottomRight: isUser ? const Radius.circular(2) : const Radius.circular(AppDesignTokens.radiusCard),
+                      bottomLeft: !isUser ? const Radius.circular(2) : const Radius.circular(AppDesignTokens.radiusCard),
                     ),
-                    border: isUser ? null : Border.all(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
+                    border: Border.all(
+                      color: isUser
+                          ? (isDark ? const Color(0xFF334155) : const Color(0xFF1E293B))
+                          : (isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0)),
+                      width: AppDesignTokens.borderWidth,
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1965,20 +1992,35 @@ class _AssistantTabState extends State<AssistantTab> {
                               ? Colors.white
                               : (isDark ? Colors.white.withValues(alpha: 0.95) : const Color(0xFF111827)),
                         ),
-                        accentColor: isUser ? Colors.white : const Color(0xFF00D2AA),
+                        accentColor: isUser ? const Color(0xFF00D2AA) : const Color(0xFF00D2AA),
                       ),
                       if (citations != null && citations.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         Container(
-                          padding: const EdgeInsets.all(6),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF00D2AA).withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
-                            border: const Border(left: BorderSide(color: Color(0xFF00D2AA), width: 3)),
+                            color: isDark ? const Color(0xFF0B1017) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(AppDesignTokens.radiusSmall),
+                            border: Border(
+                              left: const BorderSide(color: Color(0xFF00D2AA), width: 3),
+                              top: BorderSide(color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0)),
+                              right: BorderSide(color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0)),
+                              bottom: BorderSide(color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0)),
+                            ),
                           ),
-                          child: Text(
-                            "📖 Citation: ${citations[0]['document']} (p. ${citations[0]['page']})",
-                            style: const TextStyle(fontSize: 10.5, color: Color(0xFF00D2AA), fontWeight: FontWeight.bold),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.menu_book_rounded, size: 12, color: Color(0xFF00D2AA)),
+                              const SizedBox(width: 5),
+                              Flexible(
+                                child: Text(
+                                  "📖 Citation: ${citations[0]['document']} (p. ${citations[0]['page']})",
+                                  style: const TextStyle(fontSize: 10.5, color: Color(0xFF00D2AA), fontWeight: FontWeight.bold),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -1992,16 +2034,16 @@ class _AssistantTabState extends State<AssistantTab> {
 
         if (_loading)
           const Padding(
-            padding: EdgeInsets.all(8.0),
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: LinearProgressIndicator(color: Color(0xFF00D2AA), backgroundColor: Colors.transparent),
           ),
 
         // Quick Suggestion Chips
         SizedBox(
-          height: 38,
+          height: 36,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
             itemCount: _suggestions.length,
             separatorBuilder: (context, index) => const SizedBox(width: 8),
             itemBuilder: (context, idx) {
@@ -2010,12 +2052,13 @@ class _AssistantTabState extends State<AssistantTab> {
                   _suggestions[idx],
                   style: TextStyle(
                     fontSize: 11,
+                    fontWeight: FontWeight.w500,
                     color: isDark ? Colors.white70 : const Color(0xFF374151),
                   ),
                 ),
-                backgroundColor: isDark ? const Color(0xFF182230) : const Color(0xFFF3F4F6),
-                side: BorderSide(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                backgroundColor: isDark ? const Color(0xFF131922) : const Color(0xFFF1F5F9),
+                side: BorderSide(color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppDesignTokens.radiusPill)),
                 onPressed: () => _sendMessage(_suggestions[idx]),
               );
             },
@@ -2027,8 +2070,8 @@ class _AssistantTabState extends State<AssistantTab> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF131922) : Colors.white,
-            border: Border(top: BorderSide(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB))),
+            color: isDark ? const Color(0xFF0D1219) : Colors.white,
+            border: Border(top: BorderSide(color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0))),
           ),
           child: Row(
             children: [
@@ -2046,18 +2089,18 @@ class _AssistantTabState extends State<AssistantTab> {
                       fontSize: 13,
                     ),
                     filled: true,
-                    fillColor: isDark ? const Color(0xFF090D12) : const Color(0xFFF3F4F6),
+                    fillColor: isDark ? const Color(0xFF070B0F) : const Color(0xFFF1F5F9),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
+                      borderRadius: BorderRadius.circular(AppDesignTokens.radiusPill),
+                      borderSide: BorderSide(color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0)),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
+                      borderRadius: BorderRadius.circular(AppDesignTokens.radiusPill),
+                      borderSide: BorderSide(color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0)),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: BorderRadius.circular(AppDesignTokens.radiusPill),
                       borderSide: const BorderSide(color: Color(0xFF00D2AA)),
                     ),
                   ),
@@ -2065,10 +2108,14 @@ class _AssistantTabState extends State<AssistantTab> {
                 ),
               ),
               const SizedBox(width: 8),
-              IconButton.filled(
-                icon: const Icon(Icons.send, size: 18),
-                style: IconButton.styleFrom(backgroundColor: const Color(0xFF00D2AA), foregroundColor: Colors.black87),
-                onPressed: () => _sendMessage(_controller.text),
+              SizedBox(
+                width: AppDesignTokens.minTouchTarget,
+                height: AppDesignTokens.minTouchTarget,
+                child: IconButton.filled(
+                  icon: const Icon(Icons.send, size: 18),
+                  style: IconButton.styleFrom(backgroundColor: const Color(0xFF00D2AA), foregroundColor: Colors.black87),
+                  onPressed: () => _sendMessage(_controller.text),
+                ),
               ),
             ],
           ),

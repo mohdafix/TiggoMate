@@ -718,15 +718,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             Container(
               decoration: BoxDecoration(
                 color: colors.dockBg,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: colors.border),
-                boxShadow: [
-                  BoxShadow(
-                    color: colors.dockShadow,
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(AppDesignTokens.radiusPill),
+                border: Border.all(color: colors.borderSubtle, width: AppDesignTokens.borderWidth),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               child: Row(
@@ -944,11 +937,11 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
           color: colors.cardBg,
           elevation: colors.isDark ? 0 : 0.5,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-            side: BorderSide(color: colors.border),
+            borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
+            side: BorderSide(color: colors.borderSubtle, width: AppDesignTokens.borderWidth),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppDesignTokens.spaceMd),
             child: Column(
               children: [
                 // Top Stage Header: View Switcher & Dynamic Vehicle Skin Customizer
@@ -1348,8 +1341,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     color: colors.tileBg,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: colors.border),
+                    borderRadius: BorderRadius.circular(AppDesignTokens.radiusMedium),
+                    border: Border.all(color: colors.borderSubtle, width: AppDesignTokens.borderWidth),
                   ),
                   child: Row(
                     children: [
@@ -1472,8 +1465,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
           elevation: colors.isDark ? 0 : 0.5,
           color: colors.cardBg,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-            side: BorderSide(color: colors.border),
+            borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
+            side: BorderSide(color: colors.borderSubtle, width: AppDesignTokens.borderWidth),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
@@ -1538,11 +1531,11 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             elevation: 0,
             color: colors.cardBg,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24),
-              side: BorderSide(color: colors.border),
+              borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
+              side: BorderSide(color: colors.borderSubtle, width: AppDesignTokens.borderWidth),
             ),
             child: Padding(
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.all(AppDesignTokens.spaceMd),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1721,11 +1714,11 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
           elevation: 0,
           color: colors.cardBg,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-            side: BorderSide(color: colors.border),
+            borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
+            side: BorderSide(color: colors.borderSubtle, width: AppDesignTokens.borderWidth),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(AppDesignTokens.spaceMd),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1890,11 +1883,11 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
           elevation: 0,
           color: colors.cardBg,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-            side: BorderSide(color: colors.border),
+            borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
+            side: BorderSide(color: colors.borderSubtle, width: AppDesignTokens.borderWidth),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(AppDesignTokens.spaceMd),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -2159,24 +2152,24 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
   Widget _buildModeSwitcher() {
     final colors = AppColors(context);
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: colors.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.border),
+        borderRadius: BorderRadius.circular(AppDesignTokens.radiusPill),
+        border: Border.all(color: colors.borderSubtle, width: AppDesignTokens.borderWidth),
       ),
       child: Row(
         children: [
           Expanded(
             child: InkWell(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppDesignTokens.radiusPill),
               onTap: () => _toggleUiMode(false),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
                   color: !_isAdvancedView ? colors.evTeal.withValues(alpha: 0.15) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppDesignTokens.radiusPill),
                   border: Border.all(
                     color: !_isAdvancedView ? colors.evTeal.withValues(alpha: 0.5) : Colors.transparent,
                   ),
@@ -2206,14 +2199,14 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
           const SizedBox(width: 6),
           Expanded(
             child: InkWell(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppDesignTokens.radiusPill),
               onTap: () => _toggleUiMode(true),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
                   color: _isAdvancedView ? const Color(0xFF2F81F7).withValues(alpha: 0.15) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppDesignTokens.radiusPill),
                   border: Border.all(
                     color: _isAdvancedView ? const Color(0xFF2F81F7).withValues(alpha: 0.5) : Colors.transparent,
                   ),
@@ -2253,12 +2246,12 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       elevation: isDark ? 0 : 0.5,
       color: colors.cardBg,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: colors.border),
+        borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
+        side: BorderSide(color: colors.borderSubtle, width: AppDesignTokens.borderWidth),
       ),
       child: InkWell(
         onTap: () => _handleRemoteCommand('locate'),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
@@ -2398,11 +2391,11 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       elevation: colors.isDark ? 0 : 0.5,
       color: colors.cardBg,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-        side: BorderSide(color: colors.border),
+        borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
+        side: BorderSide(color: colors.borderSubtle, width: AppDesignTokens.borderWidth),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(AppDesignTokens.spaceMd),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

@@ -345,4 +345,44 @@ class AppColors {
             const Color(0xFFF7F8FA),
           ],
         );
+
+  // Design System Semantic Colors
+  Color get surface => cardBg;
+  Color get surfaceElevated => tileBg;
+  Color get borderSubtle => isDark ? const Color(0xFF18202D) : const Color(0xFFEDF2F7);
+  Color get electricCyanSubtle => evTeal.withValues(alpha: 0.12);
+  Color get petrolAmberSubtle => petrolAmber.withValues(alpha: 0.12);
+  Color get infoBlue => isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7);
+  Color get infoBlueSubtle => infoBlue.withValues(alpha: 0.12);
+  Color get danger => isDark ? const Color(0xFFEF4444) : const Color(0xFFDC2626);
+  Color get dangerSubtle => danger.withValues(alpha: 0.12);
+  Color get success => isDark ? const Color(0xFF10B981) : const Color(0xFF059669);
+  Color get successSubtle => success.withValues(alpha: 0.12);
 }
+
+/// Standardized Automotive Design System Tokens
+class AppDesignTokens {
+  // Spacing Scale
+  static const double spaceXxs = 4.0;
+  static const double spaceXs = 8.0;
+  static const double spaceSm = 12.0;
+  static const double spaceMd = 16.0;
+  static const double spaceLg = 20.0;
+  static const double spaceXl = 24.0;
+  static const double spaceXxl = 32.0;
+
+  // Corner Radii
+  static const double radiusSmall = 8.0;
+  static const double radiusMedium = 12.0;
+  static const double radiusCard = 16.0;
+  static const double radiusSheet = 24.0;
+  static const double radiusPill = 20.0;
+
+  // Touch Target Minimums
+  static const double minTouchTarget = 44.0;
+  static const double buttonHeight = 48.0;
+
+  // Standard Border Width
+  static const double borderWidth = 1.0;
+}
+
