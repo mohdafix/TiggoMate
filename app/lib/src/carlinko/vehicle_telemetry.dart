@@ -22,6 +22,19 @@ class VehicleTelemetry {
   final bool doorsOpen;
   final bool trunkOpen;
   final bool windowsOpen;
+  final bool sunroofOpen;
+  final bool engineOn;
+  final bool rapidCool;
+  final bool frontDefrost;
+  final bool rearDefrost;
+  final bool airPurifier;
+  final int fanGear; // 0 = Auto, 1..7
+  final int seatHeatDriver; // 0..3
+  final int seatVentDriver; // 0..3
+  final int seatHeatPass; // 0..3
+  final int seatVentPass; // 0..3
+  final bool steeringHeat;
+  final int airDurationMin;
 
   // Direct TPMS
   final double tyreFlPressureKpa;
@@ -57,10 +70,23 @@ class VehicleTelemetry {
     this.chargePowerKw = 0.0,
     this.chargeRemainMin,
     this.acOn = false,
-    this.acTemp = 23,
+    this.acTemp = 22,
     this.doorsOpen = false,
     this.trunkOpen = false,
     this.windowsOpen = false,
+    this.sunroofOpen = false,
+    this.engineOn = false,
+    this.rapidCool = false,
+    this.frontDefrost = false,
+    this.rearDefrost = false,
+    this.airPurifier = true,
+    this.fanGear = 0,
+    this.seatHeatDriver = 0,
+    this.seatVentDriver = 0,
+    this.seatHeatPass = 0,
+    this.seatVentPass = 0,
+    this.steeringHeat = false,
+    this.airDurationMin = 10,
     this.tyreFlPressureKpa = 235.0,
     this.tyreFrPressureKpa = 234.0,
     this.tyreRlPressureKpa = 236.0,
@@ -121,6 +147,8 @@ class VehicleTelemetry {
       doorsOpen: (m['doors'] as num?)?.toInt() != 0,
       trunkOpen: (m['trunk'] as num?)?.toInt() != 0,
       windowsOpen: (m['windows'] as num?)?.toInt() != 0,
+      sunroofOpen: (m['sunroof'] as num?)?.toInt() != 0,
+      engineOn: (m['hv_state'] as num?)?.toInt() != 0,
       tyreFlPressureKpa: flP,
       tyreFrPressureKpa: frP,
       tyreRlPressureKpa: rlP,
@@ -143,4 +171,100 @@ class VehicleTelemetry {
 
   /// Convert kPa to PSI for dual automotive readouts.
   static double kpaToPsi(double kpa) => kpa * 0.145038;
+
+  VehicleTelemetry copyWith({
+    int? batteryPct,
+    int? electricRangeKm,
+    int? fuelRangeKm,
+    int? totalRangeKm,
+    int? odometerKm,
+    double? volt12,
+    double? speedKmH,
+    bool? isCharging,
+    double? chargePowerKw,
+    int? chargeRemainMin,
+    bool? acOn,
+    int? acTemp,
+    bool? doorsOpen,
+    bool? trunkOpen,
+    bool? windowsOpen,
+    bool? sunroofOpen,
+    bool? engineOn,
+    bool? rapidCool,
+    bool? frontDefrost,
+    bool? rearDefrost,
+    bool? airPurifier,
+    int? fanGear,
+    int? seatHeatDriver,
+    int? seatVentDriver,
+    int? seatHeatPass,
+    int? seatVentPass,
+    bool? steeringHeat,
+    int? airDurationMin,
+    double? tyreFlPressureKpa,
+    double? tyreFrPressureKpa,
+    double? tyreRlPressureKpa,
+    double? tyreRrPressureKpa,
+    double? tyreFlTempC,
+    double? tyreFrTempC,
+    double? tyreRlTempC,
+    double? tyreRrTempC,
+    double? latitude,
+    double? longitude,
+    double? headingDegrees,
+    String? locationName,
+    bool? isParked,
+    String? parkedDurationText,
+    DateTime? lastUpdated,
+    bool? isSimulated,
+    String? dataSourceLabel,
+  }) {
+    return VehicleTelemetry(
+      batteryPct: batteryPct ?? this.batteryPct,
+      electricRangeKm: electricRangeKm ?? this.electricRangeKm,
+      fuelRangeKm: fuelRangeKm ?? this.fuelRangeKm,
+      totalRangeKm: totalRangeKm ?? this.totalRangeKm,
+      odometerKm: odometerKm ?? this.odometerKm,
+      volt12: volt12 ?? this.volt12,
+      speedKmH: speedKmH ?? this.speedKmH,
+      isCharging: isCharging ?? this.isCharging,
+      chargePowerKw: chargePowerKw ?? this.chargePowerKw,
+      chargeRemainMin: chargeRemainMin ?? this.chargeRemainMin,
+      acOn: acOn ?? this.acOn,
+      acTemp: acTemp ?? this.acTemp,
+      doorsOpen: doorsOpen ?? this.doorsOpen,
+      trunkOpen: trunkOpen ?? this.trunkOpen,
+      windowsOpen: windowsOpen ?? this.windowsOpen,
+      sunroofOpen: sunroofOpen ?? this.sunroofOpen,
+      engineOn: engineOn ?? this.engineOn,
+      rapidCool: rapidCool ?? this.rapidCool,
+      frontDefrost: frontDefrost ?? this.frontDefrost,
+      rearDefrost: rearDefrost ?? this.rearDefrost,
+      airPurifier: airPurifier ?? this.airPurifier,
+      fanGear: fanGear ?? this.fanGear,
+      seatHeatDriver: seatHeatDriver ?? this.seatHeatDriver,
+      seatVentDriver: seatVentDriver ?? this.seatVentDriver,
+      seatHeatPass: seatHeatPass ?? this.seatHeatPass,
+      seatVentPass: seatVentPass ?? this.seatVentPass,
+      steeringHeat: steeringHeat ?? this.steeringHeat,
+      airDurationMin: airDurationMin ?? this.airDurationMin,
+      tyreFlPressureKpa: tyreFlPressureKpa ?? this.tyreFlPressureKpa,
+      tyreFrPressureKpa: tyreFrPressureKpa ?? this.tyreFrPressureKpa,
+      tyreRlPressureKpa: tyreRlPressureKpa ?? this.tyreRlPressureKpa,
+      tyreRrPressureKpa: tyreRrPressureKpa ?? this.tyreRrPressureKpa,
+      tyreFlTempC: tyreFlTempC ?? this.tyreFlTempC,
+      tyreFrTempC: tyreFrTempC ?? this.tyreFrTempC,
+      tyreRlTempC: tyreRlTempC ?? this.tyreRlTempC,
+      tyreRrTempC: tyreRrTempC ?? this.tyreRrTempC,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      headingDegrees: headingDegrees ?? this.headingDegrees,
+      locationName: locationName ?? this.locationName,
+      isParked: isParked ?? this.isParked,
+      parkedDurationText: parkedDurationText ?? this.parkedDurationText,
+      lastUpdated: lastUpdated ?? this.lastUpdated,
+      isSimulated: isSimulated ?? this.isSimulated,
+      dataSourceLabel: dataSourceLabel ?? this.dataSourceLabel,
+    );
+  }
 }

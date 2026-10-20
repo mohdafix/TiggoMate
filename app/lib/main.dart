@@ -2716,90 +2716,95 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
         ),
         const SizedBox(height: 14),
 
-        // Upcoming 1,000 km Milestone Reminder Card
+        // Upcoming 1,000 km Milestone Reminder Banner (Clean, non-redundant)
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFFF1B343).withValues(alpha: 0.08) : const Color(0xFFFEF3C7),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: isDark ? const Color(0xFFF1B343).withValues(alpha: 0.3) : const Color(0xFFF59E0B).withValues(alpha: 0.4),
             ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '1,000 km / 1-Month Inspection',
-                    style: TextStyle(
-                      color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14.5,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      '160 km Left',
-                      style: TextStyle(
-                        color: isDark ? Colors.black87 : Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 10,
-                      ),
-                    ),
-                  ),
-                ],
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: (isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706)).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.build_circle_outlined, size: 20, color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309)),
               ),
-              const SizedBox(height: 6),
-              Text(
-                'Current Odometer: 840 km • Due soon at 1,000 km',
-                style: TextStyle(color: isDark ? Colors.white70 : const Color(0xFF4B5563), fontSize: 11.5),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                '• Dealer DMS telematics pairing & CarLinko activation\n• 3DHT hybrid transmission & battery management diagnostic scan\n• High-voltage orange harness torque check\n• Factory tyre torque & cold pressure verification (230 kPa)',
-                style: TextStyle(
-                  color: isDark ? Colors.white60 : const Color(0xFF4B5563),
-                  fontSize: 11.5,
-                  height: 1.5,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'NEXT DUE: 1,000 KM INSPECTION',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.8,
+                            color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '160 km Left',
+                            style: TextStyle(
+                              color: isDark ? Colors.black87 : Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 9,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'CarLinko Telematics Activation & 3DHT Diagnostic Scan (FOC)',
+                      style: TextStyle(color: isDark ? Colors.white70 : const Color(0xFF4B5563), fontSize: 11.5),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Compulsory Cost: FREE (FOC)', style: TextStyle(color: Color(0xFF00D2AA), fontSize: 12, fontWeight: FontWeight.bold)),
-                  Text(
-                    'Next: 10,000 km (RM 407.50)',
-                    style: TextStyle(color: isDark ? Colors.white54 : const Color(0xFF6B7280), fontSize: 11),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => setState(() => _activeSubTab = 1),
-                  icon: Icon(Icons.location_on, size: 14, color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309)),
-                  label: Text(
-                    'Find 3S/4S Service Centre for 1,000 km Activation',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309),
-                      fontWeight: FontWeight.bold,
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () => setState(() => _activeSubTab = 1),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: (isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706)).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: (isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706)).withValues(alpha: 0.35),
                     ),
                   ),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309)),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Find 3S/4S',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309),
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      Icon(Icons.chevron_right, size: 14, color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309)),
+                    ],
                   ),
                 ),
               ),

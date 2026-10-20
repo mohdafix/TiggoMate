@@ -34,7 +34,12 @@ build/
 **/.idea/
 .vscode/
 
-# Local research repos
+# Agents
+.agent/
+.agents/
+**/.agent/
+**/.agents/
+
 j5-ev-dashboard/
 .dart_tool/
 **/.dart_tool/

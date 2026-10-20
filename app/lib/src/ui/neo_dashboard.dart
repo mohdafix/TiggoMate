@@ -17,6 +17,9 @@ import 'app_notification.dart';
 import 'smart_drive_hud.dart';
 import 'widgets_shortcuts_sheet.dart';
 import '../widgets/home_widget_service.dart';
+import 'climate_control_sheet.dart';
+import 'window_sunroof_sheet.dart';
+import 'remote_engine_sheet.dart';
 
 class NeoDashboard extends StatefulWidget {
   final VehicleRepository repository;
@@ -476,6 +479,27 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 ),
               ),
               const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _openRemoteEngineSheet();
+                  },
+                  icon: const Icon(Icons.power_settings_new, size: 18),
+                  label: Text(
+                    _telemetry.engineOn ? 'Manage 1.5T Hybrid Engine (Running)' : 'Remote Engine Start & Pre-Warm',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF9F1C),
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                ),
+              ),
             ],
           ),
         );
@@ -516,6 +540,93 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     );
   }
 
+  void _openClimateControlSheet() {
+    ClimateControlSheet.show(
+      context,
+      telemetry: _telemetry,
+      initialAcOn: _isAcActive,
+      initialTempC: _telemetry.acTemp.toDouble(),
+      initialDurationMin: _telemetry.airDurationMin,
+      onApply: (acOn, tempC, durationMin, {
+        bool? rapidCool,
+        bool? frontDefrost,
+        bool? rearDefrost,
+        bool? airPurifier,
+        int? fanGear,
+        int? seatHeatDriver,
+        int? seatVentDriver,
+        int? seatHeatPass,
+        int? seatVentPass,
+        bool? steeringHeat,
+      }) {
+        setState(() {
+          _isAcActive = acOn;
+          _telemetry = _telemetry.copyWith(
+            acOn: acOn,
+            acTemp: tempC.round(),
+            airDurationMin: durationMin,
+            rapidCool: rapidCool,
+            frontDefrost: frontDefrost,
+            rearDefrost: rearDefrost,
+            airPurifier: airPurifier,
+            fanGear: fanGear,
+            seatHeatDriver: seatHeatDriver,
+            seatVentDriver: seatVentDriver,
+            seatHeatPass: seatHeatPass,
+            seatVentPass: seatVentPass,
+            steeringHeat: steeringHeat,
+          );
+        });
+        _syncWidgetTelemetry();
+        _showNotification(acOn
+            ? '❄️ Cabin Pre-cooling (${tempC.toStringAsFixed(1)}°C, ${durationMin}m)'
+            : '❄️ Climate Pre-conditioning OFF');
+      },
+    );
+  }
+
+  void _openWindowSunroofSheet() {
+    WindowSunroofSheet.show(
+      context,
+      telemetry: _telemetry,
+      initialWindowsVented: _isWindowsVented,
+      initialSunroofOpen: _telemetry.sunroofOpen,
+      onApply: (windowAction, sunroofAction) {
+        setState(() {
+          if (windowAction == 'vent') {
+            _isWindowsVented = true;
+          } else if (windowAction == 'open') {
+            _isWindowsVented = true;
+          } else {
+            _isWindowsVented = false;
+          }
+          final bool isSunroofOpen = sunroofAction != 'closed';
+          _telemetry = _telemetry.copyWith(
+            windowsOpen: _isWindowsVented,
+            sunroofOpen: isSunroofOpen,
+          );
+        });
+        _showNotification('🪟 Windows: $windowAction • Sunroof: $sunroofAction');
+      },
+    );
+  }
+
+  void _openRemoteEngineSheet() {
+    RemoteEngineSheet.show(
+      context,
+      telemetry: _telemetry,
+      initialEngineOn: _telemetry.engineOn,
+      onApply: (startEngine, runtimeMinutes) {
+        setState(() {
+          _telemetry = _telemetry.copyWith(engineOn: startEngine);
+        });
+        _showNotification(startEngine
+            ? '⚡ 1.5T Hybrid Engine started (${runtimeMinutes}m pre-warm)'
+            : '⚡ 1.5T Hybrid Engine stopped');
+      },
+    );
+  }
+
   void _handleRemoteCommand(String action) {
     if (action == 'lock') {
       setState(() => _isDoorsLocked = !_isDoorsLocked);
@@ -545,6 +656,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
   void _handleQuickActionUri(String uri) {
     if (uri.contains('/lock')) {
       _handleRemoteCommand('lock');
+    } else if (uri.contains('/climate_sheet')) {
+      _openClimateControlSheet();
     } else if (uri.contains('/climate')) {
       _handleRemoteCommand('climate');
     } else if (uri.contains('/charging')) {
@@ -553,6 +666,10 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       _handleRemoteCommand('locate');
     } else if (uri.contains('/drive')) {
       SmartDriveHudSheet.show(context);
+    } else if (uri.contains('/windows_sheet') || uri.contains('/sunroof')) {
+      _openWindowSunroofSheet();
+    } else if (uri.contains('/engine')) {
+      _openRemoteEngineSheet();
     }
   }
 
@@ -799,6 +916,15 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         case 'settings':
                           widget.onOpenSettings();
                           break;
+                        case 'climate':
+                          _openClimateControlSheet();
+                          break;
+                        case 'glazing':
+                          _openWindowSunroofSheet();
+                          break;
+                        case 'engine':
+                          _openRemoteEngineSheet();
+                          break;
                         case 'widgets':
                           _openWidgetsShortcutsSheet();
                           break;
@@ -815,6 +941,37 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       }
                     },
                     itemBuilder: (ctx) => [
+                      PopupMenuItem(
+                        value: 'climate',
+                        child: Row(
+                          children: const [
+                            Icon(Icons.ac_unit, size: 18, color: Color(0xFF2F81F7)),
+                            SizedBox(width: 10),
+                            Text('Climate & Seat Comfort', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'glazing',
+                        child: Row(
+                          children: const [
+                            Icon(Icons.window_outlined, size: 18, color: Colors.tealAccent),
+                            SizedBox(width: 10),
+                            Text('Windows & Sunroof', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'engine',
+                        child: Row(
+                          children: const [
+                            Icon(Icons.power_settings_new, size: 18, color: Color(0xFFFF9F1C)),
+                            SizedBox(width: 10),
+                            Text('Remote 1.5T Engine Start', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuDivider(),
                       PopupMenuItem(
                         value: 'settings',
                         child: Row(
@@ -864,647 +1021,507 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
         ),
         const SizedBox(height: 14),
 
-        // Vehicle Title & Identification Row (Full Width - No Truncation)
+        // Vehicle Title & Identification Row (Full Width - Premium Automotive Typography)
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              widget.vehicleNickname.isNotEmpty ? widget.vehicleNickname : 'Chery Tiggo 7 PHEV CSH',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.2,
-                color: colors.textPrimary,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 5),
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
               children: [
+                Expanded(
+                  child: Text(
+                    widget.vehicleNickname.isNotEmpty ? widget.vehicleNickname : 'Chery Tiggo 7 PHEV CSH',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.3,
+                      color: colors.textPrimary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
                 // Car Plate Badge (Malaysian Black & Silver plate aesthetic)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: colors.isDark ? const Color(0xFF090D12) : const Color(0xFF1E293B),
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(
                       color: colors.isDark ? const Color(0xFF2F81F7).withValues(alpha: 0.6) : const Color(0xFF475569),
                     ),
+                    boxShadow: [
+                      if (colors.isDark)
+                        BoxShadow(
+                          color: const Color(0xFF2F81F7).withValues(alpha: 0.2),
+                          blurRadius: 4,
+                        ),
+                    ],
                   ),
                   child: Text(
                     widget.carPlateNumber.isNotEmpty ? widget.carPlateNumber : 'VRT 3342',
                     style: const TextStyle(
-                      fontSize: 11,
+                      fontSize: 11.5,
                       fontWeight: FontWeight.w800,
-                      letterSpacing: 1.0,
+                      letterSpacing: 1.2,
                       color: Colors.white,
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
                 Expanded(
                   child: Text(
                     '${widget.ownerName} • Chery Tiggo 7 PHEV CSH • 1.5T DHT',
-                    style: TextStyle(fontSize: 12, color: colors.textSecondary),
+                    style: TextStyle(fontSize: 11.5, color: colors.textSecondary, fontWeight: FontWeight.w500),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                if (_telemetry.isSimulated)
+                  InkWell(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const CheryServiceCentresScreen(),
+                        ),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Simulated Data',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFB45309),
+                          ),
+                        ),
+                        Icon(
+                          Icons.chevron_right,
+                          size: 13,
+                          color: colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFB45309),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
 
-        // Simulated Badge if active
-        if (_telemetry.isSimulated)
-          InkWell(
-            borderRadius: BorderRadius.circular(10),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const CheryServiceCentresScreen(),
-                ),
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              decoration: BoxDecoration(
-                color: colors.isDark
-                    ? const Color(0xFFF1B343).withValues(alpha: 0.12)
-                    : const Color(0xFFFEF3C7),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: colors.isDark
-                      ? const Color(0xFFF1B343).withValues(alpha: 0.35)
-                      : const Color(0xFFF59E0B).withValues(alpha: 0.4),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 14,
-                    color: colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFB45309),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'SIMULATED DATA (CarLinko activates at 1,000 km service • Tap to find centres)',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
-                        color: colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFB45309),
+        // ---------------- 2. HERO VEHICLE STAGE (2D Studio or 3D Orbit) ----------------
+        Column(
+          children: [
+            // Top Stage Header: View Switcher & Dynamic Vehicle Skin Customizer
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (_is3DView)
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.view_in_ar,
+                        size: 15,
+                        color: Color(0xFF00D2AA),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '3D INTERACTIVE ORBIT',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.1,
+                          color: colors.isDark ? Colors.white70 : const Color(0xFF1E293B),
+                        ),
+                      ),
+                    ],
+                  )
+                else if (_isAdvancedView)
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.radar,
+                        size: 15,
+                        color: Color(0xFF00D2AA),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '2D STUDIO RADAR',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.1,
+                          color: colors.isDark ? Colors.white70 : const Color(0xFF1E293B),
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  // In Basic view, show interactive color name pill
+                  Flexible(
+                    child: InkWell(
+                      onTap: _showVehicleSkinStudioModal,
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: colors.isDark ? const Color(0xFF131922) : const Color(0xFFF3F4F6),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: colors.border),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.palette_outlined, size: 13, color: Color(0xFF00D2AA)),
+                            const SizedBox(width: 5),
+                            Flexible(
+                              child: Text(
+                                _selectedSkin.name,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: colors.isDark ? Colors.white : const Color(0xFF111827),
+                                ),
+                              ),
+                            ),
+                            if (_selectedSkin.isDualTone) ...[
+                              const SizedBox(width: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Colors.black,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  'BLACK ROOF',
+                                  style: TextStyle(fontSize: 7.5, fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(width: 2),
+                            Icon(Icons.arrow_drop_down, size: 14, color: colors.textMuted),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                  Icon(
-                    Icons.chevron_right,
-                    size: 16,
-                    color: colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFB45309),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        const SizedBox(height: 10),
 
-        // ---------------- 1.5 DUAL UI MODE SWITCHER (BASIC vs ADVANCED) ----------------
-        _buildModeSwitcher(),
-        const SizedBox(height: 10),
-
-        // ---------------- 2. HERO VEHICLE STAGE (2D Studio or 3D Orbit) ----------------
-        Card(
-          color: colors.cardBg,
-          elevation: colors.isDark ? 0 : 0.5,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
-            side: BorderSide(color: colors.borderSubtle, width: AppDesignTokens.borderWidth),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppDesignTokens.spaceMd),
-            child: Column(
-              children: [
-                // Top Stage Header: View Switcher & Dynamic Vehicle Skin Customizer
+                // Right Side: Quick 3-Color Swatches & 2D/3D toggle
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (_is3DView)
-                      Row(
+                    // Quick 3-Color Swatches Pill
+                    _buildQuickColorSwatches(colors),
+
+                    const SizedBox(width: 8),
+                    Container(
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: colors.isDark ? const Color(0xFF161E2E) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: colors.border),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
-                            Icons.view_in_ar,
-                            size: 15,
-                            color: Color(0xFF00D2AA),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '3D INTERACTIVE ORBIT',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.1,
-                              color: colors.isDark ? Colors.white70 : const Color(0xFF1E293B),
-                            ),
-                          ),
-                        ],
-                      )
-                    else if (_isAdvancedView)
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.radar,
-                            size: 15,
-                            color: Color(0xFF00D2AA),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '2D STUDIO RADAR',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.1,
-                              color: colors.isDark ? Colors.white70 : const Color(0xFF1E293B),
-                            ),
-                          ),
-                        ],
-                      )
-                    else
-                      // In Basic view, show interactive color name pill
-                      Flexible(
-                        child: InkWell(
-                          onTap: _showVehicleSkinStudioModal,
-                          borderRadius: BorderRadius.circular(14),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: colors.isDark ? const Color(0xFF131922) : const Color(0xFFF3F4F6),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: colors.border),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.palette_outlined, size: 13, color: Color(0xFF00D2AA)),
-                                const SizedBox(width: 5),
-                                Flexible(
-                                  child: Text(
-                                    _selectedSkin.name,
-                                    overflow: TextOverflow.ellipsis,
+                          InkWell(
+                            borderRadius: BorderRadius.circular(20),
+                            onTap: () => setState(() => _is3DView = false),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: !_is3DView ? const Color(0xFF00D2AA) : Colors.transparent,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.photo_size_select_actual_outlined,
+                                    size: 13,
+                                    color: !_is3DView ? Colors.black : (colors.isDark ? Colors.white60 : Colors.black54),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '2D',
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.bold,
-                                      color: colors.isDark ? Colors.white : const Color(0xFF111827),
-                                    ),
-                                  ),
-                                ),
-                                if (_selectedSkin.isDualTone) ...[
-                                  const SizedBox(width: 4),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Text(
-                                      'BLACK ROOF',
-                                      style: TextStyle(fontSize: 7.5, fontWeight: FontWeight.bold, color: Colors.white),
+                                      color: !_is3DView ? Colors.black : (colors.isDark ? Colors.white60 : Colors.black54),
                                     ),
                                   ),
                                 ],
-                                const SizedBox(width: 2),
-                                Icon(Icons.arrow_drop_down, size: 14, color: colors.textMuted),
-                              ],
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-
-                    // Right Side: Quick 3-Color Swatches & 2D/3D toggle
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Quick 3-Color Swatches Pill
-                        _buildQuickColorSwatches(colors),
-
-                        const SizedBox(width: 8),
-                        Container(
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: colors.isDark ? const Color(0xFF161E2E) : const Color(0xFFF1F5F9),
+                          InkWell(
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: colors.border),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              InkWell(
+                            onTap: () => setState(() => _is3DView = true),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: _is3DView ? const Color(0xFF00D2AA) : Colors.transparent,
                                 borderRadius: BorderRadius.circular(20),
-                                onTap: () => setState(() => _is3DView = false),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: !_is3DView ? const Color(0xFF00D2AA) : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.photo_size_select_actual_outlined,
-                                        size: 13,
-                                        color: !_is3DView ? Colors.black : (colors.isDark ? Colors.white60 : Colors.black54),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '2D',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: !_is3DView ? Colors.black : (colors.isDark ? Colors.white60 : Colors.black54),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
                               ),
-                              InkWell(
-                                borderRadius: BorderRadius.circular(20),
-                                onTap: () => setState(() => _is3DView = true),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: _is3DView ? const Color(0xFF00D2AA) : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(20),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.view_in_ar,
+                                    size: 13,
+                                    color: _is3DView ? Colors.black : (colors.isDark ? Colors.white60 : Colors.black54),
                                   ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.view_in_ar,
-                                        size: 13,
-                                        color: _is3DView ? Colors.black : (colors.isDark ? Colors.white60 : Colors.black54),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '3D',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: _is3DView ? Colors.black : (colors.isDark ? Colors.white60 : Colors.black54),
-                                        ),
-                                      ),
-                                    ],
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '3D',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: _is3DView ? Colors.black : (colors.isDark ? Colors.white60 : Colors.black54),
+                                    ),
                                   ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-              // Canvas Area: 3D ModelViewer OR 2D Studio Hotspot Stack
-              if (_is3DView)
-                  SizedBox(
-                    height: 240,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: Stack(
-                        children: [
-                          ModelViewer(
-                            src: 'assets/models/tiggo7.glb',
-                            alt: 'Chery Tiggo 7 PHEV CSH 3D Model',
-                            ar: false,
-                            autoRotate: true,
-                            autoRotateDelay: 2000,
-                            rotationPerSecond: '20deg',
-                            cameraControls: true,
-                            minCameraOrbit: 'auto 30deg 60%',
-                            maxCameraOrbit: 'auto 90deg 200%',
-                            touchAction: TouchAction.panY,
-                            shadowIntensity: 0.8,
-                            shadowSoftness: 0.5,
-                            debugLogging: false,
-                            backgroundColor: colors.cardBg,
-                            innerModelViewerHtml: '''
-                              <button class="hotspot" slot="hotspot-fl" data-position="-0.0133 0.0036 0.009" data-normal="0 0 1" data-part="fl_tyre">
-                                <div class="pin-dot"></div>
-                                <div class="pin-label">FL Tyre</div>
-                              </button>
-                              <button class="hotspot" slot="hotspot-rl" data-position="0.0131 0.0036 0.009" data-normal="0 0 1" data-part="rl_tyre">
-                                <div class="pin-dot"></div>
-                                <div class="pin-label">RL Tyre</div>
-                              </button>
-                              <button class="hotspot" slot="hotspot-port" data-position="0.012 0.011 0.0085" data-normal="0 0 1" data-part="charging_port">
-                                <div class="pin-dot"></div>
-                                <div class="pin-label">AC Port</div>
-                              </button>
-                              <button class="hotspot" slot="hotspot-engine" data-position="-0.018 0.0095 0" data-normal="0 1 0" data-part="engine">
-                                <div class="pin-dot" style="background:#2F81F7; box-shadow: 0 0 6px #2F81F7;"></div>
-                                <div class="pin-label">1.5T CSH</div>
-                              </button>
-                            ''',
-                            relatedCss: '''
-                              .hotspot {
-                                background: rgba(9, 13, 18, 0.88);
-                                border-radius: 20px;
-                                border: 1px solid rgba(0, 210, 170, 0.7);
-                                box-shadow: 0 0 10px rgba(0, 210, 170, 0.4);
-                                box-sizing: border-box;
-                                cursor: pointer;
-                                height: 24px;
-                                padding: 0 8px;
-                                display: flex;
-                                align-items: center;
-                                gap: 5px;
-                                transition: transform 0.2s, background-color 0.2s;
-                              }
-                              .hotspot:hover {
-                                transform: scale(1.08);
-                                background: rgba(0, 210, 170, 0.25);
-                              }
-                              .pin-dot {
-                                width: 8px;
-                                height: 8px;
-                                border-radius: 50%;
-                                background: #00D2AA;
-                                box-shadow: 0 0 6px #00D2AA;
-                              }
-                              .pin-label {
-                                color: #FFFFFF;
-                                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                                font-size: 10px;
-                                font-weight: 700;
-                                letter-spacing: 0.3px;
-                              }
-                            ''',
-                          ),
-                          // Subtle 3D hint overlay
-                          Positioned(
-                            bottom: 8,
-                            left: 0,
-                            right: 0,
-                            child: Center(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.65),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Text(
-                                  '360° Drag • Pinch to Zoom • Tap Hotspots',
-                                  style: TextStyle(fontSize: 10, color: Colors.white70),
-                                ),
+                                ],
                               ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  )
-                else
-                  SizedBox(
-                    height: 200,
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        return Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            // Ambient radial background glow (Obsidian dark mode only)
-                            if (colors.isDark)
-                              Positioned.fill(
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    gradient: RadialGradient(
-                                      center: Alignment.center,
-                                      radius: 0.75,
-                                      colors: [
-                                        colors.evTeal.withValues(alpha: 0.09),
-                                        Colors.transparent,
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
 
-                            // Floor shadow reflection (soft radial gradient)
-                            Positioned(
-                              bottom: 12,
-                              child: Container(
-                                width: constraints.maxWidth * 0.75,
-                                height: 16,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.all(
-                                    Radius.elliptical(constraints.maxWidth * 0.75, 16),
-                                  ),
-                                  gradient: RadialGradient(
-                                    colors: [
-                                      colors.isDark
-                                          ? Colors.black.withValues(alpha: 0.75)
-                                          : Colors.black.withValues(alpha: 0.22),
-                                      Colors.transparent,
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            // Vehicle Render (Chery Tiggo 7 PHEV CSH with dynamic skin)
-                            Positioned(
-                              top: 8,
-                              bottom: 20,
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 300),
-                                transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
-                                child: Image.asset(
-                                  _selectedSkin.assetPath,
-                                  key: ValueKey(_selectedSkin.key),
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Icon(Icons.directions_car, size: 100, color: colors.textMuted);
-                                  },
-                                ),
-                              ),
-                            ),
-
-                            if (_isAdvancedView) ...[
-                              // 1. Front-Left Wheel Hotspot
-                              Positioned(
-                                left: constraints.maxWidth * 0.48,
-                                bottom: 26,
-                                child: _buildRadarPin(
-                                  'FL Tyre',
-                                  () => _handleComponentTap('fl_tyre'),
-                                ),
-                              ),
-
-                              // 2. Rear-Left Wheel Hotspot
-                              Positioned(
-                                right: constraints.maxWidth * 0.17,
-                                bottom: 40,
-                                child: _buildRadarPin(
-                                  'RL Tyre',
-                                  () => _handleComponentTap('rl_tyre'),
-                                ),
-                              ),
-
-                              // 3. Charging Port Hotspot
-                              Positioned(
-                                right: constraints.maxWidth * 0.15,
-                                top: 52,
-                                child: _buildRadarPin(
-                                  'AC Port',
-                                  () => _handleComponentTap('charging_port'),
-                                  accentColor: const Color(0xFF00D2AA),
-                                  icon: Icons.electrical_services,
-                                ),
-                              ),
-
-                              // 4. Front Hybrid Engine Hotspot
-                              Positioned(
-                                left: constraints.maxWidth * 0.22,
-                                top: 60,
-                                child: _buildRadarPin(
-                                  '1.5T CSH',
-                                  () => _handleComponentTap('engine'),
-                                  accentColor: const Color(0xFF2F81F7),
-                                  icon: Icons.bolt,
-                                ),
-                              ),
-                            ],
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-
-                const SizedBox(height: 12),
-
-                // ---------------- 3. CARLINKO DUAL-ENERGY GLANCE DOCK ----------------
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: colors.tileBg,
-                    borderRadius: BorderRadius.circular(AppDesignTokens.radiusMedium),
-                    border: Border.all(color: colors.borderSubtle, width: AppDesignTokens.borderWidth),
-                  ),
-                  child: Row(
+            // Canvas Area: 3D ModelViewer OR 2D Studio Hotspot Stack
+            if (_is3DView)
+              SizedBox(
+                height: 240,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: Stack(
                     children: [
-                      // Electric Side (Teal)
-                      Expanded(
-                        child: InkWell(
-                          onTap: _showChargingPortModal,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(Icons.bolt, size: 14, color: colors.evTeal),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${_telemetry.batteryPct}% EV',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                      color: colors.evTeal,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${_telemetry.electricRangeKm} km',
-                                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: colors.textPrimary),
-                              ),
-                              Text('EV RANGE', style: TextStyle(fontSize: 9, color: colors.textMuted, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                        ),
+                      ModelViewer(
+                        src: 'assets/models/tiggo7.glb',
+                        alt: 'Chery Tiggo 7 PHEV CSH 3D Model',
+                        ar: false,
+                        autoRotate: true,
+                        autoRotateDelay: 2000,
+                        rotationPerSecond: '20deg',
+                        cameraControls: true,
+                        minCameraOrbit: 'auto 30deg 60%',
+                        maxCameraOrbit: 'auto 90deg 200%',
+                        touchAction: TouchAction.panY,
+                        shadowIntensity: 0.8,
+                        shadowSoftness: 0.5,
+                        debugLogging: false,
+                        backgroundColor: colors.cardBg,
+                        innerModelViewerHtml: '''
+                          <button class="hotspot" slot="hotspot-fl" data-position="-0.0133 0.0036 0.009" data-normal="0 0 1" data-part="fl_tyre">
+                            <div class="pin-dot"></div>
+                            <div class="pin-label">FL Tyre</div>
+                          </button>
+                          <button class="hotspot" slot="hotspot-rl" data-position="0.0131 0.0036 0.009" data-normal="0 0 1" data-part="rl_tyre">
+                            <div class="pin-dot"></div>
+                            <div class="pin-label">RL Tyre</div>
+                          </button>
+                          <button class="hotspot" slot="hotspot-port" data-position="0.012 0.011 0.0085" data-normal="0 0 1" data-part="charging_port">
+                            <div class="pin-dot"></div>
+                            <div class="pin-label">AC Port</div>
+                          </button>
+                          <button class="hotspot" slot="hotspot-engine" data-position="-0.018 0.0095 0" data-normal="0 1 0" data-part="engine">
+                            <div class="pin-dot" style="background:#2F81F7; box-shadow: 0 0 6px #2F81F7;"></div>
+                            <div class="pin-label">1.5T CSH</div>
+                          </button>
+                        ''',
+                        relatedCss: '''
+                          .hotspot {
+                            background: rgba(9, 13, 18, 0.88);
+                            border-radius: 20px;
+                            border: 1px solid rgba(0, 210, 170, 0.7);
+                            box-shadow: 0 0 10px rgba(0, 210, 170, 0.4);
+                            box-sizing: border-box;
+                            cursor: pointer;
+                            height: 24px;
+                            padding: 0 8px;
+                            display: flex;
+                            align-items: center;
+                            gap: 5px;
+                            transition: transform 0.2s, background-color 0.2s;
+                          }
+                          .hotspot:hover {
+                            transform: scale(1.08);
+                            background: rgba(0, 210, 170, 0.25);
+                          }
+                          .pin-dot {
+                            width: 8px;
+                            height: 8px;
+                            border-radius: 50%;
+                            background: #00D2AA;
+                            box-shadow: 0 0 6px #00D2AA;
+                          }
+                          .pin-label {
+                            color: #FFFFFF;
+                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                            font-size: 10px;
+                            font-weight: 700;
+                            letter-spacing: 0.3px;
+                          }
+                        ''',
                       ),
-
-                      // Center Divider & Total Combined Range Callout
-                      Container(width: 1, height: 38, color: colors.border),
-                      Expanded(
-                        child: Column(
-                          children: [
-                            Text(
-                              '${_telemetry.totalRangeKm} km',
-                              style: TextStyle(
-                                fontSize: 19,
-                                fontWeight: FontWeight.w800,
-                                color: colors.textPrimary,
-                                letterSpacing: 0.5,
-                              ),
+                      // Subtle 3D hint overlay
+                      Positioned(
+                        bottom: 8,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.65),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            Text(
-                              'TOTAL RANGE',
-                              style: TextStyle(
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.bold,
-                                color: colors.textSecondary,
-                                letterSpacing: 0.8,
-                              ),
+                            child: const Text(
+                              '360° Drag • Pinch to Zoom • Tap Hotspots',
+                              style: TextStyle(fontSize: 10, color: Colors.white70),
                             ),
-                            const SizedBox(height: 4),
-                            // Dual split mini progress bar
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(width: 28, height: 3, color: colors.evTeal),
-                                  const SizedBox(width: 2),
-                                  Container(width: 48, height: 3, color: colors.petrolAmber),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(width: 1, height: 38, color: colors.border),
-
-                      // Petrol Fuel Side (Amber)
-                      Expanded(
-                        child: InkWell(
-                          onTap: _showPowertrainModal,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  Icon(Icons.local_gas_station, size: 14, color: colors.petrolAmber),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '82% Fuel',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                      color: colors.petrolAmber,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${_telemetry.fuelRangeKm} km',
-                                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: colors.textPrimary),
-                              ),
-                              Text('PETROL RANGE', style: TextStyle(fontSize: 9, color: colors.textMuted, fontWeight: FontWeight.bold)),
-                            ],
                           ),
                         ),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
+              )
+            else
+              SizedBox(
+                height: 205,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Ambient radial background glow (Obsidian dark mode only)
+                        if (colors.isDark)
+                          Positioned.fill(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: RadialGradient(
+                                  center: Alignment.center,
+                                  radius: 0.75,
+                                  colors: [
+                                    colors.evTeal.withValues(alpha: 0.09),
+                                    Colors.transparent,
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+
+                        // Floor shadow reflection (soft radial gradient)
+                        Positioned(
+                          bottom: 12,
+                          child: Container(
+                            width: constraints.maxWidth * 0.75,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.all(
+                                Radius.elliptical(constraints.maxWidth * 0.75, 16),
+                              ),
+                              gradient: RadialGradient(
+                                colors: [
+                                  colors.isDark
+                                      ? Colors.black.withValues(alpha: 0.75)
+                                      : Colors.black.withValues(alpha: 0.22),
+                                  Colors.transparent,
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        // Vehicle Render (Chery Tiggo 7 PHEV CSH with dynamic skin)
+                        Positioned(
+                          top: 8,
+                          bottom: 20,
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
+                            child: Image.asset(
+                              _selectedSkin.assetPath,
+                              key: ValueKey(_selectedSkin.key),
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Icon(Icons.directions_car, size: 100, color: colors.textMuted);
+                              },
+                            ),
+                          ),
+                        ),
+
+                        if (_isAdvancedView) ...[
+                          // 1. Front-Left Wheel Hotspot
+                          Positioned(
+                            left: constraints.maxWidth * 0.48,
+                            bottom: 26,
+                            child: _buildRadarPin(
+                              'FL Tyre',
+                              () => _handleComponentTap('fl_tyre'),
+                            ),
+                          ),
+
+                          // 2. Rear-Left Wheel Hotspot
+                          Positioned(
+                            right: constraints.maxWidth * 0.17,
+                            bottom: 40,
+                            child: _buildRadarPin(
+                              'RL Tyre',
+                              () => _handleComponentTap('rl_tyre'),
+                            ),
+                          ),
+
+                          // 3. Charging Port Hotspot
+                          Positioned(
+                            right: constraints.maxWidth * 0.15,
+                            top: 52,
+                            child: _buildRadarPin(
+                              'AC Port',
+                              () => _handleComponentTap('charging_port'),
+                              accentColor: const Color(0xFF00D2AA),
+                              icon: Icons.electrical_services,
+                            ),
+                          ),
+
+                          // 4. Front Hybrid Engine Hotspot
+                          Positioned(
+                            left: constraints.maxWidth * 0.22,
+                            top: 60,
+                            child: _buildRadarPin(
+                              '1.5T CSH',
+                              () => _handleComponentTap('engine'),
+                              accentColor: const Color(0xFF2F81F7),
+                              icon: Icons.bolt,
+                            ),
+                          ),
+                        ],
+                      ],
+                    );
+                  },
+                ),
+              ),
+
+            const SizedBox(height: 10),
+
+            // ---------------- 3. PORSCHE / AUDI PRECISION DIGITAL INSTRUMENT CLUSTER ----------------
+            _buildPrecisionDualEnergyCluster(colors),
+          ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
 
         // ---------------- 4. CARLINKO 5-BUTTON CIRCULAR REMOTE CONTROL DECK ----------------
         Card(
@@ -1515,54 +1532,161 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             side: BorderSide(color: colors.borderSubtle, width: AppDesignTokens.borderWidth),
           ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                _buildCircularRemoteButton(
-                  icon: _isDoorsLocked ? Icons.lock : Icons.lock_open,
-                  label: _isDoorsLocked ? 'Locked' : 'Unlocked',
-                  sublabel: 'Doors',
-                  isActive: _isDoorsLocked,
-                  activeColor: const Color(0xFF00D2AA),
-                  onTap: () => _handleRemoteCommand('lock'),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildCircularRemoteButton(
+                      icon: _isDoorsLocked ? Icons.lock : Icons.lock_open,
+                      label: _isDoorsLocked ? 'Locked' : 'Unlocked',
+                      sublabel: 'Doors',
+                      isActive: _isDoorsLocked,
+                      activeColor: const Color(0xFF00D2AA),
+                      onTap: () => _handleRemoteCommand('lock'),
+                    ),
+                    _buildCircularRemoteButton(
+                      icon: Icons.ac_unit,
+                      label: _isAcActive ? '22°C ON' : 'A/C OFF',
+                      sublabel: 'Climate',
+                      isActive: _isAcActive,
+                      activeColor: const Color(0xFF2F81F7),
+                      onTap: () => _handleRemoteCommand('climate'),
+                      onLongPress: _openClimateControlSheet,
+                    ),
+                    _buildCircularRemoteButton(
+                      icon: Icons.air,
+                      label: _isWindowsVented ? 'Vented' : 'Closed',
+                      sublabel: 'Windows',
+                      isActive: _isWindowsVented,
+                      activeColor: Colors.tealAccent,
+                      onTap: () => _handleRemoteCommand('windows'),
+                      onLongPress: _openWindowSunroofSheet,
+                    ),
+                    _buildCircularRemoteButton(
+                      icon: Icons.luggage_outlined,
+                      label: _isTrunkOpen ? 'Open' : 'Closed',
+                      sublabel: 'Trunk',
+                      isActive: _isTrunkOpen,
+                      activeColor: Colors.amber,
+                      onTap: () => _handleRemoteCommand('trunk'),
+                    ),
+                    _buildCircularRemoteButton(
+                      icon: Icons.radar,
+                      label: 'Find Car',
+                      sublabel: 'Locate',
+                      isActive: false,
+                      activeColor: const Color(0xFF00D2AA),
+                      onTap: () => _handleRemoteCommand('locate'),
+                    ),
+                  ],
                 ),
-                _buildCircularRemoteButton(
-                  icon: Icons.ac_unit,
-                  label: _isAcActive ? '22°C ON' : 'A/C OFF',
-                  sublabel: 'Climate',
-                  isActive: _isAcActive,
-                  activeColor: const Color(0xFF2F81F7),
-                  onTap: () => _handleRemoteCommand('climate'),
-                ),
-                _buildCircularRemoteButton(
-                  icon: Icons.air,
-                  label: _isWindowsVented ? 'Vented' : 'Closed',
-                  sublabel: 'Windows',
-                  isActive: _isWindowsVented,
-                  activeColor: Colors.tealAccent,
-                  onTap: () => _handleRemoteCommand('windows'),
-                ),
-                _buildCircularRemoteButton(
-                  icon: Icons.luggage_outlined,
-                  label: _isTrunkOpen ? 'Open' : 'Closed',
-                  sublabel: 'Trunk',
-                  isActive: _isTrunkOpen,
-                  activeColor: Colors.amber,
-                  onTap: () => _handleRemoteCommand('trunk'),
-                ),
-                _buildCircularRemoteButton(
-                  icon: Icons.radar,
-                  label: 'Find Car',
-                  sublabel: 'Locate',
-                  isActive: false,
-                  activeColor: const Color(0xFF00D2AA),
-                  onTap: () => _handleRemoteCommand('locate'),
+                const SizedBox(height: 12),
+                Divider(height: 1, color: colors.borderSubtle),
+                const SizedBox(height: 10),
+                // Quick Comfort & CarLinko Feature Hot-Pills
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    InkWell(
+                      onTap: _openClimateControlSheet,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _isAcActive ? const Color(0xFF2F81F7).withValues(alpha: 0.15) : colors.tileBg,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: _isAcActive ? const Color(0xFF2F81F7).withValues(alpha: 0.5) : colors.border,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.tune, size: 12, color: _isAcActive ? const Color(0xFF2F81F7) : colors.textMuted),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Climate: ${_telemetry.acTemp}°C • ${_telemetry.airDurationMin}m',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: _isAcActive ? const Color(0xFF2F81F7) : colors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    InkWell(
+                      onTap: _openWindowSunroofSheet,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _telemetry.sunroofOpen ? Colors.tealAccent.withValues(alpha: 0.15) : colors.tileBg,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: _telemetry.sunroofOpen ? Colors.tealAccent.withValues(alpha: 0.5) : colors.border,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.window_outlined, size: 12, color: _telemetry.sunroofOpen ? Colors.tealAccent : colors.textMuted),
+                            const SizedBox(width: 4),
+                            Text(
+                              _telemetry.sunroofOpen ? 'Sunroof Open' : 'Glazing & Roof',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: _telemetry.sunroofOpen ? Colors.tealAccent : colors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    InkWell(
+                      onTap: _openRemoteEngineSheet,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _telemetry.engineOn ? const Color(0xFFFF9F1C).withValues(alpha: 0.15) : colors.tileBg,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: _telemetry.engineOn ? const Color(0xFFFF9F1C).withValues(alpha: 0.5) : colors.border,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.power_settings_new, size: 12, color: _telemetry.engineOn ? const Color(0xFFFF9F1C) : colors.textMuted),
+                            const SizedBox(width: 4),
+                            Text(
+                              _telemetry.engineOn ? '1.5T Running' : 'Pre-Warm',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: _telemetry.engineOn ? const Color(0xFFFF9F1C) : colors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
         ),
+        const SizedBox(height: 14),
+
+        // ---------------- 4.2 DUAL UI MODE SWITCHER (BASIC vs ADVANCED) ----------------
+        _buildModeSwitcher(),
         const SizedBox(height: 14),
 
         // ---------------- 4.5 LIVE VEHICLE LOCATION & RADAR GLANCE ----------------
@@ -2023,6 +2147,281 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     );
   }
 
+  Widget _buildPrecisionDualEnergyCluster(AppColors colors) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        color: colors.cardBg,
+        borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
+        border: Border.all(
+          color: colors.isDark
+              ? colors.evTeal.withValues(alpha: 0.22)
+              : colors.borderSubtle,
+          width: AppDesignTokens.borderWidth,
+        ),
+        boxShadow: [
+          if (colors.isDark)
+            BoxShadow(
+              color: colors.evTeal.withValues(alpha: 0.06),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            )
+          else
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Left: Pure EV Battery Gauge Dial (Porsche / Audi Digital Instrument)
+          Expanded(
+            child: InkWell(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                _showChargingPortModal();
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CustomPaint(
+                            painter: _MiniArcDialPainter(
+                              progress: _telemetry.batteryPct / 100.0,
+                              color: colors.evTeal,
+                              trackColor: colors.isDark ? Colors.white12 : Colors.black12,
+                            ),
+                            child: Center(
+                              child: Icon(Icons.bolt, size: 11, color: colors.evTeal),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${_telemetry.batteryPct}% EV',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: colors.evTeal,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${_telemetry.electricRangeKm} km',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: colors.textPrimary,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    Text(
+                      'EV RANGE',
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: colors.textMuted,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.7,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: colors.evTeal.withValues(alpha: colors.isDark ? 0.12 : 0.08),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        _telemetry.isCharging ? '⚡ 3.3 kW AC' : '19.27 kWh LFP',
+                        style: TextStyle(
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w600,
+                          color: colors.evTeal,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // Center: Master Combined Range Anchor
+          Container(
+            width: 1,
+            height: 52,
+            color: colors.isDark ? const Color(0xFF1E2837) : colors.border,
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '${_telemetry.totalRangeKm} km',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: colors.textPrimary,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  Text(
+                    'TOTAL RANGE',
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                      color: colors.textSecondary,
+                      letterSpacing: 0.9,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  // Dual split mini progress bar
+                  Container(
+                    width: 76,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(2),
+                      color: colors.isDark ? Colors.white12 : Colors.black12,
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(2),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: _telemetry.electricRangeKm.clamp(1, 999),
+                            child: Container(color: colors.evTeal),
+                          ),
+                          const SizedBox(width: 1),
+                          Expanded(
+                            flex: _telemetry.fuelRangeKm.clamp(1, 999),
+                            child: Container(color: colors.petrolAmber),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '1.5T DHT • HYBRID',
+                    style: TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.7,
+                      color: colors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Container(
+            width: 1,
+            height: 52,
+            color: colors.isDark ? const Color(0xFF1E2837) : colors.border,
+          ),
+
+          // Right: Petrol Fuel Reserve Gauge Dial
+          Expanded(
+            child: InkWell(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                _showPowertrainModal();
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '82% Fuel',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: colors.petrolAmber,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CustomPaint(
+                            painter: _MiniArcDialPainter(
+                              progress: 0.82,
+                              color: colors.petrolAmber,
+                              trackColor: colors.isDark ? Colors.white12 : Colors.black12,
+                            ),
+                            child: Center(
+                              child: Icon(Icons.local_gas_station, size: 11, color: colors.petrolAmber),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${_telemetry.fuelRangeKm} km',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: colors.textPrimary,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    Text(
+                      'PETROL RANGE',
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: colors.textMuted,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.7,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: colors.petrolAmber.withValues(alpha: colors.isDark ? 0.12 : 0.08),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '⛽ 51L Tank (RON95)',
+                        style: TextStyle(
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w600,
+                          color: colors.petrolAmber,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCircularRemoteButton({
     required IconData icon,
     required String label,
@@ -2030,6 +2429,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     required bool isActive,
     required Color activeColor,
     required VoidCallback onTap,
+    VoidCallback? onLongPress,
   }) {
     final colors = AppColors(context);
     final isLockedBtn = label == 'Locked';
@@ -2037,39 +2437,48 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     final Color buttonColor = useNeutralLocked
         ? colors.dockBtnBg
         : (isActive
-            ? activeColor.withValues(alpha: colors.isDark ? 0.2 : 0.15)
+            ? activeColor.withValues(alpha: colors.isDark ? 0.22 : 0.15)
             : colors.dockBtnBg);
     final Color borderColor = useNeutralLocked
         ? colors.border
-        : (isActive ? activeColor : colors.border);
+        : (isActive ? activeColor : (colors.isDark ? const Color(0xFF243042) : colors.border));
     final Color iconColor = useNeutralLocked
         ? colors.textPrimary
-        : (isActive ? activeColor : colors.dockBtnIcon);
+        : (isActive ? (colors.isDark ? Colors.white : activeColor) : colors.dockBtnIcon);
     final Color labelColor = useNeutralLocked
         ? colors.textPrimary
         : (isActive ? activeColor : colors.textPrimary);
 
     return InkWell(
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.mediumImpact();
+        onTap();
+      },
+      onLongPress: onLongPress != null
+          ? () {
+              HapticFeedback.heavyImpact();
+              onLongPress();
+            }
+          : null,
       borderRadius: BorderRadius.circular(30),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: buttonColor,
               border: Border.all(
                 color: borderColor,
-                width: 1.5,
+                width: (isActive && !useNeutralLocked) ? 2.0 : 1.2,
               ),
               boxShadow: (isActive && !useNeutralLocked)
                   ? [
                       BoxShadow(
-                        color: activeColor.withValues(alpha: colors.isDark ? 0.35 : 0.2),
-                        blurRadius: 10,
+                        color: activeColor.withValues(alpha: colors.isDark ? 0.42 : 0.25),
+                        blurRadius: 12,
                         spreadRadius: 1,
                       )
                     ]
@@ -2085,7 +2494,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             child: Center(
               child: Icon(
                 icon,
-                size: 22,
+                size: 24,
                 color: iconColor,
               ),
             ),
@@ -2101,7 +2510,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
           ),
           Text(
             sublabel,
-            style: TextStyle(fontSize: 9.5, color: colors.textMuted),
+            style: TextStyle(fontSize: 9.5, color: colors.textMuted, fontWeight: FontWeight.w500),
           ),
         ],
       ),
@@ -2465,104 +2874,116 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             // Row 1: TPMS
             InkWell(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               onTap: () => _showTyreModal('Tyres', 'Tire Pressure (TPMS)', _telemetry.tyreFlPressureKpa, _telemetry.tyreFlTempC),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: colors.tileBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: colors.border),
-                ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
                 child: Row(
                   children: [
-                    Icon(Icons.speed, size: 18, color: colors.evTeal),
-                    const SizedBox(width: 10),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: colors.evTeal.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(Icons.speed, size: 18, color: colors.evTeal),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Direct TPMS Tire Pressures', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                          Text('All 4 tyres optimal at ~230 kPa (Cold)', style: TextStyle(fontSize: 10.5, color: colors.textSecondary)),
+                          const Text('Direct TPMS Tire Pressures', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 2),
+                          Text('All 4 tyres optimal at ~230 kPa (Cold)', style: TextStyle(fontSize: 11, color: colors.textSecondary)),
                         ],
                       ),
                     ),
                     Text('230 kPa', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: colors.evTeal)),
+                    const SizedBox(width: 4),
                     Icon(Icons.chevron_right, size: 16, color: colors.textMuted),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            Divider(height: 1, color: colors.borderSubtle),
             // Row 2: Traction Battery
             InkWell(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               onTap: _showChargingPortModal,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: colors.tileBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: colors.border),
-                ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
                 child: Row(
                   children: [
-                    Icon(Icons.battery_charging_full, size: 18, color: colors.evTeal),
-                    const SizedBox(width: 10),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: colors.evTeal.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(Icons.battery_charging_full, size: 18, color: colors.evTeal),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('19.27 kWh LFP Traction Battery', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                          Text('${_telemetry.batteryPct}% SoC • ${_telemetry.electricRangeKm} km EV Range • AC Type 2', style: TextStyle(fontSize: 10.5, color: colors.textSecondary)),
+                          const Text('19.27 kWh LFP Traction Battery', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 2),
+                          Text('${_telemetry.batteryPct}% SoC • ${_telemetry.electricRangeKm} km EV Range • AC Type 2', style: TextStyle(fontSize: 11, color: colors.textSecondary)),
                         ],
                       ),
                     ),
                     Text(_telemetry.isCharging ? 'Charging' : 'Ready', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _telemetry.isCharging ? colors.evTeal : colors.textSecondary)),
+                    const SizedBox(width: 4),
                     Icon(Icons.chevron_right, size: 16, color: colors.textMuted),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            Divider(height: 1, color: colors.borderSubtle),
             // Row 3: 1,000 km Service Due
             InkWell(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (context) => const CheryServiceCentresScreen()),
                 );
               },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: colors.tileBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: colors.border),
-                ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
                 child: Row(
                   children: [
-                    Icon(Icons.build_outlined, size: 18, color: colors.petrolAmber),
-                    const SizedBox(width: 10),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: colors.petrolAmber.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(Icons.build_outlined, size: 18, color: colors.petrolAmber),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('First Service Milestone: 1,000 km', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                          Text('Labour & Inspection FOC • Chery Authorised 3S/4S', style: TextStyle(fontSize: 10.5, color: colors.textSecondary)),
+                          const Text('First Service Milestone: 1,000 km', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 2),
+                          Text('Labour & Inspection FOC • Chery Authorised 3S/4S', style: TextStyle(fontSize: 11, color: colors.textSecondary)),
                         ],
                       ),
                     ),
                     Text('FOC', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: colors.petrolAmber)),
+                    const SizedBox(width: 4),
                     Icon(Icons.chevron_right, size: 16, color: colors.textMuted),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 8),
             // Switch to Advanced Mode Button
             SizedBox(
               width: double.infinity,
@@ -2956,5 +3377,58 @@ class _VehicleSkinStudioSheetState extends State<_VehicleSkinStudioSheet> {
         ],
       ),
     );
+  }
+}
+
+/// -------------------------------------------------------------
+/// PORSCHE / AUDI PRECISION CLUSTER MINI ARC DIAL PAINTER
+/// -------------------------------------------------------------
+class _MiniArcDialPainter extends CustomPainter {
+  final double progress;
+  final Color color;
+  final Color trackColor;
+
+  _MiniArcDialPainter({
+    required this.progress,
+    required this.color,
+    required this.trackColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.width - 3.0) / 2;
+
+    final trackPaint = Paint()
+      ..color = trackColor
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
+
+    final progressPaint = Paint()
+      ..color = color
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    // Background track ring
+    canvas.drawCircle(center, radius, trackPaint);
+
+    // Active progress arc starting at top (-pi/2)
+    const startAngle = -1.57079632679;
+    final sweepAngle = 2 * 3.14159265359 * progress.clamp(0.0, 1.0);
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      startAngle,
+      sweepAngle,
+      false,
+      progressPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _MiniArcDialPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.color != color ||
+        oldDelegate.trackColor != trackColor;
   }
 }
