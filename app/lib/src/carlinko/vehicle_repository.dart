@@ -33,7 +33,7 @@ class MockVehicleRepository implements VehicleRepository {
           chargePowerKw: 0.0,
           chargeRemainMin: null,
           acOn: false,
-          acTemp: 23,
+          acTemp: 22,
           doorsOpen: false,
           trunkOpen: false,
           windowsOpen: false,

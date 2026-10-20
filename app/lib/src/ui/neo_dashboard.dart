@@ -634,7 +634,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       _syncWidgetTelemetry();
     } else if (action == 'climate') {
       setState(() => _isAcActive = !_isAcActive);
-      _showNotification(_isAcActive ? '❄️ Cabin Pre-cooling started (22°C)' : '❄️ Climate Pre-conditioning OFF');
+      _showNotification(_isAcActive ? '❄️ Cabin Pre-cooling started (${_telemetry.acTemp}°C)' : '❄️ Climate Pre-conditioning OFF');
       _syncWidgetTelemetry();
     } else if (action == 'windows') {
       setState(() => _isWindowsVented = !_isWindowsVented);
@@ -1549,7 +1549,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     ),
                     _buildCircularRemoteButton(
                       icon: Icons.ac_unit,
-                      label: _isAcActive ? '22°C ON' : 'A/C OFF',
+                      label: _isAcActive ? '${_telemetry.acTemp}°C ON' : 'A/C OFF',
                       sublabel: 'Climate',
                       isActive: _isAcActive,
                       activeColor: const Color(0xFF2F81F7),
