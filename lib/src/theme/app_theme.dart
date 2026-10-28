@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'app_tokens.dart';
+
 
 /// App Theme Controller for managing Light (Tesla), Dark (Obsidian), and System themes.
 class AppThemeController extends ChangeNotifier {
@@ -178,6 +180,7 @@ class AppTheme {
         ),
         elevation: 6,
       ),
+      extensions: const [AppTokens.light],
     );
   }
 
@@ -295,6 +298,7 @@ class AppTheme {
         ),
         elevation: 6,
       ),
+      extensions: const [AppTokens.dark],
     );
   }
 }

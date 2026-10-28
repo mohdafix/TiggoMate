@@ -11,6 +11,7 @@ import 'package:tiggomate_app/src/ui/trips_logbook_screen.dart';
 import 'package:tiggomate_app/src/ui/vehicle_radar_sheet.dart';
 import 'package:tiggomate_app/src/ui/smart_charging_sheet.dart';
 import 'package:tiggomate_app/src/ui/app_notification.dart';
+import 'package:tiggomate_app/src/ui/settings_screen.dart';
 
 void main() {
   setUp(() {
