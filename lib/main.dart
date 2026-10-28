@@ -198,6 +198,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   Future<void> _loadSettings() async {
     final s = await SettingsService.load();
     await _myTnbRepo.init();
+    if (s.carLinkoStatus == 'Active') {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final acc = prefs.getString('tm_carlinko_account') ?? s.ownerName;
+        AppVehicleRepository.instance.setPreActivationActive(account: acc);
+      } catch (_) {}
+    }
     if (mounted) {
       setState(() {
         _settings = s;

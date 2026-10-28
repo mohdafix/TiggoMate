@@ -1,6 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../carlinko/carlinko_api.dart';
 import '../carlinko/vehicle_repository.dart';
+import '../theme/app_tokens.dart';
 
 class CarlinkoConnectDialog extends StatefulWidget {
   final VehicleRepository repository;
@@ -40,14 +42,19 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
     super.dispose();
   }
 
-  void _handleUseMock() {
+  void _handleUseMock() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('tm_carlinko_status', 'Demo');
+    } catch (_) {}
+
     if (widget.repository is AppVehicleRepository) {
       (widget.repository as AppVehicleRepository).useMockMode();
     } else {
       widget.repository.disconnect();
     }
     widget.onConnected();
-    Navigator.of(context).pop();
+    if (mounted) Navigator.of(context).pop();
   }
 
   Future<void> _handleConnect() async {
@@ -74,14 +81,28 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
         password: pwd,
         region: _region,
       );
+
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('tm_carlinko_status', 'Active');
+        await prefs.setString('tm_carlinko_account', acc);
+      } catch (_) {}
+
       if (mounted) {
+        final isPreActivation = (widget.repository is AppVehicleRepository &&
+                (widget.repository as AppVehicleRepository).isPreActivation) ||
+            (widget.repository is LiveCarLinkoRepository &&
+                (widget.repository as LiveCarLinkoRepository).isPreActivation);
+
         setState(() {
           _loading = false;
-          _statusMessage = 'Connected successfully! Vehicle telemetry synced.';
           _isError = false;
+          _statusMessage = isPreActivation
+              ? 'Connected to CarLinko Cloud! Pre-Activation mode is active — telematics will auto-pair once your Chery 3S/4S centre links your VIN.'
+              : 'Connected successfully! Vehicle telemetry synced.';
         });
         widget.onConnected();
-        Future.delayed(const Duration(milliseconds: 1200), () {
+        Future.delayed(const Duration(milliseconds: 1400), () {
           if (mounted) Navigator.of(context).pop();
         });
       }
@@ -107,11 +128,14 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.tokens;
+
     return Dialog(
       backgroundColor: const Color(0xFF131922),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(22),
+        padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -121,16 +145,16 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF00D2AA).withValues(alpha: 0.15),
+                    color: t.accent.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.cell_tower, color: Color(0xFF00D2AA), size: 24),
+                  child: Icon(Icons.cell_tower, color: t.accent, size: 24),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Text(
                     'CarLinko Telematics Cloud',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: t.ink),
                   ),
                 ),
               ],
@@ -141,19 +165,19 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFF00D2AA).withValues(alpha: 0.1),
+                color: t.accent.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: 0.3)),
+                border: Border.all(color: t.accent.withValues(alpha: 0.25)),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Icon(Icons.verified_outlined, color: Color(0xFF00D2AA), size: 20),
-                  SizedBox(width: 10),
+                children: [
+                  Icon(Icons.verified_outlined, color: t.accent, size: 20),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       'Pre-Activation Mode Active: Chery CarLinko telematics is activated by your authorised Chery 3S/4S centre during the 1,000 km initial vehicle service. Until activation, TiggoMate runs in high-fidelity Simulation Mode.',
-                      style: TextStyle(fontSize: 11, color: Color(0xFF99F6E4), height: 1.35),
+                      style: TextStyle(fontSize: 11, color: t.accent.withValues(alpha: 0.9), height: 1.35),
                     ),
                   ),
                 ],
@@ -191,7 +215,7 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
               decoration: const InputDecoration(
                 labelText: 'Account / Registered Phone Number',
                 prefixIcon: Icon(Icons.person_outline, size: 20),
-                hintText: '+60123456789',
+                hintText: '+60123456789 or email',
               ),
             ),
             const SizedBox(height: 12),
@@ -214,6 +238,7 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
             // Region Dropdown
             DropdownButtonFormField<String>(
               initialValue: _region,
+              isExpanded: true,
               decoration: const InputDecoration(
                 labelText: 'CarLinko Cloud Region',
                 prefixIcon: Icon(Icons.public, size: 20),
@@ -232,66 +257,93 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
 
             if (_statusMessage != null) ...[
               Container(
-                padding: const EdgeInsets.all(10),
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: _isError
                       ? Colors.red.withValues(alpha: 0.12)
-                      : const Color(0xFF00D2AA).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  _statusMessage!,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: _isError ? Colors.redAccent : const Color(0xFF00D2AA),
+                      : t.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: _isError
+                        ? Colors.red.withValues(alpha: 0.3)
+                        : t.accent.withValues(alpha: 0.3),
                   ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      _isError ? Icons.error_outline : Icons.check_circle_outline,
+                      size: 18,
+                      color: _isError ? Colors.redAccent : t.accent,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _statusMessage!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _isError ? Colors.redAccent : t.accent,
+                          height: 1.35,
+                        ),
+                        softWrap: true,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 14),
             ],
 
             // Action Buttons
-            Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 8,
-              runSpacing: 10,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: _loading ? null : _handleUseMock,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF00D2AA),
-                    side: const BorderSide(color: Color(0xFF00D2AA)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  icon: const Icon(Icons.speed, size: 16),
-                  label: const Text('Use Simulation Mode'),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _loading ? null : _handleConnect,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: t.accent,
+                  foregroundColor: t.onAccent,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+                icon: _loading
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: t.onAccent),
+                      )
+                    : const Icon(Icons.cloud_sync_rounded, size: 18),
+                label: Text(
+                  _loading ? 'Connecting...' : 'Connect Cloud',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _loading ? null : _handleUseMock,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: t.ink2,
+                      side: BorderSide(color: t.border),
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                    const SizedBox(width: 8),
-                    ElevatedButton.icon(
-                      onPressed: _loading ? null : _handleConnect,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00D2AA),
-                        foregroundColor: Colors.black87,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      icon: _loading
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black87),
-                            )
-                          : const Icon(Icons.login, size: 18),
-                      label: Text(_loading ? 'Connecting...' : 'Connect Cloud'),
-                    ),
-                  ],
+                    icon: const Icon(Icons.speed, size: 16),
+                    label: const Text('Use Simulation Mode', style: TextStyle(fontSize: 12)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  ),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
                 ),
               ],
             ),

@@ -110,7 +110,18 @@ void main() {
       liveRepo.dispose();
     });
 
-    test('AppVehicleRepository operates in verified pre-activation simulation mode', () {
+    test('LiveCarLinkoRepository maintains connected status in pre-activation mode without vehicle bound', () {
+      final liveRepo = LiveCarLinkoRepository();
+      liveRepo.setPreActivationMode(account: 'linexsg@gmail.com');
+      expect(liveRepo.connectionStatus, equals(VehicleConnectionStatus.connected));
+      expect(liveRepo.isPreActivation, isTrue);
+      expect(liveRepo.account, equals('linexsg@gmail.com'));
+      expect(liveRepo.currentTelemetry.isSimulated, isTrue);
+      expect(liveRepo.currentTelemetry.dataSourceLabel, contains('CarLinko Cloud Active • Pre-Activation'));
+      liveRepo.dispose();
+    });
+
+    test('AppVehicleRepository operates in verified pre-activation simulation mode and restores active', () {
       final sharedRepo = AppVehicleRepository.instance;
       expect(sharedRepo.isPreActivationMode, isTrue);
       expect(sharedRepo.isLiveActive, isFalse);
@@ -121,6 +132,12 @@ void main() {
 
       sharedRepo.toggleCharging(false);
       expect(sharedRepo.currentTelemetry.isCharging, isFalse);
+
+      sharedRepo.setPreActivationActive(account: 'linexsg@gmail.com');
+      expect(sharedRepo.isLiveActive, isTrue);
+      expect(sharedRepo.isPreActivation, isTrue);
+      expect(sharedRepo.connectionStatus, equals(VehicleConnectionStatus.connected));
+      expect(sharedRepo.currentTelemetry.dataSourceLabel, contains('Pre-Activation'));
 
       sharedRepo.useMockMode();
       expect(sharedRepo.isLiveActive, isFalse);
@@ -156,4 +173,3 @@ void main() {
     });
   });
 }
-
