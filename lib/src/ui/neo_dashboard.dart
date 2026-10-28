@@ -520,12 +520,17 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     });
   }
 
-  void _openCarlinkoConnect() {
+  void _openCarlinkoConnect() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedAccount = prefs.getString('tm_carlinko_account') ??
+        widget.repository.connectedAccount ??
+        '';
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (context) => CarlinkoConnectDialog(
         repository: widget.repository,
-        currentAccount: widget.ownerName,
+        currentAccount: savedAccount,
         onConnected: () => setState(() {}),
       ),
     );
@@ -809,26 +814,51 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         ),
                       ),
                       const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: _telemetry.isCharging
-                              ? colors.evTeal.withValues(alpha: 0.2)
-                              : (!_telemetry.isSimulated ? colors.evTeal.withValues(alpha: 0.15) : Colors.orange.withValues(alpha: 0.15)),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          _telemetry.isCharging
-                              ? '⚡ 3.3kW'
-                              : (_telemetry.isSimulated ? 'Simulated' : 'Connected'),
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: _telemetry.isCharging
-                                ? colors.evTeal
-                                : (!_telemetry.isSimulated ? colors.evTeal : Colors.orangeAccent),
-                          ),
-                        ),
+                      Builder(
+                        builder: (context) {
+                          final isCloudActive = widget.repository.isCloudConnected;
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: _telemetry.isCharging
+                                  ? colors.evTeal.withValues(alpha: 0.2)
+                                  : (isCloudActive
+                                      ? colors.evTeal.withValues(alpha: 0.15)
+                                      : Colors.orange.withValues(alpha: 0.15)),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (isCloudActive) ...[
+                                  Container(
+                                    width: 5,
+                                    height: 5,
+                                    decoration: BoxDecoration(
+                                      color: colors.evTeal,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                ],
+                                Text(
+                                  _telemetry.isCharging
+                                      ? '⚡ 3.3kW'
+                                      : (isCloudActive
+                                          ? (widget.repository.isPreActivationMode ? 'Cloud Active' : 'Connected')
+                                          : 'Simulated'),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: _telemetry.isCharging
+                                        ? colors.evTeal
+                                        : (isCloudActive ? colors.evTeal : Colors.orangeAccent),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -848,13 +878,42 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.all(6),
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                    tooltip: 'CarLinko Cloud Sync',
-                    icon: Icon(Icons.cell_tower, size: 18, color: colors.evTeal),
-                    onPressed: _openCarlinkoConnect,
+                  Builder(
+                    builder: (context) {
+                      final isCloudActive = widget.repository.isCloudConnected;
+                      return IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.all(6),
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        tooltip: isCloudActive
+                            ? 'CarLinko Cloud: Connected (${widget.repository.connectedAccount ?? "Active"})'
+                            : 'CarLinko Cloud: Disconnected (Tap to connect)',
+                        icon: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Icon(
+                              Icons.cell_tower,
+                              size: 18,
+                              color: isCloudActive ? colors.evTeal : colors.dockBtnIcon,
+                            ),
+                            if (isCloudActive)
+                              Positioned(
+                                right: -2,
+                                top: -2,
+                                child: Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF10B981),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        onPressed: _openCarlinkoConnect,
+                      );
+                    },
                   ),
                   ListenableBuilder(
                     listenable: VehicleAlertsManager.instance,
@@ -1095,7 +1154,43 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (_telemetry.isSimulated)
+                if (widget.repository.isCloudConnected)
+                  InkWell(
+                    onTap: _openCarlinkoConnect,
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: colors.evTeal.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: colors.evTeal.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.cloud_done, size: 12, color: colors.evTeal),
+                          const SizedBox(width: 4),
+                          Text(
+                            widget.repository.isPreActivationMode
+                                ? 'CarLinko Cloud Active'
+                                : 'Live Telematics Synced',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: colors.evTeal,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          Icon(
+                            Icons.chevron_right,
+                            size: 13,
+                            color: colors.evTeal,
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else if (_telemetry.isSimulated)
                   InkWell(
                     onTap: () {
                       Navigator.of(context).push(

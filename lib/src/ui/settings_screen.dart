@@ -724,15 +724,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: _showCarLinkoStatusPicker,
             ),
             _buildSettingTile(
-              leading: Icon(Icons.link, color: t.ink2, size: 22),
-              title: 'Connect CarLinko Account',
-              subtitle: 'Pair Malaysia VIN & CarLinko credentials',
-              onTap: () {
+              leading: Icon(
+                AppVehicleRepository.instance.isCloudConnected ? Icons.cloud_done : Icons.link,
+                color: AppVehicleRepository.instance.isCloudConnected ? t.ok : t.ink2,
+                size: 22,
+              ),
+              title: AppVehicleRepository.instance.isCloudConnected
+                  ? 'CarLinko Cloud Session'
+                  : 'Connect CarLinko Account',
+              subtitle: AppVehicleRepository.instance.isCloudConnected
+                  ? 'Active Account: ${AppVehicleRepository.instance.connectedAccount ?? "Verified Session"}'
+                  : 'Pair Malaysia VIN & CarLinko credentials',
+              onTap: () async {
+                final prefs = await SharedPreferences.getInstance();
+                final savedAccount = prefs.getString('tm_carlinko_account') ??
+                    AppVehicleRepository.instance.connectedAccount ??
+                    '';
+                if (!context.mounted) return;
                 showDialog(
                   context: context,
                   builder: (ctx) => CarlinkoConnectDialog(
                     repository: AppVehicleRepository.instance,
-                    currentAccount: _ownerController.text,
+                    currentAccount: savedAccount,
                     onConnected: () => setState(() => _carLinkoStatus = 'Active'),
                   ),
                 );

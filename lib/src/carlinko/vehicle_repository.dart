@@ -6,6 +6,9 @@ abstract class VehicleRepository {
   Stream<VehicleTelemetry> get telemetryStream;
   VehicleTelemetry get currentTelemetry;
   VehicleConnectionStatus get connectionStatus;
+  bool get isCloudConnected;
+  bool get isPreActivationMode;
+  String? get connectedAccount;
   Future<void> refresh();
   Future<void> connect({required String account, required String password, String region = 'sea'});
   Future<void> disconnect();
@@ -58,6 +61,15 @@ class MockVehicleRepository implements VehicleRepository {
 
   @override
   VehicleConnectionStatus get connectionStatus => _status;
+
+  @override
+  bool get isCloudConnected => false;
+
+  @override
+  bool get isPreActivationMode => false;
+
+  @override
+  String? get connectedAccount => null;
 
   @override
   Future<void> refresh() async {
@@ -176,6 +188,15 @@ class LiveCarLinkoRepository implements VehicleRepository {
 
   @override
   VehicleConnectionStatus get connectionStatus => _status;
+
+  @override
+  bool get isCloudConnected => _status == VehicleConnectionStatus.connected;
+
+  @override
+  bool get isPreActivationMode => _isPreActivation;
+
+  @override
+  String? get connectedAccount => _account;
 
   @override
   Future<void> connect({required String account, required String password, String region = 'sea'}) async {
@@ -430,8 +451,17 @@ class AppVehicleRepository implements VehicleRepository {
 
   bool _isLiveActive = false;
   bool get isLiveActive => _isLiveActive;
-  bool get isPreActivationMode => !_isLiveActive || _liveRepo.isPreActivation;
-  bool get isPreActivation => _liveRepo.isPreActivation;
+  bool get isPreActivation => isPreActivationMode;
+
+  @override
+  bool get isCloudConnected => _isLiveActive && _liveRepo.isCloudConnected;
+
+  @override
+  bool get isPreActivationMode => !_isLiveActive || _liveRepo.isPreActivationMode;
+
+  @override
+  String? get connectedAccount => _isLiveActive ? _liveRepo.connectedAccount : null;
+
   LiveCarLinkoRepository get liveRepo => _liveRepo;
 
   final _controller = StreamController<VehicleTelemetry>.broadcast();
