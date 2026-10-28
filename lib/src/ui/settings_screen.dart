@@ -12,6 +12,7 @@ import 'app_notification.dart';
 import 'auth_sheet.dart';
 import 'carlinko_connect_dialog.dart';
 import 'mytnb_connect_dialog.dart';
+import 'setup_intro_screen.dart';
 
 // Re-export AppSettings and SettingsService so existing callers keep working seamlessly
 class AppSettings {
@@ -605,6 +606,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           // Group 1: Driver & Vehicle Appearance
           _group('Driver & Car Look', [
+            _buildSettingTile(
+              leading: Icon(Icons.auto_awesome_rounded, color: t.accent, size: 22),
+              title: 'Cockpit Setup Wizard',
+              subtitle: 'Re-run initial car & driver onboarding',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => SetupIntroScreen(
+                      isRevisit: true,
+                      onCompleted: () {
+                        Navigator.pop(context);
+                        _loadPreferences();
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
             _inputRow(
               icon: Icons.person_outline,
               label: 'Driver Profile Name',

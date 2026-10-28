@@ -31,6 +31,7 @@ void main() {
       'tiggomate_auth_is_guest': false,
       'tiggomate_auth_name': 'Ahmad Razak',
       'tiggomate_auth_plate': 'VAG 7777',
+      'tm_has_completed_setup': true,
       'tiggomate_auth_nickname': 'Tiggo Grey Wolf',
     });
   });
@@ -38,6 +39,7 @@ void main() {
   testWidgets('LoginScreen renders on first launch when not authenticated and allows guest entry', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'tiggomate_has_chosen_auth': false,
+      'tm_has_completed_setup': true,
     });
 
     await tester.pumpWidget(const TiggoMateApp());

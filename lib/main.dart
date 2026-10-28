@@ -17,6 +17,8 @@ import 'src/ui/login_screen.dart';
 import 'src/theme/app_theme.dart';
 
 import 'src/ui/app_notification.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'src/ui/setup_intro_screen.dart';
 import 'src/ui/settings_screen.dart';
 import 'src/theme/accent.dart';
 
@@ -85,6 +87,7 @@ class _AppRootGateState extends State<AppRootGate> {
   final _authService = AuthService();
   bool _initialized = false;
   bool _hasChosenAuth = false;
+  bool _hasCompletedSetup = false;
 
   @override
   void initState() {
@@ -102,9 +105,12 @@ class _AppRootGateState extends State<AppRootGate> {
   Future<void> _initGate() async {
     try {
       await _authService.initialize();
+      final prefs = await SharedPreferences.getInstance();
+      final setupDone = prefs.getBool('tm_has_completed_setup') ?? false;
       final chosen = await _authService.hasChosenAuth();
       if (mounted) {
         setState(() {
+          _hasCompletedSetup = setupDone;
           _hasChosenAuth = chosen;
           _initialized = true;
         });
@@ -113,7 +119,8 @@ class _AppRootGateState extends State<AppRootGate> {
       debugPrint('Gate initialization error: $e');
       if (mounted) {
         setState(() {
-          _hasChosenAuth = true; // Fallback to guest mode
+          _hasCompletedSetup = false;
+          _hasChosenAuth = true;
           _initialized = true;
         });
       }
@@ -128,6 +135,17 @@ class _AppRootGateState extends State<AppRootGate> {
         body: Center(
           child: CircularProgressIndicator(color: Theme.of(context).colorScheme.secondary),
         ),
+      );
+    }
+
+    if (!_hasCompletedSetup) {
+      return SetupIntroScreen(
+        onCompleted: () {
+          setState(() {
+            _hasCompletedSetup = true;
+            _hasChosenAuth = true;
+          });
+        },
       );
     }
 
