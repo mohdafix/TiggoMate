@@ -1,4 +1,4 @@
-name: tiggomate
+name: tiggomate_app
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -31,18 +31,27 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # The following adds the Cupertino Icons font to your application.
+  # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  flutter_riverpod: ^2.6.1
-  go_router: ^14.8.1
-  shared_preferences: ^2.5.3
-  intl: ^0.20.2
-  flutter_markdown: ^0.7.6+1
-  uuid: ^4.5.1
-  http: ^1.3.0
+  shared_preferences: ^2.5.6
+  crypto: ^3.0.6
+  model_viewer_plus: ^1.10.0
+  webview_flutter: ^4.14.1
+  url_launcher: ^6.3.3
+  firebase_core: ^4.15.0
+  firebase_auth: ^6.7.0
+  cloud_firestore: ^6.10.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
+  # The "flutter_lints" package below contains a set of recommended lints to
+  # encourage good coding practices. The lint set provided by the package is
+  # activated in the `analysis_options.yaml` file located at the root of your
+  # package. See that file for information about deactivating specific lint
+  # rules and activating additional ones.
   flutter_lints: ^6.0.0
 
 # For information on the generic Dart part of this file, see the
@@ -55,9 +64,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
-
   assets:
-    - assets/knowledge/
+    - assets/images/
+    - assets/models/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
