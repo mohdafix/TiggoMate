@@ -158,7 +158,7 @@ void main() {
       expect(find.text('EV Path'), findsOneWidget);
       expect(find.text('DISTANCE'), findsOneWidget);
       expect(find.text('TRIP COST'), findsOneWidget);
-      expect(find.text('Test Drive'), findsOneWidget);
+      expect(find.text('Pause Drive'), findsOneWidget);
       expect(find.text('Finish & Save'), findsOneWidget);
 
       // Stop drive timer so no pending timers remain when test finishes

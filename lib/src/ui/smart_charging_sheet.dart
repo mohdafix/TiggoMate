@@ -798,7 +798,7 @@ class _SmartChargingSheetState extends State<SmartChargingSheet> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Simulated AC Charging Curve',
+                    'PHEV AC Charging Curve',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,

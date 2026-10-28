@@ -50,19 +50,19 @@ void main() {
 
     // Verify dialog content is present in login view
     expect(find.text('CarLinko Telematics Cloud'), findsOneWidget);
-    expect(find.text('Pre-Activation Mode Active: Chery CarLinko telematics is activated by your authorised Chery 3S/4S centre during the 1,000 km initial vehicle service. Until activation, TiggoMate runs in high-fidelity Simulation Mode.'), findsOneWidget);
+    expect(find.text('Chery CarLinko Cloud Standby: Connect with your official CarLinko account. Once your dealer binds the vehicle VIN, live telematics and remote controls automatically sync in real time.'), findsOneWidget);
     expect(find.text('Single Session Notice: Chery CarLinko permits only one active mobile session. Connecting live here may log out your official phone app.'), findsOneWidget);
     expect(find.text('Connect Cloud'), findsOneWidget);
-    expect(find.text('Use Simulation Mode'), findsOneWidget);
+    expect(find.text('Offline Standby'), findsOneWidget);
     expect(find.text('Cancel'), findsOneWidget);
 
     // No overflow exception thrown
     expect(tester.takeException(), isNull);
 
-    // Tap "Use Simulation Mode" after ensuring it is visible
-    await tester.ensureVisible(find.text('Use Simulation Mode'));
+    // Tap "Offline Standby" after ensuring it is visible
+    await tester.ensureVisible(find.text('Offline Standby'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Use Simulation Mode'));
+    await tester.tap(find.text('Offline Standby'));
     await tester.pumpAndSettle();
 
     expect(connectedCalled, isTrue);

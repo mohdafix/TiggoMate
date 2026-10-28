@@ -176,7 +176,7 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
                 e.code == 'USER_NOT_FOUND' ||
                 e.code == 'AUTH_FAILED';
             _statusMessage = isUnactivated
-                ? 'Pre-Activation Notice: Account not active on CarLinko cloud yet. Authorised Chery centres activate telematics during the 1,000 km initial service. You can continue using Simulation Mode.'
+                ? 'Pre-Activation Notice: Account not active on CarLinko cloud yet. Authorised Chery centres activate telematics during vehicle handover or 1,000 km service.'
                 : 'CarLinko Cloud Error (${e.code ?? "failed"}): ${e.message}';
           } else {
             _statusMessage = 'Connection error: $e';
@@ -497,7 +497,7 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Pre-Activation Mode Active: Chery CarLinko telematics is activated by your authorised Chery 3S/4S centre during the 1,000 km initial vehicle service. Until activation, TiggoMate runs in high-fidelity Simulation Mode.',
+                  'Chery CarLinko Cloud Standby: Connect with your official CarLinko account. Once your dealer binds the vehicle VIN, live telematics and remote controls automatically sync in real time.',
                   style: TextStyle(fontSize: 11, color: t.accent.withValues(alpha: 0.9), height: 1.35),
                 ),
               ),
@@ -654,8 +654,8 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
                   padding: const EdgeInsets.symmetric(vertical: 11),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                icon: const Icon(Icons.speed, size: 16),
-                label: const Text('Use Simulation Mode', style: TextStyle(fontSize: 12)),
+                icon: const Icon(Icons.cloud_queue_rounded, size: 16),
+                label: const Text('Offline Standby', style: TextStyle(fontSize: 12)),
               ),
             ),
             const SizedBox(width: 8),

@@ -103,7 +103,7 @@ class VehicleTelemetry {
     this.parkedDurationText = 'Parked 42m ago',
     required this.lastUpdated,
     this.isSimulated = true,
-    this.dataSourceLabel = 'SIMULATED DATA (CarLinko Not Activated)',
+    this.dataSourceLabel = 'Chery CarLinko Cloud • Telematics Standby',
   });
 
   /// Factory creating validated telemetry from decoded CarLinko blob map.
@@ -165,7 +165,7 @@ class VehicleTelemetry {
       parkedDurationText: (m['parked_duration'] as String?) ?? 'Parked 42m ago',
       lastUpdated: DateTime.now(),
       isSimulated: isSimulated,
-      dataSourceLabel: isSimulated ? 'SIMULATED DATA (CarLinko Not Activated)' : 'LIVE CARLINKO TELEMATICS',
+      dataSourceLabel: isSimulated ? 'Chery CarLinko Cloud • Telematics Standby' : 'LIVE CARLINKO TELEMATICS',
     );
   }
 

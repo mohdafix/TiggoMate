@@ -28,6 +28,7 @@ class NeoDashboard extends StatefulWidget {
   final String vehicleNickname;
   final double tnbTariff;
   final double fuelPrice;
+  final String? vehicleSkinKey;
   final VoidCallback onOpenSettings;
   final VoidCallback onOpenAssistant;
 
@@ -39,6 +40,7 @@ class NeoDashboard extends StatefulWidget {
     required this.vehicleNickname,
     required this.tnbTariff,
     required this.fuelPrice,
+    this.vehicleSkinKey,
     required this.onOpenSettings,
     required this.onOpenAssistant,
   });
@@ -57,13 +59,26 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
   bool _isWindowsVented = false;
   bool _isTrunkOpen = false;
   bool _spendingExpanded = false;
-  String _selectedVehicleColorKey = 'khaki_white';
 
-  VehicleSkinOption get _selectedSkin => getVehicleSkinByKey(_selectedVehicleColorKey);
+  String get _selectedVehicleColorKey => VehicleSkinManager.instance.currentSkinKey;
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
   StreamSubscription<String>? _quickActionSubscription;
+
+  void _handleSkinChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant NeoDashboard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.vehicleSkinKey != null && widget.vehicleSkinKey != oldWidget.vehicleSkinKey) {
+      VehicleSkinManager.instance.setSkin(widget.vehicleSkinKey!);
+    }
+  }
 
   @override
   void initState() {
@@ -73,6 +88,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     _isAcActive = _telemetry.acOn;
     _isTrunkOpen = _telemetry.trunkOpen;
     _isWindowsVented = _telemetry.windowsOpen;
+    VehicleSkinManager.instance.addListener(_handleSkinChanged);
 
     // Initialize native Android Home Widget and App Shortcuts listeners
     HomeWidgetService.instance.init();
@@ -84,7 +100,6 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       if (mounted) {
         setState(() {
           _isAdvancedView = prefs.getBool('tiggomate_ui_mode_advanced') ?? false;
-          _selectedVehicleColorKey = prefs.getString('tm_vehicle_color_skin') ?? 'khaki_white';
         });
         _syncWidgetTelemetry();
       }
@@ -115,6 +130,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
 
   @override
   void dispose() {
+    VehicleSkinManager.instance.removeListener(_handleSkinChanged);
     _quickActionSubscription?.cancel();
     _pulseController.dispose();
     super.dispose();
@@ -138,13 +154,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
 
   Future<void> _updateVehicleColor(String key) async {
     HapticFeedback.selectionClick();
-    setState(() {
-      _selectedVehicleColorKey = key;
-    });
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('tm_vehicle_color_skin', key);
-    } catch (_) {}
+    await VehicleSkinManager.instance.setSkin(key);
   }
 
   void _showVehicleSkinStudioModal() {
@@ -634,24 +644,32 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
 
   void _handleRemoteCommand(String action) {
     if (action == 'lock') {
-      setState(() => _isDoorsLocked = !_isDoorsLocked);
-      _showNotification(_isDoorsLocked ? '🔒 CarLinko: Doors Locked' : '🔓 CarLinko: Doors Unlocked');
+      final willLock = !_isDoorsLocked;
+      setState(() => _isDoorsLocked = willLock);
+      widget.repository.sendRemoteCommand(willLock ? 'door_lock' : 'door_unlock');
+      _showNotification(willLock ? '🔒 CarLinko: Doors Locked' : '🔓 CarLinko: Doors Unlocked');
       _syncWidgetTelemetry();
     } else if (action == 'climate') {
-      setState(() => _isAcActive = !_isAcActive);
-      _showNotification(_isAcActive ? '❄️ Cabin Pre-cooling started (${_telemetry.acTemp}°C)' : '❄️ Climate Pre-conditioning OFF');
+      final willTurnOn = !_isAcActive;
+      setState(() => _isAcActive = willTurnOn);
+      widget.repository.sendRemoteCommand(willTurnOn ? 'ac_on' : 'ac_off');
+      _showNotification(willTurnOn ? '❄️ Cabin Pre-cooling started (${_telemetry.acTemp}°C)' : '❄️ Climate Pre-conditioning OFF');
       _syncWidgetTelemetry();
     } else if (action == 'windows') {
       setState(() => _isWindowsVented = !_isWindowsVented);
+      widget.repository.sendRemoteCommand(_isWindowsVented ? 'window_vent' : 'window_close');
       _showNotification(_isWindowsVented ? '🪟 Windows vented (20mm)' : '🪟 All Windows closed');
     } else if (action == 'trunk') {
       setState(() => _isTrunkOpen = !_isTrunkOpen);
+      widget.repository.sendRemoteCommand(_isTrunkOpen ? 'trunk_open' : 'trunk_close');
       _showNotification(_isTrunkOpen ? '🚗 Power Tailgate opened' : '🚗 Tailgate closed');
     } else if (action == 'locate') {
+      widget.repository.sendRemoteCommand('locate');
       VehicleRadarSheet.show(
         context,
         telemetry: _telemetry,
         onHornFlash: () {
+          widget.repository.sendRemoteCommand('locate');
           _showNotification('📢 CarLinko: Lights flashing & horn sounding');
         },
       );
@@ -846,7 +864,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                                       ? '⚡ 3.3kW'
                                       : (isCloudActive
                                           ? (widget.repository.isPreActivationMode ? 'Cloud Active' : 'Connected')
-                                          : 'Simulated'),
+                                          : 'Standby'),
                                   style: TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
@@ -1097,24 +1115,10 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Top Row: Malaysian Plate Badge + CarLinko Cloud Connectivity Pill
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
               children: [
-                Expanded(
-                  child: Text(
-                    widget.vehicleNickname.isNotEmpty ? widget.vehicleNickname : 'Chery Tiggo 7 PHEV CSH',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.3,
-                      color: colors.textPrimary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
                 // Car Plate Badge (Malaysian Black & Silver plate aesthetic)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -1142,83 +1146,108 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     ),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '${widget.ownerName} • Chery Tiggo 7 PHEV CSH • 1.5T DHT',
-                    style: TextStyle(fontSize: 11.5, color: colors.textSecondary, fontWeight: FontWeight.w500),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (widget.repository.isCloudConnected)
-                  InkWell(
-                    onTap: _openCarlinkoConnect,
-                    borderRadius: BorderRadius.circular(6),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: colors.evTeal.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: colors.evTeal.withValues(alpha: 0.3)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.cloud_done, size: 12, color: colors.evTeal),
-                          const SizedBox(width: 4),
-                          Text(
-                            widget.repository.isPreActivationMode
-                                ? 'CarLinko Cloud Active'
-                                : 'Live Telematics Synced',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: colors.evTeal,
-                            ),
-                          ),
-                          const SizedBox(width: 2),
-                          Icon(
-                            Icons.chevron_right,
-                            size: 13,
-                            color: colors.evTeal,
-                          ),
-                        ],
+
+                // CarLinko Cloud Connectivity Pill
+                InkWell(
+                  onTap: _openCarlinkoConnect,
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: widget.repository.isCloudConnected
+                          ? colors.evTeal.withValues(alpha: 0.12)
+                          : (colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFB45309)).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: widget.repository.isCloudConnected
+                            ? colors.evTeal.withValues(alpha: 0.35)
+                            : (colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFB45309)).withValues(alpha: 0.35),
                       ),
                     ),
-                  )
-                else if (_telemetry.isSimulated)
-                  InkWell(
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const CheryServiceCentresScreen(),
-                        ),
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(6),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        Icon(
+                          widget.repository.isCloudConnected
+                              ? Icons.cloud_done
+                              : Icons.cloud_off_outlined,
+                          size: 13,
+                          color: widget.repository.isCloudConnected
+                              ? colors.evTeal
+                              : (colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFB45309)),
+                        ),
+                        const SizedBox(width: 5),
                         Text(
-                          'Simulated Data',
+                          widget.repository.isCloudConnected
+                              ? (widget.repository.isPreActivationMode
+                                  ? 'CarLinko Cloud Active'
+                                  : 'Live Telematics Synced')
+                              : 'CarLinko Standby • Tap to Connect',
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: 10.5,
                             fontWeight: FontWeight.bold,
-                            color: colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFB45309),
+                            color: widget.repository.isCloudConnected
+                                ? colors.evTeal
+                                : (colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFB45309)),
                           ),
                         ),
+                        const SizedBox(width: 2),
                         Icon(
                           Icons.chevron_right,
                           size: 13,
-                          color: colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFB45309),
+                          color: widget.repository.isCloudConnected
+                              ? colors.evTeal
+                              : (colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFB45309)),
                         ),
                       ],
                     ),
                   ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Vehicle Title: Full Width - Never Cropped
+            Text(
+              widget.vehicleNickname.isNotEmpty ? widget.vehicleNickname : 'Chery Tiggo 7 PHEV CSH',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.2,
+                color: colors.textPrimary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 3),
+
+            // Subtitle: Owner & Powertrain (Clean, non-redundant)
+            Row(
+              children: [
+                Icon(Icons.person_outline, size: 13, color: colors.textSecondary),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    widget.ownerName.isNotEmpty ? widget.ownerName : 'Owner',
+                    style: TextStyle(fontSize: 11.5, color: colors.textSecondary, fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Text(
+                  '  •  ',
+                  style: TextStyle(fontSize: 11.5, color: colors.textSecondary.withValues(alpha: 0.5)),
+                ),
+                Icon(Icons.bolt, size: 13, color: colors.evTeal),
+                const SizedBox(width: 2),
+                Flexible(
+                  child: Text(
+                    widget.vehicleNickname.isNotEmpty && widget.vehicleNickname != 'Chery Tiggo 7 PHEV CSH'
+                        ? 'Chery Tiggo 7 PHEV CSH • 1.5T DHT'
+                        : 'Chery Super Hybrid • 1.5T DHT',
+                    style: TextStyle(fontSize: 11.5, color: colors.textSecondary, fontWeight: FontWeight.w500),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
           ],
@@ -1519,17 +1548,27 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         Positioned(
                           top: 8,
                           bottom: 20,
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 300),
-                            transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
-                            child: Image.asset(
-                              _selectedSkin.assetPath,
-                              key: ValueKey(_selectedSkin.key),
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Icon(Icons.directions_car, size: 100, color: colors.textMuted);
-                              },
-                            ),
+                          child: ListenableBuilder(
+                            listenable: VehicleSkinManager.instance,
+                            builder: (context, _) {
+                              final activeSkin = getVehicleSkinByKey(
+                                VehicleSkinManager.instance.currentSkinKey.isNotEmpty
+                                    ? VehicleSkinManager.instance.currentSkinKey
+                                    : _selectedVehicleColorKey,
+                              );
+                              return AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 300),
+                                transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
+                                child: Image.asset(
+                                  activeSkin.assetPath,
+                                  key: ValueKey(activeSkin.key),
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Icon(Icons.directions_car, size: 100, color: colors.textMuted);
+                                  },
+                                ),
+                              );
+                            },
                           ),
                         ),
 
@@ -1927,9 +1966,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       Expanded(
                         child: OutlinedButton(
                           onPressed: () {
-                            if (widget.repository is MockVehicleRepository) {
-                              (widget.repository as MockVehicleRepository).toggleCharging(!_telemetry.isCharging);
-                            }
+                            widget.repository.toggleCharging(!_telemetry.isCharging);
                           },
                           style: OutlinedButton.styleFrom(
                             side: BorderSide(color: colors.border),
@@ -3259,6 +3296,7 @@ class _VehicleSkinStudioSheetState extends State<_VehicleSkinStudioSheet> {
                 onTap: () {
                   HapticFeedback.selectionClick();
                   setState(() => _activeKey = skin.key);
+                  VehicleSkinManager.instance.setSkin(skin.key);
                   widget.onSkinSelected(skin.key);
                 },
                 borderRadius: BorderRadius.circular(16),
@@ -3382,6 +3420,7 @@ class _VehicleSkinStudioSheetState extends State<_VehicleSkinStudioSheet> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
+              VehicleSkinManager.instance.setSkin(activeSkin.key);
               AppNotification.show(
                 context,
                 message: 'Chery Tiggo 7 PHEV skin set to ${activeSkin.name}${activeSkin.isDualTone ? " (Dual Tone)" : ""}',

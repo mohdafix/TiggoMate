@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Official Chery Tiggo 7 PHEV (CSH) Malaysian Market Exterior Colors
 class VehicleSkinOption {
@@ -61,4 +62,36 @@ VehicleSkinOption getVehicleSkinByKey(String? key) {
     (skin) => skin.key == key,
     orElse: () => kOfficialVehicleSkins[0],
   );
+}
+
+/// Global reactive state manager for vehicle exterior skin customization
+class VehicleSkinManager extends ChangeNotifier {
+  static final VehicleSkinManager instance = VehicleSkinManager._internal();
+  VehicleSkinManager._internal();
+
+  String _currentSkinKey = 'khaki_white';
+  String get currentSkinKey => _currentSkinKey;
+  VehicleSkinOption get currentSkin => getVehicleSkinByKey(_currentSkinKey);
+
+  Future<void> init() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString('tm_vehicle_color_skin');
+      if (saved != null && saved.isNotEmpty) {
+        _currentSkinKey = saved;
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> setSkin(String key) async {
+    if (_currentSkinKey != key) {
+      _currentSkinKey = key;
+      notifyListeners();
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('tm_vehicle_color_skin', key);
+      } catch (_) {}
+    }
+  }
 }

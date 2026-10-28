@@ -26,6 +26,7 @@ class AppSettings {
   final String carLinkoStatus; // 'Unactivated', 'Active', 'Demo'
   final double tnbTariff;
   final double fuelPrice;
+  final String vehicleSkinKey;
 
   const AppSettings({
     this.ownerName = "Chery Owner",
@@ -38,6 +39,7 @@ class AppSettings {
     this.carLinkoStatus = "Unactivated",
     this.tnbTariff = 0.57,
     this.fuelPrice = 2.05,
+    this.vehicleSkinKey = "khaki_white",
   });
 
   AppSettings copyWith({
@@ -51,6 +53,7 @@ class AppSettings {
     String? carLinkoStatus,
     double? tnbTariff,
     double? fuelPrice,
+    String? vehicleSkinKey,
   }) {
     return AppSettings(
       ownerName: ownerName ?? this.ownerName,
@@ -63,6 +66,7 @@ class AppSettings {
       carLinkoStatus: carLinkoStatus ?? this.carLinkoStatus,
       tnbTariff: tnbTariff ?? this.tnbTariff,
       fuelPrice: fuelPrice ?? this.fuelPrice,
+      vehicleSkinKey: vehicleSkinKey ?? this.vehicleSkinKey,
     );
   }
 }
@@ -78,6 +82,7 @@ class SettingsService {
   static const String _kCarLinko = "tm_carlinko_status";
   static const String _kTnbTariff = "tm_tnb_tariff";
   static const String _kFuelPrice = "tm_fuel_price";
+  static const String _kSkin = "tm_vehicle_color_skin";
 
   static Future<AppSettings> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -92,6 +97,7 @@ class SettingsService {
       carLinkoStatus: prefs.getString(_kCarLinko) ?? "Unactivated",
       tnbTariff: prefs.getDouble(_kTnbTariff) ?? 0.57,
       fuelPrice: prefs.getDouble(_kFuelPrice) ?? 2.05,
+      vehicleSkinKey: prefs.getString(_kSkin) ?? "khaki_white",
     );
   }
 
@@ -107,6 +113,7 @@ class SettingsService {
     await prefs.setString(_kCarLinko, s.carLinkoStatus);
     await prefs.setDouble(_kTnbTariff, s.tnbTariff);
     await prefs.setDouble(_kFuelPrice, s.fuelPrice);
+    await prefs.setString(_kSkin, s.vehicleSkinKey);
   }
 }
 
@@ -166,6 +173,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _fuelController = TextEditingController(text: widget.settings.fuelPrice.toStringAsFixed(2));
     _provider = widget.settings.aiProvider;
     _carLinkoStatus = widget.settings.carLinkoStatus;
+    _vehicleSkinKey = widget.settings.vehicleSkinKey.isNotEmpty
+        ? widget.settings.vehicleSkinKey
+        : VehicleSkinManager.instance.currentSkinKey;
 
     _loadPreferences();
   }
@@ -175,7 +185,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
       setState(() {
-        _vehicleSkinKey = prefs.getString('tm_vehicle_color_skin') ?? 'khaki_white';
+        _vehicleSkinKey = prefs.getString('tm_vehicle_color_skin') ?? VehicleSkinManager.instance.currentSkinKey;
         _is24Hour = prefs.getBool('tm_clock_24h') ?? true;
         _useKmh = prefs.getBool('tm_speed_kmh') ?? true;
       });
@@ -208,7 +218,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       carLinkoStatus: _carLinkoStatus,
       tnbTariff: double.tryParse(_tnbController.text.trim()) ?? 0.57,
       fuelPrice: double.tryParse(_fuelController.text.trim()) ?? 2.05,
+      vehicleSkinKey: _vehicleSkinKey,
     );
+    VehicleSkinManager.instance.setSkin(_vehicleSkinKey);
     widget.onSave(updated);
     Navigator.of(context).pop(updated);
     AppNotification.show(
@@ -442,10 +454,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onTap: () async {
                     setState(() => _vehicleSkinKey = skin.key);
                     Navigator.pop(ctx);
-                    try {
-                      final prefs = await SharedPreferences.getInstance();
-                      await prefs.setString('tm_vehicle_color_skin', skin.key);
-                    } catch (_) {}
+                    await VehicleSkinManager.instance.setSkin(skin.key);
+                    widget.onSave(widget.settings.copyWith(vehicleSkinKey: skin.key));
                   },
                 ),
                 Divider(height: 1, indent: 56, color: t.border),
@@ -539,9 +549,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _showCarLinkoStatusPicker() {
     const states = [
-      ['Active', 'Live Connected CarLinko', 'Real telemetry broadcast with active sync'],
-      ['Unactivated', 'Unactivated (Inspection Due)', 'Displays 1,000 km pre-inspection state'],
-      ['Demo', 'Demo Mode', 'Simulates live Chery PHEV telemetry without hardware'],
+      ['Active', 'Live Connected CarLinko', 'Real telemetry broadcast with active cloud sync'],
+      ['Unactivated', 'Standby (Awaiting Vehicle Pairing)', 'Awaiting dealer VIN binding on delivery or handover'],
     ];
     showModalBottomSheet(
       context: context,
@@ -705,7 +714,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: 'Telematics Connection State',
               subtitle: _carLinkoStatus == 'Active'
                   ? 'Active (Live Connected CarLinko)'
-                  : (_carLinkoStatus == 'Demo' ? 'Demo Mode (Simulated Data)' : 'Unactivated (Inspection Due)'),
+                  : 'Standby (Awaiting Vehicle Pairing)',
               trailing: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(

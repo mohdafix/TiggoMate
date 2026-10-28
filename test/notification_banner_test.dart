@@ -233,13 +233,6 @@ void main() {
       expect(find.text('Vehicle Alerts & History'), findsOneWidget);
       expect(find.text('AC Pre-cooling'), findsOneWidget);
       expect(find.text('Cabin cooled to 22.0°C'), findsOneWidget);
-
-      // Verify Test Notification Buttons exist
-      expect(find.textContaining('Test Notification Banners'), findsOneWidget);
-      expect(find.text('🔒 Lock'), findsOneWidget);
-      expect(find.text('⚡ Charging'), findsOneWidget);
-      expect(find.text('❄️ Climate'), findsOneWidget);
-      expect(find.text('⚠️ TPMS'), findsOneWidget);
     });
   });
 

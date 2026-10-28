@@ -709,21 +709,6 @@ class _VehicleAlertsSheetState extends State<VehicleAlertsSheet> {
     return '${diff.inDays}d ago';
   }
 
-  void _triggerTestNotification(NotificationType type, String title, String msg, IconData icon) {
-    Navigator.of(context).pop();
-    Future.delayed(const Duration(milliseconds: 250), () {
-      if (mounted) {
-        AppNotification.show(
-          context,
-          title: title,
-          message: msg,
-          type: type,
-          icon: icon,
-        );
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final colors = AppColors(context);
@@ -802,87 +787,6 @@ class _VehicleAlertsSheetState extends State<VehicleAlertsSheet> {
                           ),
                         ),
                     ],
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Quick Test Banners Row (Helps user immediately verify High-Contrast Banners)
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: colors.tileBg,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: colors.border),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.palette_outlined, size: 14, color: colors.textSecondary),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Test Notification Banners (${isDark ? "Obsidian Dark" : "Tesla Light"} Mode)',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.bold,
-                                color: colors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              _TestButton(
-                                label: '🔒 Lock',
-                                color: colors.evTeal,
-                                onTap: () => _triggerTestNotification(
-                                  NotificationType.success,
-                                  'Security Armed',
-                                  'All 4 doors locked and perimeter ultrasonic sensor active.',
-                                  Icons.lock_rounded,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              _TestButton(
-                                label: '⚡ Charging',
-                                color: colors.evTeal,
-                                onTap: () => _triggerTestNotification(
-                                  NotificationType.success,
-                                  'Smart Charging Initiated',
-                                  'AC Wallbox 3.3 kW connected. Charging to 80% SoC.',
-                                  Icons.bolt_rounded,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              _TestButton(
-                                label: '❄️ Climate',
-                                color: const Color(0xFF38BDF8),
-                                onTap: () => _triggerTestNotification(
-                                  NotificationType.info,
-                                  'Climate Pre-cooling',
-                                  'Target 22.0°C reached. Cabin refresh active.',
-                                  Icons.ac_unit_rounded,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              _TestButton(
-                                label: '⚠️ TPMS',
-                                color: const Color(0xFFFF9F1C),
-                                onTap: () => _triggerTestNotification(
-                                  NotificationType.warning,
-                                  'TPMS Attention',
-                                  'Cold tyre pressure: 228 kPa nominal across all 4 tyres.',
-                                  Icons.speed_rounded,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
                   const SizedBox(height: 12),
 
@@ -1016,42 +920,6 @@ class _VehicleAlertsSheetState extends State<VehicleAlertsSheet> {
           },
         );
       },
-    );
-  }
-}
-
-class _TestButton extends StatelessWidget {
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _TestButton({
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withValues(alpha: 0.35)),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-      ),
     );
   }
 }

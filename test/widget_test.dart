@@ -506,7 +506,7 @@ void main() {
     await tester.tap(find.text('Power Curve & SOH'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Simulated AC Charging Curve'), findsOneWidget);
+    expect(find.text('PHEV AC Charging Curve'), findsOneWidget);
     expect(find.text('Battery Health & Diagnostics (SOH)'), findsOneWidget);
     expect(find.text('99.2%'), findsOneWidget);
 

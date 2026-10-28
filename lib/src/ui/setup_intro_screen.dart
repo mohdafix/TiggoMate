@@ -80,6 +80,7 @@ class _SetupIntroScreenState extends State<SetupIntroScreen> {
       await prefs.setString('tm_car_plate', plate);
       await prefs.setString('tm_vehicle_nickname', _selectedModel);
       await prefs.setString('tm_vehicle_color_skin', _skinKey);
+      await VehicleSkinManager.instance.setSkin(_skinKey);
 
       // Initialize guest session in AuthService with configured driver details
       final auth = AuthService();

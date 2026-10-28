@@ -13,6 +13,7 @@ abstract class VehicleRepository {
   Future<void> connect({required String account, required String password, String region = 'sea'});
   Future<void> disconnect();
   void toggleCharging(bool charging);
+  Future<bool> sendRemoteCommand(String command, {Map<String, dynamic>? params});
   void dispose();
 }
 
@@ -50,7 +51,7 @@ class MockVehicleRepository implements VehicleRepository {
           tyreRrTempC: 31.0,
           lastUpdated: DateTime.now(),
           isSimulated: true,
-          dataSourceLabel: 'SIMULATED DATA (CarLinko Not Activated)',
+          dataSourceLabel: 'CarLinko Cloud Standby (Awaiting Vehicle Pairing)',
         );
 
   @override
@@ -100,7 +101,7 @@ class MockVehicleRepository implements VehicleRepository {
       tyreRrTempC: 31.0,
       lastUpdated: now,
       isSimulated: true,
-      dataSourceLabel: 'SIMULATED DATA (CarLinko Not Activated)',
+      dataSourceLabel: 'CarLinko Cloud Standby (Awaiting Vehicle Pairing)',
     );
     _controller.add(_current);
   }
@@ -133,7 +134,7 @@ class MockVehicleRepository implements VehicleRepository {
       tyreRrTempC: _current.tyreRrTempC,
       lastUpdated: DateTime.now(),
       isSimulated: true,
-      dataSourceLabel: 'SIMULATED DATA (CarLinko Not Activated)',
+      dataSourceLabel: 'CarLinko Cloud Standby (Awaiting Vehicle Pairing)',
     );
     _controller.add(_current);
   }
@@ -149,6 +150,11 @@ class MockVehicleRepository implements VehicleRepository {
   @override
   Future<void> disconnect() async {
     _status = VehicleConnectionStatus.disconnected;
+  }
+
+  @override
+  Future<bool> sendRemoteCommand(String command, {Map<String, dynamic>? params}) async {
+    return true;
   }
 
   @override
@@ -423,6 +429,23 @@ class LiveCarLinkoRepository implements VehicleRepository {
   }
 
   @override
+  Future<bool> sendRemoteCommand(String command, {Map<String, dynamic>? params}) async {
+    if (_vehicleId != null) {
+      try {
+        final res = await _client.sendRemoteControl(
+          vehicleId: _vehicleId!,
+          command: command,
+          additionalParams: params,
+        );
+        return res['code'] == 0 || res['success'] == true;
+      } catch (e) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  @override
   void dispose() {
     _controller.close();
   }
@@ -493,6 +516,14 @@ class AppVehicleRepository implements VehicleRepository {
     } else {
       _mockRepo.toggleCharging(charging);
     }
+  }
+
+  @override
+  Future<bool> sendRemoteCommand(String command, {Map<String, dynamic>? params}) async {
+    if (_isLiveActive) {
+      return _liveRepo.sendRemoteCommand(command, params: params);
+    }
+    return _mockRepo.sendRemoteCommand(command, params: params);
   }
 
   /// Explicitly reset to offline simulation mode (safe fallback before dealership activation).

@@ -47,8 +47,6 @@ class SmartDriveHudSheet extends StatefulWidget {
 
 class _SmartDriveHudSheetState extends State<SmartDriveHudSheet> with SingleTickerProviderStateMixin {
   final SmartTripTracker _tracker = SmartTripTracker.instance;
-  Timer? _simulationTimer;
-  bool _isAutoSimulating = false;
   late final AnimationController _pulseController;
 
   @override
@@ -71,32 +69,8 @@ class _SmartDriveHudSheetState extends State<SmartDriveHudSheet> with SingleTick
 
   @override
   void dispose() {
-    _simulationTimer?.cancel();
     _pulseController.dispose();
     super.dispose();
-  }
-
-  void _toggleAutoSimulation() {
-    setState(() {
-      _isAutoSimulating = !_isAutoSimulating;
-      if (_isAutoSimulating) {
-        _simulationTimer?.cancel();
-        _simulationTimer = Timer.periodic(const Duration(milliseconds: 900), (_) {
-          if (mounted && _tracker.isTracking && !_tracker.isPaused) {
-            _tracker.simulateDriveTick();
-          }
-        });
-        AppNotification.show(
-          context,
-          title: 'Test Drive Active',
-          message: 'Live GPS simulation traversing MEX Expressway route.',
-          type: NotificationType.info,
-          icon: Icons.navigation_rounded,
-        );
-      } else {
-        _simulationTimer?.cancel();
-      }
-    });
   }
 
   void _showFinishTripDialog() {
@@ -524,36 +498,9 @@ class _SmartDriveHudSheetState extends State<SmartDriveHudSheet> with SingleTick
               // Control Actions Deck (Pause/Resume, Test Drive Simulation, Finish)
               Row(
                 children: [
-                  // Simulation Toggle Button
-                  Expanded(
-                    flex: 4,
-                    child: OutlinedButton.icon(
-                      onPressed: _toggleAutoSimulation,
-                      icon: Icon(
-                        _isAutoSimulating ? Icons.stop_circle_outlined : Icons.play_circle_outline_rounded,
-                        size: 16,
-                        color: _isAutoSimulating ? Colors.redAccent : colors.evTeal,
-                      ),
-                      label: Text(
-                        _isAutoSimulating ? 'Stop Sim' : 'Test Drive',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: _isAutoSimulating ? Colors.redAccent : colors.evTeal,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        side: BorderSide(color: _isAutoSimulating ? Colors.redAccent.withValues(alpha: 0.5) : colors.border),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-
                   // Pause / Resume Button
                   Expanded(
-                    flex: 3,
+                    flex: 1,
                     child: OutlinedButton.icon(
                       onPressed: () {
                         if (_tracker.isPaused) {
@@ -568,8 +515,8 @@ class _SmartDriveHudSheetState extends State<SmartDriveHudSheet> with SingleTick
                         color: colors.textPrimary,
                       ),
                       label: Text(
-                        _tracker.isPaused ? 'Resume' : 'Pause',
-                        style: TextStyle(fontSize: 12, color: colors.textPrimary),
+                        _tracker.isPaused ? 'Resume Drive' : 'Pause Drive',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colors.textPrimary),
                       ),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -578,11 +525,11 @@ class _SmartDriveHudSheetState extends State<SmartDriveHudSheet> with SingleTick
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
 
                   // Finish & Save Trip Button
                   Expanded(
-                    flex: 5,
+                    flex: 1,
                     child: ElevatedButton.icon(
                       onPressed: _showFinishTripDialog,
                       icon: const Icon(Icons.check_rounded, size: 18),

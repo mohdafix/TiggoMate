@@ -6,6 +6,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'src/ai/ai_service.dart';
 import 'src/carlinko/vehicle_repository.dart';
+import 'src/carlinko/vehicle_skin.dart';
 import 'src/mytnb/mytnb_api.dart';
 
 import 'src/ui/neo_dashboard.dart';
@@ -43,6 +44,7 @@ void main() async {
   try {
     await AppThemeController.instance.init();
     await Accent.load();
+    await VehicleSkinManager.instance.init();
   } catch (e) {
     debugPrint('AppThemeController.init warning: $e');
   }
@@ -186,16 +188,29 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   void initState() {
     super.initState();
+    VehicleSkinManager.instance.addListener(_handleGlobalSkinChanged);
     _loadSettings();
+  }
+
+  void _handleGlobalSkinChanged() {
+    final newSkin = VehicleSkinManager.instance.currentSkinKey;
+    if (mounted && _settings.vehicleSkinKey != newSkin) {
+      setState(() {
+        _settings = _settings.copyWith(vehicleSkinKey: newSkin);
+      });
+      SettingsService.save(_settings);
+    }
   }
 
   @override
   void dispose() {
+    VehicleSkinManager.instance.removeListener(_handleGlobalSkinChanged);
     _vehicleRepo.dispose();
     super.dispose();
   }
 
   Future<void> _loadSettings() async {
+    await VehicleSkinManager.instance.init();
     final s = await SettingsService.load();
     await _myTnbRepo.init();
     if (s.carLinkoStatus == 'Active') {
@@ -226,9 +241,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         ),
       ),
     );
+    final curSkin = VehicleSkinManager.instance.currentSkinKey;
     if (updated != null && mounted) {
-      setState(() => _settings = updated);
-      await SettingsService.save(updated);
+      setState(() => _settings = updated.copyWith(vehicleSkinKey: curSkin));
+      await SettingsService.save(_settings);
+    } else if (mounted && _settings.vehicleSkinKey != curSkin) {
+      setState(() => _settings = _settings.copyWith(vehicleSkinKey: curSkin));
+      await SettingsService.save(_settings);
     }
   }
 
@@ -250,6 +269,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         vehicleNickname: _settings.vehicleNickname,
         tnbTariff: _settings.tnbTariff,
         fuelPrice: _settings.fuelPrice,
+        vehicleSkinKey: _settings.vehicleSkinKey,
         onOpenSettings: _openSettings,
         onOpenAssistant: () => setState(() => _currentIndex = 1),
       ),
@@ -361,6 +381,7 @@ class DashboardTab extends StatelessWidget {
       vehicleNickname: settings.vehicleNickname,
       tnbTariff: settings.tnbTariff,
       fuelPrice: settings.fuelPrice,
+      vehicleSkinKey: settings.vehicleSkinKey,
       onOpenSettings: onOpenSettings,
       onOpenAssistant: () => onNavigateToTab(1),
     );
@@ -1717,17 +1738,25 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Service Schedule & Pricing', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 2),
-                Text(
-                  'Chery Tiggo 7 PHEV CSH • ${widget.settings.carPlateNumber} • ${widget.settings.ownerName}',
-                  style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF6B7280)),
-                ),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Service Schedule & Pricing',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Chery Tiggo 7 PHEV CSH • ${widget.settings.carPlateNumber} • ${widget.settings.ownerName}',
+                    style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF6B7280)),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
@@ -1742,7 +1771,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
 
         // Upcoming 1,000 km Milestone Reminder Banner (Clean, non-redundant)
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFFF1B343).withValues(alpha: 0.08) : const Color(0xFFFEF3C7),
             borderRadius: BorderRadius.circular(12),
@@ -1750,35 +1779,39 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
               color: isDark ? const Color(0xFFF1B343).withValues(alpha: 0.3) : const Color(0xFFF59E0B).withValues(alpha: 0.4),
             ),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: (isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706)).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(Icons.build_circle_outlined, size: 20, color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309)),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: (isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706)).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.build_circle_outlined, size: 18, color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309)),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'NEXT DUE: 1,000 KM INSPECTION',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.8,
-                            color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309),
+                        Flexible(
+                          child: Text(
+                            'NEXT DUE: 1,000 KM INSPECTION',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.6,
+                              color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309),
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706),
                             borderRadius: BorderRadius.circular(4),
@@ -1788,49 +1821,56 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                             style: TextStyle(
                               color: isDark ? Colors.black87 : Colors.white,
                               fontWeight: FontWeight.bold,
-                              fontSize: 9,
+                              fontSize: 9.5,
                             ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Text(
                       'CarLinko Telematics Activation & 3DHT Diagnostic Scan (FOC)',
                       style: TextStyle(color: isDark ? Colors.white70 : const Color(0xFF4B5563), fontSize: 11.5),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              InkWell(
-                onTap: () => setState(() => _activeSubTab = 1),
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: (isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706)).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: (isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706)).withValues(alpha: 0.35),
-                    ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Find 3S/4S',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309),
+                  const SizedBox(width: 10),
+                  InkWell(
+                    onTap: () => setState(() => _activeSubTab = 1),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: (isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706)).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: (isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706)).withValues(alpha: 0.35),
                         ),
                       ),
-                      const SizedBox(width: 2),
-                      Icon(Icons.chevron_right, size: 14, color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309)),
-                    ],
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Find 3S/4S',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309),
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          Icon(Icons.chevron_right, size: 14, color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309)),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ],
           ),
@@ -1838,14 +1878,17 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
         const SizedBox(height: 16),
 
         // Filter Chips
-        Row(
-          children: [
-            _buildFilterChip('All (16)', 0, isDark),
-            const SizedBox(width: 8),
-            _buildFilterChip('Free Labour (6 FOC)', 1, isDark),
-            const SizedBox(width: 8),
-            _buildFilterChip('Major Services (4)', 2, isDark),
-          ],
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _buildFilterChip('All (16)', 0, isDark),
+              const SizedBox(width: 8),
+              _buildFilterChip('Free Labour (6 FOC)', 1, isDark),
+              const SizedBox(width: 8),
+              _buildFilterChip('Major Services (4)', 2, isDark),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
 
