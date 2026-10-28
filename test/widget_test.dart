@@ -204,9 +204,13 @@ void main() {
     await tester.pump();
     expect(find.text('22°C ON'), findsOneWidget);
 
-    // Test Dynamic 2D Vehicle Skin Customizer
-    expect(find.text('Khaki White'), findsOneWidget);
-    await tester.tap(find.text('Khaki White'));
+    // Test Dynamic 2D Vehicle Skin Customizer from Options Menu
+    await tester.pump(const Duration(seconds: 4));
+    await tester.tap(find.byType(PopupMenuButton<String>).first, warnIfMissed: false);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Vehicle Paint Studio'), findsOneWidget);
+    await tester.tap(find.text('Vehicle Paint Studio'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 

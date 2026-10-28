@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../theme/app_tokens.dart';
 import 'app_notification.dart';
 
 class CheryServiceCentre {
@@ -585,6 +586,8 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
     }).toList();
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = context.tokens.accent;
+    final onAccent = context.tokens.onAccent;
 
     Widget content = Column(
       children: [
@@ -596,23 +599,23 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: isDark
-                    ? const [Color(0xFF1B2A32), Color(0xFF131922)]
-                    : const [Color(0xFFE6FFFA), Color(0xFFF0FDF4)],
+                    ? [accent.withValues(alpha: 0.15), const Color(0xFF131922)]
+                    : [accent.withValues(alpha: 0.1), const Color(0xFFF0FDF4)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: isDark ? 0.3 : 0.5)),
+              border: Border.all(color: accent.withValues(alpha: isDark ? 0.3 : 0.5)),
             ),
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF00D2AA).withValues(alpha: 0.15),
+                    color: accent.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.support_agent, color: Color(0xFF00D2AA), size: 26),
+                  child: Icon(Icons.support_agent, color: accent, size: 26),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -633,10 +636,10 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                 ),
                 ElevatedButton.icon(
                   onPressed: () => _makePhoneCall(CheryServiceDirectory.tollFreeCareline),
-                  icon: const Icon(Icons.call, size: 14, color: Colors.black87),
-                  label: const Text('Call', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87, fontSize: 12)),
+                  icon: Icon(Icons.call, size: 14, color: onAccent),
+                  label: Text('Call', style: TextStyle(fontWeight: FontWeight.bold, color: onAccent, fontSize: 12)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00D2AA),
+                    backgroundColor: accent,
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     minimumSize: Size.zero,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -657,7 +660,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
             decoration: InputDecoration(
               hintText: 'Search city, dealer, or location (e.g. Puchong, Tampoi, Ipoh)...',
               hintStyle: TextStyle(fontSize: 12.5, color: isDark ? Colors.white38 : const Color(0xFF9CA3AF)),
-              prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF00D2AA)),
+              prefixIcon: Icon(Icons.search, size: 20, color: accent),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
                       icon: Icon(Icons.clear, size: 18, color: isDark ? Colors.white60 : const Color(0xFF6B7280)),
@@ -680,7 +683,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: Color(0xFF00D2AA)),
+                borderSide: BorderSide(color: accent),
               ),
             ),
           ),
@@ -701,15 +704,15 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                       reg,
                       style: TextStyle(
                         fontSize: 11.5,
-                        color: isSelected ? Colors.black : (isDark ? Colors.white70 : const Color(0xFF4B5563)),
+                        color: isSelected ? onAccent : (isDark ? Colors.white70 : const Color(0xFF4B5563)),
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                       ),
                     ),
                     selected: isSelected,
                     onSelected: (val) => setState(() => _selectedRegion = reg),
                     backgroundColor: isDark ? const Color(0xFF131922) : const Color(0xFFF1F5F9),
-                    selectedColor: const Color(0xFF00D2AA),
-                    side: BorderSide(color: isSelected ? const Color(0xFF00D2AA) : (isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0))),
+                    selectedColor: accent,
+                    side: BorderSide(color: isSelected ? accent : (isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0))),
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   ),
                 );
@@ -760,10 +763,10 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                   }
                 },
                 child: Row(
-                  children: const [
-                    Text('Official Portal', style: TextStyle(fontSize: 11, color: Color(0xFF00D2AA), fontWeight: FontWeight.bold)),
-                    SizedBox(width: 2),
-                    Icon(Icons.open_in_new, size: 12, color: Color(0xFF00D2AA)),
+                  children: [
+                    Text('Official Portal', style: TextStyle(fontSize: 11, color: accent, fontWeight: FontWeight.bold)),
+                    const SizedBox(width: 2),
+                    Icon(Icons.open_in_new, size: 12, color: accent),
                   ],
                 ),
               ),
@@ -790,7 +793,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                             _selectedType = 'All';
                           });
                         },
-                        child: const Text('Reset Filters', style: TextStyle(color: Color(0xFF00D2AA))),
+                        child: Text('Reset Filters', style: TextStyle(color: accent)),
                       ),
                     ],
                   ),
@@ -824,6 +827,8 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
   Widget _buildCentreCard(CheryServiceCentre centre) {
     final is4S = centre.type == '4S';
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = context.tokens.accent;
+    final onAccent = context.tokens.onAccent;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -858,12 +863,12 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                   decoration: BoxDecoration(
                     color: is4S
                         ? const Color(0xFF2F81F7).withValues(alpha: 0.2)
-                        : const Color(0xFF00D2AA).withValues(alpha: 0.2),
+                        : accent.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: is4S
                           ? const Color(0xFF2F81F7).withValues(alpha: 0.6)
-                          : const Color(0xFF00D2AA).withValues(alpha: 0.6),
+                          : accent.withValues(alpha: 0.6),
                     ),
                   ),
                   child: Text(
@@ -871,7 +876,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: is4S ? const Color(0xFF58A6FF) : const Color(0xFF00D2AA),
+                      color: is4S ? const Color(0xFF58A6FF) : accent,
                     ),
                   ),
                 ),
@@ -884,7 +889,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
               spacing: 6,
               runSpacing: 4,
               children: [
-                _buildCapabilityBadge(Icons.bolt, 'PHEV / HV Diagnostic Ready', const Color(0xFF00D2AA)),
+                _buildCapabilityBadge(Icons.bolt, 'PHEV / HV Diagnostic Ready', accent),
                 if (centre.hasBodyPaint)
                   _buildCapabilityBadge(Icons.format_paint, 'Body & Paint (B&P)', const Color(0xFF2F81F7)),
                 _buildCapabilityBadge(Icons.location_on_outlined, centre.state, isDark ? Colors.white54 : const Color(0xFF6B7280)),
@@ -930,7 +935,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                 Expanded(
                   child: Row(
                     children: [
-                      const Icon(Icons.phone_outlined, size: 14, color: Color(0xFF00D2AA)),
+                      Icon(Icons.phone_outlined, size: 14, color: accent),
                       const SizedBox(width: 6),
                       Text(
                         centre.phone,
@@ -942,10 +947,10 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                 // Call Button
                 OutlinedButton.icon(
                   onPressed: () => _makePhoneCall(centre.phone),
-                  icon: const Icon(Icons.call, size: 13, color: Color(0xFF00D2AA)),
-                  label: const Text('Call', style: TextStyle(fontSize: 11.5, color: Color(0xFF00D2AA), fontWeight: FontWeight.bold)),
+                  icon: Icon(Icons.call, size: 13, color: accent),
+                  label: Text('Call', style: TextStyle(fontSize: 11.5, color: accent, fontWeight: FontWeight.bold)),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFF00D2AA)),
+                    side: BorderSide(color: accent),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     minimumSize: Size.zero,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -955,10 +960,10 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                 // Navigate Button
                 ElevatedButton.icon(
                   onPressed: () => _openMaps(centre.name, centre.address),
-                  icon: const Icon(Icons.directions, size: 13, color: Colors.black87),
-                  label: const Text('Map', style: TextStyle(fontSize: 11.5, color: Colors.black87, fontWeight: FontWeight.bold)),
+                  icon: Icon(Icons.directions, size: 13, color: onAccent),
+                  label: Text('Map', style: TextStyle(fontSize: 11.5, color: onAccent, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00D2AA),
+                    backgroundColor: accent,
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     minimumSize: Size.zero,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

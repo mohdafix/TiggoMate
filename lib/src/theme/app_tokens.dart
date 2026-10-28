@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'accent.dart';
 
 /// Semantic colour tokens shared across the app (DashMate design system).
 @immutable
@@ -116,10 +117,20 @@ class AppTokens extends ThemeExtension<AppTokens> {
 
 extension AppTokensContext on BuildContext {
   AppTokens get tokens {
-    final t = Theme.of(this).extension<AppTokens>();
-    if (t != null) return t;
-    return Theme.of(this).brightness == Brightness.dark
-        ? AppTokens.dark
-        : AppTokens.light;
+    final cur = Theme.of(this).extension<AppTokens>();
+    final curAccent = Accent.current.value;
+    if (cur != null) {
+      // Ensure tokens accent matches the current chosen accent
+      final dynamicAccent = cur.isDark ? curAccent.night : curAccent.day;
+      final dynamicOnAccent = cur.isDark ? curAccent.onNight : curAccent.onDay;
+      if (cur.accent != dynamicAccent) {
+        return cur.copyWith(accent: dynamicAccent, onAccent: dynamicOnAccent);
+      }
+      return cur;
+    }
+    final isDark = Theme.of(this).brightness == Brightness.dark;
+    return isDark
+        ? AppTokens.dark.copyWith(accent: curAccent.night, onAccent: curAccent.onNight)
+        : AppTokens.light.copyWith(accent: curAccent.day, onAccent: curAccent.onDay);
   }
 }

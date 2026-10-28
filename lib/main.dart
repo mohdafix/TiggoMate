@@ -21,6 +21,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'src/ui/setup_intro_screen.dart';
 import 'src/ui/settings_screen.dart';
 import 'src/theme/accent.dart';
+import 'src/theme/app_tokens.dart';
 
 
 void main() async {
@@ -63,11 +64,12 @@ class TiggoMateApp extends StatelessWidget {
     return ListenableBuilder(
       listenable: Listenable.merge([AppThemeController.instance, Accent.current]),
       builder: (context, _) {
+        final curAccent = Accent.current.value;
         return MaterialApp(
           title: 'TiggoMate',
           debugShowCheckedModeBanner: false,
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
+          theme: AppTheme.light(curAccent),
+          darkTheme: AppTheme.dark(curAccent),
           themeMode: AppThemeController.instance.themeMode,
           home: const AppRootGate(),
         );
@@ -226,9 +228,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
+      return Scaffold(
         body: Center(
-          child: CircularProgressIndicator(color: Color(0xFF00D2AA)),
+          child: CircularProgressIndicator(color: context.tokens.accent),
         ),
       );
     }
@@ -291,7 +293,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               selectedIcon: Icon(
                 Icons.directions_car,
                 size: 22,
-                color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF00D2AA) : const Color(0xFF111827),
+                color: context.tokens.accent,
               ),
               label: 'Vehicle',
             ),
@@ -300,7 +302,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               selectedIcon: Icon(
                 Icons.chat_bubble,
                 size: 22,
-                color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF00D2AA) : const Color(0xFF111827),
+                color: context.tokens.accent,
               ),
               label: 'Assistant',
             ),
@@ -309,7 +311,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               selectedIcon: Icon(
                 Icons.route,
                 size: 22,
-                color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF00D2AA) : const Color(0xFF111827),
+                color: context.tokens.accent,
               ),
               label: 'Trips & Log',
             ),
@@ -318,7 +320,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               selectedIcon: Icon(
                 Icons.build,
                 size: 22,
-                color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF00D2AA) : const Color(0xFF111827),
+                color: context.tokens.accent,
               ),
               label: 'Service',
             ),
@@ -365,18 +367,19 @@ class DashboardTab extends StatelessWidget {
 class MarkdownMessageView extends StatelessWidget {
   final String content;
   final TextStyle baseStyle;
-  final Color accentColor;
+  final Color? accentColor;
 
   const MarkdownMessageView({
     super.key,
     required this.content,
     this.baseStyle = const TextStyle(fontSize: 13.5, height: 1.45, color: Colors.white),
-    this.accentColor = const Color(0xFF00D2AA),
+    this.accentColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    final blocks = _parseBlocks(content);
+    final effectiveAccent = accentColor ?? context.tokens.accent;
+    final blocks = _parseBlocks(content, effectiveAccent);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -384,7 +387,7 @@ class MarkdownMessageView extends StatelessWidget {
     );
   }
 
-  List<Widget> _parseBlocks(String text) {
+  List<Widget> _parseBlocks(String text, Color accentColor) {
     final widgets = <Widget>[];
     final lines = text.split('\n');
     bool inCodeBlock = false;
@@ -397,7 +400,7 @@ class MarkdownMessageView extends StatelessWidget {
       // Code block handling
       if (trimmed.startsWith('```')) {
         if (inCodeBlock) {
-          widgets.add(_buildCodeBlock(codeBlockLines.join('\n')));
+          widgets.add(_buildCodeBlock(codeBlockLines.join('\n'), accentColor));
           codeBlockLines.clear();
           inCodeBlock = false;
         } else {
@@ -562,13 +565,13 @@ class MarkdownMessageView extends StatelessWidget {
     }
 
     if (inCodeBlock && codeBlockLines.isNotEmpty) {
-      widgets.add(_buildCodeBlock(codeBlockLines.join('\n')));
+      widgets.add(_buildCodeBlock(codeBlockLines.join('\n'), accentColor));
     }
 
     return widgets;
   }
 
-  Widget _buildCodeBlock(String code) {
+  Widget _buildCodeBlock(String code, Color accentColor) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(vertical: 6),
@@ -582,10 +585,10 @@ class MarkdownMessageView extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         child: Text(
           code,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'monospace',
             fontSize: 12,
-            color: Color(0xFF00D2AA),
+            color: accentColor,
             height: 1.4,
           ),
         ),
@@ -927,6 +930,8 @@ class _AssistantTabState extends State<AssistantTab> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = context.tokens.accent;
+    final onAccent = context.tokens.onAccent;
 
     return Column(
       children: [
@@ -941,10 +946,10 @@ class _AssistantTabState extends State<AssistantTab> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
-                children: const [
-                  Icon(Icons.auto_awesome, color: Color(0xFF00D2AA), size: 18),
-                  SizedBox(width: 8),
-                  Text('TiggoMate AI Assistant', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                children: [
+                  Icon(Icons.auto_awesome, color: accent, size: 18),
+                  const SizedBox(width: 8),
+                  const Text('TiggoMate AI Assistant', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 ],
               ),
               Row(
@@ -952,14 +957,14 @@ class _AssistantTabState extends State<AssistantTab> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00D2AA).withValues(alpha: 0.12),
+                      color: accent.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       widget.settings.aiApiKey.trim().isNotEmpty
                           ? 'Live • ${widget.settings.aiModel}'
                           : 'Grounded RAG',
-                      style: const TextStyle(color: Color(0xFF00D2AA), fontSize: 10, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: accent, fontSize: 10, fontWeight: FontWeight.bold),
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -973,7 +978,7 @@ class _AssistantTabState extends State<AssistantTab> {
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
                       ),
-                      child: const Icon(Icons.tune, color: Color(0xFF00D2AA), size: 16),
+                      child: Icon(Icons.tune, color: accent, size: 16),
                     ),
                   ),
                 ],
@@ -1026,7 +1031,7 @@ class _AssistantTabState extends State<AssistantTab> {
                               ? Colors.white
                               : (isDark ? Colors.white.withValues(alpha: 0.95) : const Color(0xFF111827)),
                         ),
-                        accentColor: isUser ? const Color(0xFF00D2AA) : const Color(0xFF00D2AA),
+                        accentColor: isUser ? Colors.white : accent,
                       ),
                       if (citations != null && citations.isNotEmpty) ...[
                         const SizedBox(height: 8),
@@ -1036,7 +1041,7 @@ class _AssistantTabState extends State<AssistantTab> {
                             color: isDark ? const Color(0xFF0B1017) : const Color(0xFFF1F5F9),
                             borderRadius: BorderRadius.circular(AppDesignTokens.radiusSmall),
                             border: Border(
-                              left: const BorderSide(color: Color(0xFF00D2AA), width: 3),
+                              left: BorderSide(color: accent, width: 3),
                               top: BorderSide(color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0)),
                               right: BorderSide(color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0)),
                               bottom: BorderSide(color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0)),
@@ -1045,12 +1050,12 @@ class _AssistantTabState extends State<AssistantTab> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.menu_book_rounded, size: 12, color: Color(0xFF00D2AA)),
+                              Icon(Icons.menu_book_rounded, size: 12, color: accent),
                               const SizedBox(width: 5),
                               Flexible(
                                 child: Text(
                                   "📖 Citation: ${citations[0]['document']} (p. ${citations[0]['page']})",
-                                  style: const TextStyle(fontSize: 10.5, color: Color(0xFF00D2AA), fontWeight: FontWeight.bold),
+                                  style: TextStyle(fontSize: 10.5, color: accent, fontWeight: FontWeight.bold),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -1067,9 +1072,9 @@ class _AssistantTabState extends State<AssistantTab> {
         ),
 
         if (_loading)
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            child: LinearProgressIndicator(color: Color(0xFF00D2AA), backgroundColor: Colors.transparent),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            child: LinearProgressIndicator(color: accent, backgroundColor: Colors.transparent),
           ),
 
         // Quick Suggestion Chips
@@ -1135,7 +1140,7 @@ class _AssistantTabState extends State<AssistantTab> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppDesignTokens.radiusPill),
-                      borderSide: const BorderSide(color: Color(0xFF00D2AA)),
+                      borderSide: BorderSide(color: accent),
                     ),
                   ),
                   onSubmitted: _sendMessage,
@@ -1147,7 +1152,7 @@ class _AssistantTabState extends State<AssistantTab> {
                 height: AppDesignTokens.minTouchTarget,
                 child: IconButton.filled(
                   icon: const Icon(Icons.send, size: 18),
-                  style: IconButton.styleFrom(backgroundColor: const Color(0xFF00D2AA), foregroundColor: Colors.black87),
+                  style: IconButton.styleFrom(backgroundColor: accent, foregroundColor: onAccent),
                   onPressed: () => _sendMessage(_controller.text),
                 ),
               ),
@@ -1171,6 +1176,7 @@ class EnergyTab extends StatelessWidget {
     final double totalCost = homeAcCost + petrolCost;
     const double iceEquivalent = 165.40;
     final double savings = iceEquivalent - totalCost;
+    final accent = context.tokens.accent;
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -1184,12 +1190,12 @@ class EnergyTab extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text('AC TYPE 2 CHARGING RATE', style: TextStyle(fontSize: 11, color: Colors.white54, fontWeight: FontWeight.w600)),
-                SizedBox(height: 4),
-                Text('Up to 6.6 kW', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF00D2AA))),
-                SizedBox(height: 4),
-                Text('0–100% full charge in ~2.8 hours on AC Wallbox (19.27 kWh pack)', style: TextStyle(fontSize: 12, color: Colors.white60)),
+              children: [
+                const Text('AC TYPE 2 CHARGING RATE', style: TextStyle(fontSize: 11, color: Colors.white54, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Text('Up to 6.6 kW', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: accent)),
+                const SizedBox(height: 4),
+                const Text('0–100% full charge in ~2.8 hours on AC Wallbox (19.27 kWh pack)', style: TextStyle(fontSize: 12, color: Colors.white60)),
               ],
             ),
           ),
@@ -1209,7 +1215,7 @@ class EnergyTab extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text('⚡ Home AC (TNB RM ${settings.tnbTariff.toStringAsFixed(2)}/kWh)', style: const TextStyle(fontSize: 13)),
-                    Text('RM ${homeAcCost.toStringAsFixed(2)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF00D2AA))),
+                    Text('RM ${homeAcCost.toStringAsFixed(2)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: accent)),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -1231,7 +1237,7 @@ class EnergyTab extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   'Estimated ICE equivalent: RM ${iceEquivalent.toStringAsFixed(2)} (RM ${savings.toStringAsFixed(2)} monthly savings)',
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF00D2AA)),
+                  style: TextStyle(fontSize: 11, color: accent),
                 ),
               ],
             ),
@@ -1242,24 +1248,24 @@ class EnergyTab extends StatelessWidget {
         // Recent Sessions
         const Text('Recent Charging Sessions', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
-        _buildSessionTile('Home Wallbox AC', 'Yesterday 21:15 • +12.4 kWh (20% → 85%)', 'RM 7.87'),
-        _buildSessionTile('Home Wallbox AC', '3 days ago 19:40 • +14.8 kWh (18% → 95%)', 'RM 9.35'),
-        _buildSessionTile('Mall Destination AC', '5 days ago 13:10 • +8.6 kWh (42% → 86%)', 'RM 10.32'),
+        _buildSessionTile('Home Wallbox AC', 'Yesterday 21:15 • +12.4 kWh (20% → 85%)', 'RM 7.87', accent),
+        _buildSessionTile('Home Wallbox AC', '3 days ago 19:40 • +14.8 kWh (18% → 95%)', 'RM 9.35', accent),
+        _buildSessionTile('Mall Destination AC', '5 days ago 13:10 • +8.6 kWh (42% → 86%)', 'RM 10.32', accent),
       ],
     );
   }
 
-  Widget _buildSessionTile(String title, String sub, String cost) {
+  Widget _buildSessionTile(String title, String sub, String cost, Color accent) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        leading: const CircleAvatar(
-          backgroundColor: Color(0xFF090D12),
-          child: Icon(Icons.ev_station, color: Color(0xFF00D2AA), size: 20),
+        leading: CircleAvatar(
+          backgroundColor: const Color(0xFF090D12),
+          child: Icon(Icons.ev_station, color: accent, size: 20),
         ),
         title: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
         subtitle: Text(sub, style: const TextStyle(fontSize: 11, color: Colors.white54)),
-        trailing: Text(cost, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00D2AA), fontSize: 14)),
+        trailing: Text(cost, style: TextStyle(fontWeight: FontWeight.bold, color: accent, fontSize: 14)),
       ),
     );
   }
@@ -1593,6 +1599,9 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
   ];
 
   Widget _buildSubTabSwitcher(bool isDark) {
+    final accent = context.tokens.accent;
+    final onAccent = context.tokens.onAccent;
+
     return Container(
       height: 38,
       decoration: BoxDecoration(
@@ -1609,7 +1618,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
               child: Container(
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: _activeSubTab == 0 ? const Color(0xFF00D2AA) : Colors.transparent,
+                  color: _activeSubTab == 0 ? accent : Colors.transparent,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -1617,7 +1626,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: _activeSubTab == 0 ? Colors.black : (isDark ? Colors.white70 : const Color(0xFF6B7280)),
+                    color: _activeSubTab == 0 ? onAccent : (isDark ? Colors.white70 : const Color(0xFF6B7280)),
                   ),
                 ),
               ),
@@ -1630,7 +1639,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
               child: Container(
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: _activeSubTab == 1 ? const Color(0xFF00D2AA) : Colors.transparent,
+                  color: _activeSubTab == 1 ? accent : Colors.transparent,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
@@ -1639,7 +1648,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                     Icon(
                       Icons.location_on,
                       size: 13,
-                      color: _activeSubTab == 1 ? Colors.black : const Color(0xFF00D2AA),
+                      color: _activeSubTab == 1 ? onAccent : accent,
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -1647,7 +1656,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: _activeSubTab == 1 ? Colors.black : (isDark ? Colors.white70 : const Color(0xFF6B7280)),
+                        color: _activeSubTab == 1 ? onAccent : (isDark ? Colors.white70 : const Color(0xFF6B7280)),
                       ),
                     ),
                   ],
@@ -1689,6 +1698,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
       _selectedMilestoneIndex = 0;
     }
     final selected = _milestones[_selectedMilestoneIndex];
+    final accent = context.tokens.accent;
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -1714,10 +1724,10 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFF00D2AA).withValues(alpha: 0.12),
+                color: accent.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Text('27 Aug 2026 Gazette', style: TextStyle(color: Color(0xFF00D2AA), fontSize: 9.5, fontWeight: FontWeight.bold)),
+              child: Text('27 Aug 2026 Gazette', style: TextStyle(color: accent, fontSize: 9.5, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -1852,12 +1862,12 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? const Color(0xFF00D2AA).withValues(alpha: isDark ? 0.15 : 0.12)
+                        ? accent.withValues(alpha: isDark ? 0.15 : 0.12)
                         : (isDark ? const Color(0xFF131922) : Colors.white),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: isSelected
-                          ? const Color(0xFF00D2AA)
+                          ? accent
                           : (isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
                       width: isSelected ? 1.5 : 1.0,
                     ),
@@ -1877,7 +1887,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.bold,
                                 color: isSelected
-                                    ? const Color(0xFF00D2AA)
+                                    ? accent
                                     : (isDark ? Colors.white : const Color(0xFF111827)),
                               ),
                             ),
@@ -1886,10 +1896,10 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF00D2AA).withValues(alpha: 0.2),
+                                color: accent.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: const Text('FOC', style: TextStyle(color: Color(0xFF00D2AA), fontSize: 8.5, fontWeight: FontWeight.bold)),
+                              child: Text('FOC', style: TextStyle(color: accent, fontSize: 8.5, fontWeight: FontWeight.bold)),
                             ),
                         ],
                       ),
@@ -1947,11 +1957,11 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF00D2AA).withValues(alpha: 0.15),
+                          color: accent.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF00D2AA)),
+                          border: Border.all(color: accent),
                         ),
-                        child: const Text('FREE LABOUR', style: TextStyle(color: Color(0xFF00D2AA), fontSize: 10, fontWeight: FontWeight.bold)),
+                        child: Text('FREE LABOUR', style: TextStyle(color: accent, fontSize: 10, fontWeight: FontWeight.bold)),
                       )
                     else if (selected.isMajor)
                       Container(
@@ -1988,7 +1998,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                             const SizedBox(height: 2),
                             Text(
                               selected.compulsoryFee == 0 ? 'FOC' : 'RM ${selected.compulsoryFee.toStringAsFixed(2)}',
-                              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF00D2AA)),
+                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: accent),
                             ),
                             Text(
                               selected.isLabourFoc ? 'Labour FOC (Included)' : 'Labour: RM ${selected.labourFee.toStringAsFixed(2)}',
@@ -2067,7 +2077,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
           icon: Icon(_showFullTable ? Icons.expand_less : Icons.table_chart_outlined, size: 18),
           label: Text(_showFullTable ? 'Hide 150,000 km Schedule Table' : 'View Full 150,000 km Schedule Table (16 Milestones)'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: const Color(0xFF00D2AA),
+            foregroundColor: accent,
             side: BorderSide(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
             padding: const EdgeInsets.symmetric(vertical: 12),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -2112,9 +2122,9 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                             ),
                           ),
                         ),
-                        const Expanded(
+                        Expanded(
                           flex: 3,
-                          child: Text('Compulsory', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF00D2AA))),
+                          child: Text('Compulsory', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: accent)),
                         ),
                         Expanded(
                           flex: 3,
@@ -2139,7 +2149,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
                         decoration: BoxDecoration(
-                          color: isHighlighted ? const Color(0xFF00D2AA).withValues(alpha: 0.1) : Colors.transparent,
+                          color: isHighlighted ? accent.withValues(alpha: 0.1) : Colors.transparent,
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Row(
@@ -2162,7 +2172,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                                 style: TextStyle(
                                   fontSize: 10.5,
                                   color: m.isLabourFoc
-                                      ? const Color(0xFF00D2AA)
+                                      ? accent
                                       : (isDark ? Colors.white60 : const Color(0xFF4B5563)),
                                   fontWeight: m.isLabourFoc ? FontWeight.bold : FontWeight.normal,
                                 ),
@@ -2172,7 +2182,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                               flex: 3,
                               child: Text(
                                 m.compulsoryFee == 0 ? 'FOC' : 'RM ${m.compulsoryFee.toStringAsFixed(2)}',
-                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF00D2AA)),
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: accent),
                               ),
                             ),
                             Expanded(
@@ -2218,7 +2228,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                 const SizedBox(height: 4),
                 Text('• Replacement item is based on month or mileage, whichever comes first.', style: TextStyle(fontSize: 11.5, color: isDark ? Colors.white70 : const Color(0xFF374151), height: 1.4)),
                 const SizedBox(height: 4),
-                const Text('• Free Labour (FOC): Month 1 (1k km), Month 12 (20k km), Month 24 (40k km), Month 36 (60k km), Month 48 (80k km), and Month 60 (100k km).', style: TextStyle(fontSize: 11.5, color: Color(0xFF00D2AA), height: 1.4, fontWeight: FontWeight.w600)),
+                Text('• Free Labour (FOC): Month 1 (1k km), Month 12 (20k km), Month 24 (40k km), Month 36 (60k km), Month 48 (80k km), and Month 60 (100k km).', style: TextStyle(fontSize: 11.5, color: accent, height: 1.4, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
                 Text('• Wheel alignment and balancing is recommended every 10,000 km.', style: TextStyle(fontSize: 11.5, color: isDark ? Colors.white70 : const Color(0xFF374151), height: 1.4)),
                 const SizedBox(height: 4),
@@ -2268,22 +2278,23 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
 
   Widget _buildFilterChip(String label, int index, bool isDark) {
     final isSelected = _filterIndex == index;
+    final accent = context.tokens.accent;
     return ChoiceChip(
       label: Text(
         label,
         style: TextStyle(
           fontSize: 11,
           color: isSelected
-              ? const Color(0xFF00D2AA)
+              ? accent
               : (isDark ? Colors.white70 : const Color(0xFF4B5563)),
         ),
       ),
       selected: isSelected,
-      selectedColor: const Color(0xFF00D2AA).withValues(alpha: isDark ? 0.15 : 0.12),
+      selectedColor: accent.withValues(alpha: isDark ? 0.15 : 0.12),
       backgroundColor: isDark ? const Color(0xFF131922) : const Color(0xFFF3F4F6),
       side: BorderSide(
         color: isSelected
-            ? const Color(0xFF00D2AA)
+            ? accent
             : (isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -2293,6 +2304,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
 
   Widget _buildPartRow(String name, double price, {required bool isCompulsory, required bool isDark}) {
     final isFoc = price == 0.00;
+    final accent = context.tokens.accent;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -2305,7 +2317,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                   isCompulsory ? Icons.check_circle_outline : Icons.add_circle_outline,
                   size: 14,
                   color: isCompulsory
-                      ? const Color(0xFF00D2AA)
+                      ? accent
                       : (isDark ? Colors.white38 : const Color(0xFF9CA3AF)),
                 ),
                 const SizedBox(width: 8),
@@ -2329,7 +2341,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: isFoc
-                  ? const Color(0xFF00D2AA)
+                  ? accent
                   : (isCompulsory
                       ? (isDark ? Colors.white : const Color(0xFF111827))
                       : (isDark ? Colors.white70 : const Color(0xFF4B5563))),

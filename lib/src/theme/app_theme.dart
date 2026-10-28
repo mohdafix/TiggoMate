@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'accent.dart';
 import 'app_tokens.dart';
 
 
@@ -67,7 +68,12 @@ class AppTheme {
   static const Color petrolAmberLight = Color(0xFFD97706);
 
   /// Tesla-Style Light Theme
-  static ThemeData get lightTheme {
+  static ThemeData light([Accent? a]) {
+    final curAccent = a ?? Accent.current.value;
+    final accentColor = curAccent.day;
+    final onAccentColor = curAccent.onDay;
+    final tokens = AppTokens.light.copyWith(accent: accentColor, onAccent: onAccentColor);
+
     const bg = Color(0xFFF7F8FA);
     const cardBg = Color(0xFFFFFFFF);
     const border = Color(0xFFE5E7EB);
@@ -78,14 +84,14 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.light,
       scaffoldBackgroundColor: bg,
-      colorScheme: const ColorScheme.light(
-        primary: Color(0xFF111827),
-        secondary: evTealLight,
+      colorScheme: ColorScheme.light(
+        primary: accentColor,
+        secondary: accentColor,
         surface: cardBg,
         onSurface: textPrimary,
-        inverseSurface: Color(0xFF111827),
+        inverseSurface: const Color(0xFF111827),
         onInverseSurface: Colors.white,
-        error: Color(0xFFDC2626),
+        error: const Color(0xFFDC2626),
       ),
       cardTheme: CardThemeData(
         color: cardBg,
@@ -109,17 +115,17 @@ class AppTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: cardBg,
-        indicatorColor: const Color(0xFF111827).withValues(alpha: 0.08),
+        indicatorColor: accentColor.withValues(alpha: 0.12),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return const IconThemeData(color: Color(0xFF111827));
+            return IconThemeData(color: accentColor);
           }
           return const IconThemeData(color: textSecondary);
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return const TextStyle(
-              color: Color(0xFF111827),
+            return TextStyle(
+              color: accentColor,
               fontSize: 12,
               fontWeight: FontWeight.w600,
             );
@@ -159,7 +165,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF111827), width: 1.5),
+          borderSide: BorderSide(color: accentColor, width: 1.5),
         ),
       ),
       dividerTheme: const DividerThemeData(
@@ -180,12 +186,17 @@ class AppTheme {
         ),
         elevation: 6,
       ),
-      extensions: const [AppTokens.light],
+      extensions: [tokens],
     );
   }
 
   /// Obsidian Dark Theme
-  static ThemeData get darkTheme {
+  static ThemeData dark([Accent? a]) {
+    final curAccent = a ?? Accent.current.value;
+    final accentColor = curAccent.night;
+    final onAccentColor = curAccent.onNight;
+    final tokens = AppTokens.dark.copyWith(accent: accentColor, onAccent: onAccentColor);
+
     const bg = Color(0xFF090D12);
     const cardBg = Color(0xFF131922);
     const border = Color(0xFF232D3D);
@@ -196,14 +207,14 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: bg,
-      colorScheme: const ColorScheme.dark(
-        primary: evTealDark,
-        secondary: Color(0xFF2F81F7),
+      colorScheme: ColorScheme.dark(
+        primary: accentColor,
+        secondary: accentColor,
         surface: cardBg,
         onSurface: textPrimary,
-        inverseSurface: Color(0xFF161E2E),
+        inverseSurface: const Color(0xFF161E2E),
         onInverseSurface: Colors.white,
-        error: Color(0xFFF85149),
+        error: const Color(0xFFF85149),
       ),
       cardTheme: CardThemeData(
         color: cardBg,
@@ -227,17 +238,17 @@ class AppTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: const Color(0xFF0D1117),
-        indicatorColor: evTealDark.withValues(alpha: 0.2),
+        indicatorColor: accentColor.withValues(alpha: 0.22),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return const IconThemeData(color: evTealDark);
+            return IconThemeData(color: accentColor);
           }
           return const IconThemeData(color: Colors.white60);
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return const TextStyle(
-              color: evTealDark,
+            return TextStyle(
+              color: accentColor,
               fontSize: 12,
               fontWeight: FontWeight.w600,
             );
@@ -277,7 +288,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: evTealDark, width: 1.5),
+          borderSide: BorderSide(color: accentColor, width: 1.5),
         ),
       ),
       dividerTheme: const DividerThemeData(
@@ -298,9 +309,12 @@ class AppTheme {
         ),
         elevation: 6,
       ),
-      extensions: const [AppTokens.dark],
+      extensions: [tokens],
     );
   }
+
+  static ThemeData get lightTheme => light();
+  static ThemeData get darkTheme => dark();
 }
 
 /// Dynamic Theme-Aware Context Color Helper.
@@ -320,7 +334,9 @@ class AppColors {
   Color get textSecondary => isDark ? Colors.white70 : const Color(0xFF4B5563);
   Color get textMuted => isDark ? Colors.white38 : const Color(0xFF9CA3AF);
 
-  Color get evTeal => isDark ? AppTheme.evTealDark : AppTheme.evTealLight;
+  Color get accent => context.tokens.accent;
+  Color get onAccent => context.tokens.onAccent;
+  Color get evTeal => context.tokens.accent;
   Color get petrolAmber => isDark ? AppTheme.petrolAmberDark : AppTheme.petrolAmberLight;
 
   Color get trackBg => isDark ? const Color(0xFF1E2837) : const Color(0xFFE5E7EB);
@@ -337,7 +353,7 @@ class AppColors {
           center: Alignment.center,
           radius: 0.85,
           colors: [
-            const Color(0xFF142030).withValues(alpha: 0.4),
+            accent.withValues(alpha: 0.18),
             const Color(0xFF090D12),
           ],
         )
@@ -345,7 +361,7 @@ class AppColors {
           center: Alignment.center,
           radius: 0.9,
           colors: [
-            const Color(0xFFE2E8F0).withValues(alpha: 0.6),
+            accent.withValues(alpha: 0.12),
             const Color(0xFFF7F8FA),
           ],
         );

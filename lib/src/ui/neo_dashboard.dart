@@ -938,6 +938,9 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                             ),
                           );
                           break;
+                        case 'skin_studio':
+                          _showVehicleSkinStudioModal();
+                          break;
                       }
                     },
                     itemBuilder: (ctx) => [
@@ -985,10 +988,10 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       PopupMenuItem(
                         value: 'widgets',
                         child: Row(
-                          children: const [
-                            Icon(Icons.widgets_outlined, size: 18, color: Color(0xFF00D2AA)),
-                            SizedBox(width: 10),
-                            Text('Android Widgets & Shortcuts', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          children: [
+                            Icon(Icons.widgets_outlined, size: 18, color: colors.accent),
+                            const SizedBox(width: 10),
+                            const Text('Android Widgets & Shortcuts', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                           ],
                         ),
                       ),
@@ -1009,6 +1012,16 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                             Icon(Icons.location_on_outlined, size: 18, color: colors.dockBtnIcon),
                             const SizedBox(width: 10),
                             const Text('Chery Service Centres', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'skin_studio',
+                        child: Row(
+                          children: [
+                            Icon(Icons.palette_outlined, size: 18, color: colors.accent),
+                            const SizedBox(width: 10),
+                            const Text('Vehicle Paint Studio', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                           ],
                         ),
                       ),
@@ -1127,10 +1140,10 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 if (_is3DView)
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.view_in_ar,
                         size: 15,
-                        color: Color(0xFF00D2AA),
+                        color: colors.accent,
                       ),
                       const SizedBox(width: 6),
                       Text(
@@ -1147,10 +1160,10 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 else if (_isAdvancedView)
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.radar,
                         size: 15,
-                        color: Color(0xFF00D2AA),
+                        color: colors.accent,
                       ),
                       const SizedBox(width: 6),
                       Text(
@@ -1165,136 +1178,97 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     ],
                   )
                 else
-                  // In Basic view, show interactive color name pill
-                  Flexible(
-                    child: InkWell(
-                      onTap: _showVehicleSkinStudioModal,
-                      borderRadius: BorderRadius.circular(14),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: colors.isDark ? const Color(0xFF131922) : const Color(0xFFF3F4F6),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: colors.border),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.directions_car_filled,
+                        size: 15,
+                        color: colors.accent,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'VEHICLE PERSPECTIVE',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.1,
+                          color: colors.isDark ? Colors.white70 : const Color(0xFF1E293B),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.palette_outlined, size: 13, color: Color(0xFF00D2AA)),
-                            const SizedBox(width: 5),
-                            Flexible(
-                              child: Text(
-                                _selectedSkin.name,
-                                overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+
+                // Right Side: 2D/3D View Switcher
+                Container(
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: colors.isDark ? const Color(0xFF161E2E) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: colors.border),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: () => setState(() => _is3DView = false),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: !_is3DView ? colors.accent : Colors.transparent,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.photo_size_select_actual_outlined,
+                                size: 13,
+                                color: !_is3DView ? colors.onAccent : (colors.isDark ? Colors.white60 : Colors.black54),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '2D',
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
-                                  color: colors.isDark ? Colors.white : const Color(0xFF111827),
-                                ),
-                              ),
-                            ),
-                            if (_selectedSkin.isDualTone) ...[
-                              const SizedBox(width: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: Colors.black,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Text(
-                                  'BLACK ROOF',
-                                  style: TextStyle(fontSize: 7.5, fontWeight: FontWeight.bold, color: Colors.white),
+                                  color: !_is3DView ? colors.onAccent : (colors.isDark ? Colors.white60 : Colors.black54),
                                 ),
                               ),
                             ],
-                            const SizedBox(width: 2),
-                            Icon(Icons.arrow_drop_down, size: 14, color: colors.textMuted),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-
-                // Right Side: Quick 3-Color Swatches & 2D/3D toggle
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Quick 3-Color Swatches Pill
-                    _buildQuickColorSwatches(colors),
-
-                    const SizedBox(width: 8),
-                    Container(
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: colors.isDark ? const Color(0xFF161E2E) : const Color(0xFFF1F5F9),
+                      InkWell(
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: colors.border),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          InkWell(
+                        onTap: () => setState(() => _is3DView = true),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _is3DView ? colors.accent : Colors.transparent,
                             borderRadius: BorderRadius.circular(20),
-                            onTap: () => setState(() => _is3DView = false),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: !_is3DView ? const Color(0xFF00D2AA) : Colors.transparent,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.photo_size_select_actual_outlined,
-                                    size: 13,
-                                    color: !_is3DView ? Colors.black : (colors.isDark ? Colors.white60 : Colors.black54),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '2D',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: !_is3DView ? Colors.black : (colors.isDark ? Colors.white60 : Colors.black54),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
                           ),
-                          InkWell(
-                            borderRadius: BorderRadius.circular(20),
-                            onTap: () => setState(() => _is3DView = true),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: _is3DView ? const Color(0xFF00D2AA) : Colors.transparent,
-                                borderRadius: BorderRadius.circular(20),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.view_in_ar,
+                                size: 13,
+                                color: _is3DView ? colors.onAccent : (colors.isDark ? Colors.white60 : Colors.black54),
                               ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.view_in_ar,
-                                    size: 13,
-                                    color: _is3DView ? Colors.black : (colors.isDark ? Colors.white60 : Colors.black54),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '3D',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: _is3DView ? Colors.black : (colors.isDark ? Colors.white60 : Colors.black54),
-                                    ),
-                                  ),
-                                ],
+                              const SizedBox(width: 4),
+                              Text(
+                                '3D',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: _is3DView ? colors.onAccent : (colors.isDark ? Colors.white60 : Colors.black54),
+                                ),
                               ),
-                            ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1492,7 +1466,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                             child: _buildRadarPin(
                               'AC Port',
                               () => _handleComponentTap('charging_port'),
-                              accentColor: const Color(0xFF00D2AA),
+                              accentColor: colors.accent,
                               icon: Icons.electrical_services,
                             ),
                           ),
@@ -1544,7 +1518,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       label: _isDoorsLocked ? 'Locked' : 'Unlocked',
                       sublabel: 'Doors',
                       isActive: _isDoorsLocked,
-                      activeColor: const Color(0xFF00D2AA),
+                      activeColor: colors.accent,
                       onTap: () => _handleRemoteCommand('lock'),
                     ),
                     _buildCircularRemoteButton(
@@ -1578,7 +1552,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       label: 'Find Car',
                       sublabel: 'Locate',
                       isActive: false,
-                      activeColor: const Color(0xFF00D2AA),
+                      activeColor: colors.accent,
                       onTap: () => _handleRemoteCommand('locate'),
                     ),
                   ],
@@ -1586,94 +1560,110 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 const SizedBox(height: 12),
                 Divider(height: 1, color: colors.borderSubtle),
                 const SizedBox(height: 10),
-                // Quick Comfort & CarLinko Feature Hot-Pills
+                // Quick Comfort & CarLinko Feature Hot-Pills (Constrained to prevent mobile overflow)
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    InkWell(
-                      onTap: _openClimateControlSheet,
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _isAcActive ? const Color(0xFF2F81F7).withValues(alpha: 0.15) : colors.tileBg,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: _isAcActive ? const Color(0xFF2F81F7).withValues(alpha: 0.5) : colors.border,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.tune, size: 12, color: _isAcActive ? const Color(0xFF2F81F7) : colors.textMuted),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Climate: ${_telemetry.acTemp}°C • ${_telemetry.airDurationMin}m',
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.bold,
-                                color: _isAcActive ? const Color(0xFF2F81F7) : colors.textSecondary,
-                              ),
+                    Expanded(
+                      child: InkWell(
+                        onTap: _openClimateControlSheet,
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: _isAcActive ? const Color(0xFF2F81F7).withValues(alpha: 0.15) : colors.tileBg,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: _isAcActive ? const Color(0xFF2F81F7).withValues(alpha: 0.5) : colors.border,
                             ),
-                          ],
+                          ),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.tune, size: 12, color: _isAcActive ? const Color(0xFF2F81F7) : colors.textMuted),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Climate: ${_telemetry.acTemp.toInt()}°C • ${_telemetry.airDurationMin}m',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: _isAcActive ? const Color(0xFF2F81F7) : colors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                    InkWell(
-                      onTap: _openWindowSunroofSheet,
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _telemetry.sunroofOpen ? Colors.tealAccent.withValues(alpha: 0.15) : colors.tileBg,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: _telemetry.sunroofOpen ? Colors.tealAccent.withValues(alpha: 0.5) : colors.border,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.window_outlined, size: 12, color: _telemetry.sunroofOpen ? Colors.tealAccent : colors.textMuted),
-                            const SizedBox(width: 4),
-                            Text(
-                              _telemetry.sunroofOpen ? 'Sunroof Open' : 'Glazing & Roof',
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.bold,
-                                color: _telemetry.sunroofOpen ? Colors.tealAccent : colors.textSecondary,
-                              ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: InkWell(
+                        onTap: _openWindowSunroofSheet,
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: _telemetry.sunroofOpen ? Colors.tealAccent.withValues(alpha: 0.15) : colors.tileBg,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: _telemetry.sunroofOpen ? Colors.tealAccent.withValues(alpha: 0.5) : colors.border,
                             ),
-                          ],
+                          ),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.window_outlined, size: 12, color: _telemetry.sunroofOpen ? Colors.tealAccent : colors.textMuted),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _telemetry.sunroofOpen ? 'Sunroof Open' : 'Glazing & Roof',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: _telemetry.sunroofOpen ? Colors.tealAccent : colors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                    InkWell(
-                      onTap: _openRemoteEngineSheet,
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _telemetry.engineOn ? const Color(0xFFFF9F1C).withValues(alpha: 0.15) : colors.tileBg,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: _telemetry.engineOn ? const Color(0xFFFF9F1C).withValues(alpha: 0.5) : colors.border,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.power_settings_new, size: 12, color: _telemetry.engineOn ? const Color(0xFFFF9F1C) : colors.textMuted),
-                            const SizedBox(width: 4),
-                            Text(
-                              _telemetry.engineOn ? '1.5T Running' : 'Pre-Warm',
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.bold,
-                                color: _telemetry.engineOn ? const Color(0xFFFF9F1C) : colors.textSecondary,
-                              ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: InkWell(
+                        onTap: _openRemoteEngineSheet,
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: _telemetry.engineOn ? const Color(0xFFFF9F1C).withValues(alpha: 0.15) : colors.tileBg,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: _telemetry.engineOn ? const Color(0xFFFF9F1C).withValues(alpha: 0.5) : colors.border,
                             ),
-                          ],
+                          ),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.power_settings_new, size: 12, color: _telemetry.engineOn ? const Color(0xFFFF9F1C) : colors.textMuted),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _telemetry.engineOn ? '1.5T Running' : 'Pre-Warm',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: _telemetry.engineOn ? const Color(0xFFFF9F1C) : colors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -2095,11 +2085,11 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
-                            const CircularProgressIndicator(
+                            CircularProgressIndicator(
                               value: 0.45,
                               strokeWidth: 7,
-                              backgroundColor: Color(0xFF2F81F7),
-                              color: Color(0xFF00D2AA),
+                              backgroundColor: const Color(0xFF2F81F7),
+                              color: colors.accent,
                             ),
                             Column(
                               mainAxisSize: MainAxisSize.min,
@@ -2116,7 +2106,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       Expanded(
                         child: Column(
                           children: [
-                            _buildLegendRow('⚡ Home AC (TNB)', 'RM ${homeAcCost.toStringAsFixed(2)}', const Color(0xFF00D2AA)),
+                            _buildLegendRow('⚡ Home AC (TNB)', 'RM ${homeAcCost.toStringAsFixed(2)}', colors.accent),
                             const SizedBox(height: 4),
                             _buildLegendRow('⛽ Petrol (RON95)', 'RM ${petrolCost.toStringAsFixed(2)}', const Color(0xFF2F81F7)),
                             const SizedBox(height: 4),
@@ -2551,7 +2541,9 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     );
   }
 
-  Widget _buildRadarPin(String label, VoidCallback onTap, {Color accentColor = const Color(0xFF00D2AA), IconData? icon}) {
+  Widget _buildRadarPin(String label, VoidCallback onTap, {Color? accentColor, IconData? icon}) {
+    final colors = AppColors(context);
+    final effectiveColor = accentColor ?? colors.accent;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedBuilder(
@@ -2561,10 +2553,10 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: accentColor.withValues(alpha: 0.25),
+              color: effectiveColor.withValues(alpha: 0.25),
               boxShadow: [
                 BoxShadow(
-                  color: accentColor.withValues(alpha: 0.35),
+                  color: effectiveColor.withValues(alpha: 0.35),
                   blurRadius: 10 * _pulseAnimation.value,
                   spreadRadius: 2 * _pulseAnimation.value,
                 ),
@@ -2575,7 +2567,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
               height: 14,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: accentColor,
+                color: effectiveColor,
               ),
               child: icon != null
                   ? Icon(icon, size: 9, color: Colors.black87)
@@ -3001,67 +2993,6 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       ),
     );
   }
-
-  Widget _buildQuickColorSwatches(AppColors colors) {
-    return Container(
-      height: 32,
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
-      decoration: BoxDecoration(
-        color: colors.isDark ? const Color(0xFF161E2E) : const Color(0xFFF3F4F6),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colors.border),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: kOfficialVehicleSkins.map((skin) {
-          final isSelected = skin.key == _selectedVehicleColorKey;
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 3),
-            child: InkWell(
-              onTap: () => _updateVehicleColor(skin.key),
-              borderRadius: BorderRadius.circular(14),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: isSelected ? 22 : 18,
-                height: isSelected ? 22 : 18,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isSelected ? const Color(0xFF00D2AA) : (colors.isDark ? Colors.white24 : Colors.black12),
-                    width: isSelected ? 2 : 1,
-                  ),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: const Color(0xFF00D2AA).withValues(alpha: 0.45),
-                            blurRadius: 5,
-                          ),
-                        ]
-                      : null,
-                ),
-                child: ClipOval(
-                  child: skin.isDualTone
-                      ? Stack(
-                          children: [
-                            Container(color: skin.primaryColor),
-                            Align(
-                              alignment: Alignment.topCenter,
-                              child: Container(
-                                height: isSelected ? 10 : 8,
-                                color: skin.secondaryColor,
-                              ),
-                            ),
-                          ],
-                        )
-                      : Container(color: skin.primaryColor),
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
 }
 
 /// -------------------------------------------------------------
@@ -3126,10 +3057,10 @@ class _VehicleSkinStudioSheetState extends State<_VehicleSkinStudioSheet> {
                   Container(
                     padding: const EdgeInsets.all(7),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00D2AA).withValues(alpha: 0.15),
+                      color: colors.accent.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.palette, color: Color(0xFF00D2AA), size: 18),
+                    child: Icon(Icons.palette, color: colors.accent, size: 18),
                   ),
                   const SizedBox(width: 10),
                   Column(
@@ -3245,7 +3176,7 @@ class _VehicleSkinStudioSheetState extends State<_VehicleSkinStudioSheet> {
                         : (colors.isDark ? const Color(0xFF131922) : const Color(0xFFF9FAFB)),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isSelected ? const Color(0xFF00D2AA) : colors.border,
+                      color: isSelected ? colors.accent : colors.border,
                       width: isSelected ? 1.5 : 1,
                     ),
                   ),
@@ -3258,7 +3189,7 @@ class _VehicleSkinStudioSheetState extends State<_VehicleSkinStudioSheet> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: isSelected ? const Color(0xFF00D2AA) : (colors.isDark ? Colors.white30 : Colors.black12),
+                            color: isSelected ? colors.accent : (colors.isDark ? Colors.white30 : Colors.black12),
                             width: isSelected ? 2 : 1,
                           ),
                           boxShadow: [
@@ -3306,7 +3237,7 @@ class _VehicleSkinStudioSheetState extends State<_VehicleSkinStudioSheet> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: isSelected ? const Color(0xFF00D2AA).withValues(alpha: 0.15) : (colors.isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
+                                    color: isSelected ? colors.accent.withValues(alpha: 0.15) : (colors.isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
@@ -3314,7 +3245,7 @@ class _VehicleSkinStudioSheetState extends State<_VehicleSkinStudioSheet> {
                                     style: TextStyle(
                                       fontSize: 9.5,
                                       fontWeight: FontWeight.bold,
-                                      color: isSelected ? const Color(0xFF00D2AA) : colors.textSecondary,
+                                      color: isSelected ? colors.accent : colors.textSecondary,
                                     ),
                                   ),
                                 ),
@@ -3336,13 +3267,13 @@ class _VehicleSkinStudioSheetState extends State<_VehicleSkinStudioSheet> {
                         height: 22,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: isSelected ? const Color(0xFF00D2AA) : Colors.transparent,
+                          color: isSelected ? colors.accent : Colors.transparent,
                           border: Border.all(
-                            color: isSelected ? const Color(0xFF00D2AA) : colors.textMuted,
+                            color: isSelected ? colors.accent : colors.textMuted,
                             width: 1.5,
                           ),
                         ),
-                        child: isSelected ? const Icon(Icons.check, size: 14, color: Colors.black) : null,
+                        child: isSelected ? Icon(Icons.check, size: 14, color: colors.onAccent) : null,
                       ),
                     ],
                   ),
@@ -3364,8 +3295,8 @@ class _VehicleSkinStudioSheetState extends State<_VehicleSkinStudioSheet> {
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00D2AA),
-              foregroundColor: Colors.black,
+              backgroundColor: colors.accent,
+              foregroundColor: colors.onAccent,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               padding: const EdgeInsets.symmetric(vertical: 13),
             ),

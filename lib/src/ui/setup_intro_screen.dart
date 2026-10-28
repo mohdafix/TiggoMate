@@ -430,7 +430,10 @@ class _SetupIntroScreenState extends State<SetupIntroScreen> {
                         children: Accent.all.map((a) {
                           final isSel = cur.id == a.id;
                           return GestureDetector(
-                            onTap: () => Accent.set(a),
+                            onTap: () {
+                              Accent.set(a);
+                              setState(() {});
+                            },
                             child: Container(
                               width: 36,
                               height: 36,
