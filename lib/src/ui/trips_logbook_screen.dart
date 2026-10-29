@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +9,7 @@ import '../theme/app_theme.dart';
 import 'mytnb_connect_dialog.dart';
 import 'app_notification.dart';
 import 'smart_drive_hud.dart';
+import '../firebase/firebase_sync_service.dart';
 
 /// Model representing a completed PHEV trip.
 class TripRecord {
@@ -464,6 +466,30 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
       final prefs = await SharedPreferences.getInstance();
       final encoded = jsonEncode(_customExpenses.map((e) => e.toJson()).toList());
       await prefs.setString(_kExpenseStorageKey, encoded);
+    } catch (_) {}
+    unawaited(FirebaseSyncService.instance.syncExpense(record));
+  }
+
+  Future<void> _syncFromCloud() async {
+    try {
+      final cloudTrips = await FirebaseSyncService.instance.fetchTrips();
+      final cloudExpenses = await FirebaseSyncService.instance.fetchExpenses();
+      if (mounted && (cloudTrips.isNotEmpty || cloudExpenses.isNotEmpty)) {
+        setState(() {
+          final existingTripIds = _trips.map((t) => t.id).toSet();
+          for (final t in cloudTrips) {
+            if (!existingTripIds.contains(t.id)) {
+              _trips.add(t);
+            }
+          }
+          final existingExpIds = _customExpenses.map((e) => e.id).toSet();
+          for (final e in cloudExpenses) {
+            if (!existingExpIds.contains(e.id)) {
+              _customExpenses.add(e);
+            }
+          }
+        });
+      }
     } catch (_) {}
   }
 

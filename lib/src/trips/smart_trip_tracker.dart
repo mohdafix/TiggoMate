@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../ui/trips_logbook_screen.dart';
+import '../firebase/firebase_sync_service.dart';
 
 /// Individual GPS/vector breadcrumb point along a driving route.
 class TripBreadcrumbPoint {
@@ -13,6 +15,8 @@ class TripBreadcrumbPoint {
   final double speedKmh;
   final bool isEv; // True if driving on electric battery, false if DHT 1.5T petrol engine
   final DateTime timestamp;
+  final double? latitude;
+  final double? longitude;
 
   const TripBreadcrumbPoint({
     required this.x,
@@ -20,6 +24,8 @@ class TripBreadcrumbPoint {
     required this.speedKmh,
     required this.isEv,
     required this.timestamp,
+    this.latitude,
+    this.longitude,
   });
 
   Map<String, dynamic> toJson() => {
@@ -28,6 +34,8 @@ class TripBreadcrumbPoint {
         'speedKmh': speedKmh,
         'isEv': isEv,
         'timestamp': timestamp.toIso8601String(),
+        if (latitude != null) 'lat': latitude,
+        if (longitude != null) 'lng': longitude,
       };
 
   factory TripBreadcrumbPoint.fromJson(Map<String, dynamic> json) {
@@ -37,6 +45,8 @@ class TripBreadcrumbPoint {
       speedKmh: (json['speedKmh'] as num).toDouble(),
       isEv: json['isEv'] as bool? ?? true,
       timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '') ?? DateTime.now(),
+      latitude: (json['lat'] as num?)?.toDouble(),
+      longitude: (json['lng'] as num?)?.toDouble(),
     );
   }
 }
@@ -71,6 +81,19 @@ class SmartTripTracker extends ChangeNotifier {
   Timer? _driveTimer;
   int _simStep = 0;
 
+  // Real Hardware GNSS / GPS state
+  bool _isGpsActive = false;
+  bool _hasRealGpsFix = false;
+  String _gpsStatus = "GPS Idle";
+  double? _lastGpsAccuracy;
+  Position? _lastGpsPosition;
+  StreamSubscription<Position>? _gpsPositionSub;
+
+  double? _minLat;
+  double? _maxLat;
+  double? _minLng;
+  double? _maxLng;
+
   // Getters
   bool get isTracking => _isTracking;
   bool get isPaused => _isPaused;
@@ -85,6 +108,11 @@ class SmartTripTracker extends ChangeNotifier {
   double get liveCostRm => _liveCostRm;
   String get tripTitle => _tripTitle;
   List<TripBreadcrumbPoint> get breadcrumbs => List.unmodifiable(_breadcrumbs);
+
+  bool get isGpsActive => _isGpsActive;
+  bool get hasRealGpsFix => _hasRealGpsFix;
+  String get gpsStatus => _gpsStatus;
+  double? get lastGpsAccuracy => _lastGpsAccuracy;
 
   double get evRatio => _totalDistanceKm > 0 ? (_evDistanceKm / _totalDistanceKm) * 100 : 100.0;
   double get avgSpeedKmh => _elapsedSeconds > 0 ? (_totalDistanceKm / (_elapsedSeconds / 3600)) : 0.0;
@@ -125,6 +153,13 @@ class SmartTripTracker extends ChangeNotifier {
     _breadcrumbs.clear();
     _simStep = 0;
 
+    _minLat = null;
+    _maxLat = null;
+    _minLng = null;
+    _maxLng = null;
+    _lastGpsPosition = null;
+    _hasRealGpsFix = false;
+
     // Add initial start point
     _breadcrumbs.add(
       TripBreadcrumbPoint(
@@ -148,6 +183,146 @@ class SmartTripTracker extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Request Location Permission & Start Real-time GNSS Hardware Streaming
+  Future<bool> startLiveGpsTracking() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _gpsStatus = "Location Services Off";
+        notifyListeners();
+        return false;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          _gpsStatus = "Permission Denied";
+          notifyListeners();
+          return false;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        _gpsStatus = "Permission Blocked";
+        notifyListeners();
+        return false;
+      }
+
+      _isGpsActive = true;
+      _gpsStatus = "Acquiring GPS...";
+      notifyListeners();
+
+      await _gpsPositionSub?.cancel();
+
+      const locationSettings = LocationSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 2, // 2-meter threshold
+      );
+
+      _gpsPositionSub = Geolocator.getPositionStream(
+        locationSettings: locationSettings,
+      ).listen(
+        _handleRealGpsPosition,
+        onError: (err) {
+          _gpsStatus = "GPS Error";
+          notifyListeners();
+        },
+      );
+
+      return true;
+    } catch (e) {
+      _gpsStatus = "GPS Unavailable";
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Stop real GNSS hardware streaming
+  void stopLiveGpsTracking() {
+    _gpsPositionSub?.cancel();
+    _gpsPositionSub = null;
+    _isGpsActive = false;
+    _gpsStatus = "GPS Inactive";
+    notifyListeners();
+  }
+
+  /// Handle incoming real hardware GPS fix
+  void _handleRealGpsPosition(Position pos) {
+    if (!_isTracking || _isPaused) return;
+
+    _hasRealGpsFix = true;
+    _lastGpsAccuracy = pos.accuracy;
+    _gpsStatus = "GNSS Fix (±${pos.accuracy.toStringAsFixed(0)}m)";
+
+    // Speed in m/s converted to km/h
+    double speedKmh = pos.speed >= 0 ? (pos.speed * 3.6) : 0.0;
+    if (speedKmh < 1.0) speedKmh = 0.0; // clamp stationary jitter
+    _currentSpeedKmh = speedKmh;
+
+    // Powertrain determination: <= 70 km/h is Pure EV, > 70 km/h is 1.5T DHT HEV
+    final isEv = speedKmh <= 70.0;
+
+    // Distance calculation from previous real GNSS coordinate
+    if (_lastGpsPosition != null) {
+      final distMeters = Geolocator.distanceBetween(
+        _lastGpsPosition!.latitude,
+        _lastGpsPosition!.longitude,
+        pos.latitude,
+        pos.longitude,
+      );
+
+      // Filter out GPS jump spikes (> 500m per fix) or noise (< 1m)
+      if (distMeters >= 1.0 && distMeters <= 500.0) {
+        final segmentKm = distMeters / 1000.0;
+        _totalDistanceKm += segmentKm;
+        if (isEv) {
+          _evDistanceKm += segmentKm;
+          _electricKwh += segmentKm * 0.140; // Tiggo 7 PHEV ~14.0 kWh/100km
+        } else {
+          _hevDistanceKm += segmentKm;
+          _petrolLitres += segmentKm * 0.052; // 1.5T DHT ~5.2 L/100km
+        }
+        _liveCostRm = (_electricKwh * _tnbTariff) + (_petrolLitres * _fuelPrice);
+      }
+    }
+
+    // Dynamic bounding box for vector map projection
+    if (_minLat == null || pos.latitude < _minLat!) _minLat = pos.latitude;
+    if (_maxLat == null || pos.latitude > _maxLat!) _maxLat = pos.latitude;
+    if (_minLng == null || pos.longitude < _minLng!) _minLng = pos.longitude;
+    if (_maxLng == null || pos.longitude > _maxLng!) _maxLng = pos.longitude;
+
+    double spanLng = (_maxLng! - _minLng!).abs();
+    double spanLat = (_maxLat! - _minLat!).abs();
+
+    double normX;
+    double normY;
+    if (spanLng < 0.0001 || spanLat < 0.0001) {
+      normX = 0.50;
+      normY = 0.50;
+    } else {
+      normX = 0.10 + 0.80 * ((pos.longitude - _minLng!) / spanLng);
+      // Invert Y so North is top
+      normY = 0.90 - 0.80 * ((pos.latitude - _minLat!) / spanLat);
+    }
+
+    _breadcrumbs.add(
+      TripBreadcrumbPoint(
+        x: normX.clamp(0.05, 0.95),
+        y: normY.clamp(0.05, 0.95),
+        speedKmh: speedKmh,
+        isEv: isEv,
+        timestamp: pos.timestamp,
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+      ),
+    );
+
+    _lastGpsPosition = pos;
+    notifyListeners();
+  }
+
   /// Pause current tracking session
   void pauseDrive() {
     _isPaused = true;
@@ -161,8 +336,9 @@ class SmartTripTracker extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Stop tracking and cancel periodic timer
+  /// Stop tracking and cancel periodic timer & GPS stream
   void stopDrive() {
+    stopLiveGpsTracking();
     _driveTimer?.cancel();
     _driveTimer = null;
     _isTracking = false;
@@ -170,7 +346,7 @@ class SmartTripTracker extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Record a GPS coordinate / vector point
+  /// Record a simulated GPS coordinate / vector point
   void recordPoint({
     required double x,
     required double y,
@@ -198,11 +374,9 @@ class SmartTripTracker extends ChangeNotifier {
       _totalDistanceKm += clampedSegment;
       if (isEv) {
         _evDistanceKm += clampedSegment;
-        // Tiggo 7 PHEV averages ~14.0 kWh/100km on pure electric
         _electricKwh += clampedSegment * 0.140;
       } else {
         _hevDistanceKm += clampedSegment;
-        // 1.5T DHT petrol engine consumes ~5.2 L/100km in hybrid assist
         _petrolLitres += clampedSegment * 0.052;
       }
 
@@ -266,6 +440,7 @@ class SmartTripTracker extends ChangeNotifier {
     required String title,
     String? highwayNote,
   }) async {
+    stopLiveGpsTracking();
     _driveTimer?.cancel();
     _driveTimer = null;
     _isTracking = false;
@@ -292,6 +467,11 @@ class SmartTripTracker extends ChangeNotifier {
             Offset(0.48, 0.86),
           ];
 
+    final note = highwayNote ??
+        (_hasRealGpsFix
+            ? 'Live GPS Tracking • ${(resolvedEvDist / resolvedDistance * 100).round()}% EV Ratio'
+            : 'Smart Drive Tracking • ${(resolvedEvDist / resolvedDistance * 100).round()}% EV Ratio');
+
     final newTrip = TripRecord(
       id: 'trip_${DateTime.now().millisecondsSinceEpoch}',
       title: title.isNotEmpty ? title : 'Live Drive (${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')})',
@@ -304,7 +484,7 @@ class SmartTripTracker extends ChangeNotifier {
       petrolLitres: double.parse(resolvedPetrolLitres.toStringAsFixed(2)),
       costRm: double.parse(resolvedCost.toStringAsFixed(2)),
       avgSpeedKmh: double.parse((avgSpeedKmh > 0 ? avgSpeedKmh : 56.0).toStringAsFixed(1)),
-      highwayNote: highwayNote ?? 'Smart GPS Tracking • ${(resolvedEvDist / resolvedDistance * 100).round()}% EV Ratio',
+      highwayNote: note,
       routePoints: sampleRoute,
       evPointCount: evPoints > 0 ? evPoints : (sampleRoute.length * 0.7).round(),
     );
@@ -321,12 +501,16 @@ class SmartTripTracker extends ChangeNotifier {
       await prefs.setString(_kTripsStorageKey, jsonEncode(list));
     } catch (_) {}
 
+    // Cloud Firestore Sync
+    unawaited(FirebaseSyncService.instance.syncTrip(newTrip));
+
     HapticFeedback.heavyImpact();
     notifyListeners();
     return newTrip;
   }
 
   void cancelDrive() {
+    stopLiveGpsTracking();
     _driveTimer?.cancel();
     _driveTimer = null;
     _isTracking = false;

@@ -5,6 +5,8 @@ import 'package:tiggomate_app/src/trips/smart_trip_tracker.dart';
 import 'package:tiggomate_app/src/widgets/home_widget_service.dart';
 import 'package:tiggomate_app/src/ui/widgets_shortcuts_sheet.dart';
 import 'package:tiggomate_app/src/ui/smart_drive_hud.dart';
+import 'package:tiggomate_app/src/service/service_appointment_manager.dart';
+import 'package:tiggomate_app/src/ui/book_service_appointment_sheet.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -73,6 +75,18 @@ void main() {
       final stored = prefs.getString('tm_logged_trips_v2');
       expect(stored, isNotNull);
       expect(stored!.contains('Putrajaya Sentral Commute'), isTrue);
+    });
+
+    test('GPS tracking controls and getters behave gracefully in headless environment', () async {
+      final tracker = SmartTripTracker.instance;
+      expect(tracker.isGpsActive, isFalse);
+      expect(tracker.hasRealGpsFix, isFalse);
+      expect(tracker.gpsStatus, isNotEmpty);
+
+      // In unit test environment without real GNSS hardware, it handles gracefully without crashing
+      await tracker.startLiveGpsTracking();
+      tracker.stopLiveGpsTracking();
+      expect(tracker.isGpsActive, isFalse);
     });
   });
 
@@ -164,6 +178,89 @@ void main() {
       // Stop drive timer so no pending timers remain when test finishes
       SmartTripTracker.instance.stopDrive();
       await tester.pump();
+    });
+  });
+
+  group('Feature 5: Service Appointment & Reminder System Tests', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('ServiceAppointmentManager creates, schedules reminder, and retrieves upcoming appointment', () async {
+      final manager = ServiceAppointmentManager.instance;
+      final tomorrow = DateTime.now().add(const Duration(days: 2));
+
+      final appointment = ServiceAppointment(
+        id: 'test_apt_1000km',
+        centreId: 'sel_setia_alam',
+        centreName: 'Chery Setia Alam',
+        centreAddress: '1-4-G & 1-5-G Jalan Setia Prima, Shah Alam',
+        centrePhone: '03-33459668',
+        serviceType: '1,000 km 1st Inspection & Activation (FOC)',
+        appointmentDate: tomorrow,
+        timeSlot: '10:30 AM',
+        reminderPreference: '1_day_before',
+        notes: 'DMS pairing and BMS scan',
+        createdAt: DateTime.now(),
+      );
+
+      await manager.setAppointment(appointment);
+
+      expect(manager.appointments, isNotEmpty);
+      expect(manager.upcomingAppointment, isNotNull);
+      expect(manager.upcomingAppointment!.centreName, 'Chery Setia Alam');
+      expect(manager.upcomingAppointment!.serviceType, contains('1,000 km'));
+      expect(manager.upcomingAppointment!.formattedReminder, '1 day before');
+      expect(manager.upcomingAppointment!.calendarUrl, contains('calendar.google.com'));
+      expect(manager.upcomingAppointment!.calendarUrl, contains('Chery%20Setia%20Alam'));
+
+      // Test rescheduling
+      final nextWeek = DateTime.now().add(const Duration(days: 7));
+      await manager.rescheduleAppointment(
+        id: appointment.id,
+        newDate: nextWeek,
+        newTimeSlot: '02:00 PM',
+        newReminder: '2_hours_before',
+      );
+
+      expect(manager.upcomingAppointment!.timeSlot, '02:00 PM');
+      expect(manager.upcomingAppointment!.formattedReminder, '2 hours before');
+
+      // Test cancellation
+      await manager.cancelAppointment(appointment.id);
+      expect(manager.upcomingAppointment, isNull);
+    });
+
+    testWidgets('BookServiceAppointmentSheet renders booking form with date, time, and reminder options',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: BookServiceAppointmentSheet(
+              initialServiceType: '1,000 km 1st Inspection & Activation (FOC)',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Book Service Appointment'), findsOneWidget);
+      expect(find.text('1. SELECT SERVICE CENTRE'), findsOneWidget);
+      expect(find.text('2. SERVICE MILESTONE / TYPE'), findsOneWidget);
+      expect(find.text('3. APPOINTMENT DATE & TIME'), findsOneWidget);
+      expect(find.text('4. SET REMINDER NOTIFICATION'), findsOneWidget);
+      expect(find.text('1 day before'), findsOneWidget);
+      expect(find.text('Confirm Appointment'), findsOneWidget);
+
+      // Tap Confirm Appointment to save
+      await tester.tap(find.text('Confirm Appointment'));
+      await tester.pumpAndSettle();
+
+      expect(ServiceAppointmentManager.instance.upcomingAppointment, isNotNull);
     });
   });
 }

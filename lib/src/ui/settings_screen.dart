@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../ai/ai_service.dart';
@@ -13,6 +14,7 @@ import 'auth_sheet.dart';
 import 'carlinko_connect_dialog.dart';
 import 'mytnb_connect_dialog.dart';
 import 'setup_intro_screen.dart';
+import '../firebase/firebase_sync_service.dart';
 
 // Re-export AppSettings and SettingsService so existing callers keep working seamlessly
 class AppSettings {
@@ -114,6 +116,9 @@ class SettingsService {
     await prefs.setDouble(_kTnbTariff, s.tnbTariff);
     await prefs.setDouble(_kFuelPrice, s.fuelPrice);
     await prefs.setString(_kSkin, s.vehicleSkinKey);
+
+    // Sync vehicle preferences to Google Cloud Firestore
+    unawaited(FirebaseSyncService.instance.syncSettings(s));
   }
 }
 

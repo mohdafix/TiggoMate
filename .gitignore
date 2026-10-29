@@ -45,3 +45,8 @@ app.*.map.json
 /android/app/release
 
 *.apk
+
+# Local research and decompiled references
+/app/
+/carlinko/
+/j5-ev-dashboard/

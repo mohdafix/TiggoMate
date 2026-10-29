@@ -1,8 +1,13 @@
+import 'package:geolocator/geolocator.dart';
+import '../theme/app_tokens.dart';
+import 'book_service_appointment_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../theme/app_tokens.dart';
+import '../trips/smart_trip_tracker.dart';
 import 'app_notification.dart';
+import 'book_service_appointment_sheet.dart';
 
 class CheryServiceCentre {
   final String id;
@@ -16,6 +21,8 @@ class CheryServiceCentre {
   final String operatingHours;
   final bool hasBodyPaint;
   final bool isPhevCertified;
+  final double latitude;
+  final double longitude;
 
   const CheryServiceCentre({
     required this.id,
@@ -26,10 +33,17 @@ class CheryServiceCentre {
     required this.state,
     required this.address,
     required this.phone,
+    required this.latitude,
+    required this.longitude,
     this.operatingHours = 'Mon - Sat: 8:30 AM - 5:30 PM • Sun: Closed',
     this.hasBodyPaint = false,
     this.isPhevCertified = true,
   });
+
+  /// Calculates geodesic distance to user location in kilometers
+  double distanceTo(double userLat, double userLng) {
+    return Geolocator.distanceBetween(userLat, userLng, latitude, longitude) / 1000.0;
+  }
 }
 
 class CheryServiceDirectory {
@@ -40,6 +54,8 @@ class CheryServiceDirectory {
     // ---------------- KLANG VALLEY (KUALA LUMPUR & SELANGOR) ----------------
     CheryServiceCentre(
       id: 'kl_segambut',
+      latitude: 3.1872,
+      longitude: 101.6705,
       name: 'Chery Segambut',
       dealerName: 'Robust Marque Sdn. Bhd.',
       type: '3S',
@@ -52,6 +68,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'kl_connaught',
+      latitude: 3.0827,
+      longitude: 101.7378,
       name: 'Chery Taman Connaught',
       dealerName: 'UCSI Auto Sdn. Bhd.',
       type: '3S',
@@ -64,6 +82,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'kl_sri_petaling',
+      latitude: 3.0673,
+      longitude: 101.6917,
       name: 'Chery Sri Petaling',
       dealerName: 'Ace Synergy Motor Sdn. Bhd.',
       type: '3S',
@@ -76,6 +96,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'sel_setia_alam',
+      latitude: 3.1118,
+      longitude: 101.4496,
       name: 'Chery Setia Alam',
       dealerName: 'Creater Auto Sdn. Bhd.',
       type: '4S',
@@ -88,6 +110,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'sel_puchong_bukit',
+      latitude: 2.9865,
+      longitude: 101.6212,
       name: 'Chery Bandar Bukit Puchong',
       dealerName: 'Lesydear Automobile Sdn. Bhd.',
       type: '3S',
@@ -100,6 +124,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'sel_puchong_tpp',
+      latitude: 3.0182,
+      longitude: 101.6115,
       name: 'Chery Puchong TPP',
       dealerName: 'CNO Autohaus Sdn. Bhd.',
       type: '3S',
@@ -112,6 +138,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'sel_klang_botanic',
+      latitude: 2.9972,
+      longitude: 101.4398,
       name: 'Chery Bandar Botanic Klang',
       dealerName: 'AI Futuretech Sdn. Bhd.',
       type: '3S',
@@ -124,6 +152,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'sel_balakong',
+      latitude: 3.0315,
+      longitude: 101.7642,
       name: 'Chery Balakong',
       dealerName: 'Tropical Impact Sdn. Bhd.',
       type: '3S',
@@ -136,6 +166,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'sel_rawang',
+      latitude: 3.3082,
+      longitude: 101.5458,
       name: 'Chery Rawang',
       dealerName: 'Carro Care Sdn. Bhd.',
       type: '3S',
@@ -148,6 +180,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'sel_bangi',
+      latitude: 2.9463,
+      longitude: 101.7765,
       name: 'Chery Bandar Baru Bangi 3S',
       dealerName: 'WH Oneplus Auto Sdn. Bhd.',
       type: '3S',
@@ -160,6 +194,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'sel_kd',
+      latitude: 3.1534,
+      longitude: 101.5942,
       name: 'Chery Kota Damansara 3S',
       dealerName: 'Apple Autotech Sdn. Bhd.',
       type: '3S',
@@ -172,6 +208,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'sel_semenyih',
+      latitude: 2.9515,
+      longitude: 101.8441,
       name: 'Chery Semenyih 3S',
       dealerName: 'G-Mart Motor Sdn. Bhd.',
       type: '3S',
@@ -186,6 +224,8 @@ class CheryServiceDirectory {
     // ---------------- NORTHERN REGION ----------------
     CheryServiceCentre(
       id: 'png_butterworth',
+      latitude: 5.4295,
+      longitude: 100.3845,
       name: 'Chery Butterworth',
       dealerName: 'CS Euro Auto Sdn. Bhd.',
       type: '3S',
@@ -198,6 +238,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'png_georgetown',
+      latitude: 5.4124,
+      longitude: 100.3185,
       name: 'Chery Georgetown',
       dealerName: 'BK Autoworld Sdn. Bhd.',
       type: '3S',
@@ -210,6 +252,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'prk_ipoh',
+      latitude: 4.5821,
+      longitude: 101.0742,
       name: 'Chery Ipoh',
       dealerName: 'Leading Fame Auto Sdn. Bhd.',
       type: '4S',
@@ -222,6 +266,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'prk_taiping',
+      latitude: 4.8295,
+      longitude: 100.7185,
       name: 'Chery Taiping',
       dealerName: 'Leading Fame Auto Sdn. Bhd.',
       type: '3S',
@@ -234,6 +280,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'kdh_alor_setar',
+      latitude: 6.1365,
+      longitude: 100.3541,
       name: 'Chery Alor Setar',
       dealerName: 'Indah Utara Enterprise Sdn. Bhd.',
       type: '3S',
@@ -246,6 +294,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'kdh_sp',
+      latitude: 5.6272,
+      longitude: 100.4875,
       name: 'Chery Sungai Petani',
       dealerName: 'CS Euro Auto Sdn. Bhd.',
       type: '3S',
@@ -260,6 +310,8 @@ class CheryServiceDirectory {
     // ---------------- SOUTHERN REGION ----------------
     CheryServiceCentre(
       id: 'ns_seremban',
+      latitude: 2.6954,
+      longitude: 101.9562,
       name: 'Chery Seremban',
       dealerName: 'Taycn Kredit Sdn. Bhd.',
       type: '4S',
@@ -272,6 +324,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'mlk_cheng',
+      latitude: 2.2612,
+      longitude: 102.2185,
       name: 'Chery Melaka',
       dealerName: 'AJ Asia Auto Sdn. Bhd.',
       type: '3S',
@@ -284,6 +338,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'jhr_tampoi',
+      latitude: 1.5034,
+      longitude: 103.7042,
       name: 'Chery Tampoi 4S',
       dealerName: 'Autohub Mobility Sdn. Bhd.',
       type: '4S',
@@ -296,6 +352,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'jhr_kulai',
+      latitude: 1.6425,
+      longitude: 103.6128,
       name: 'Chery Kulai 3S',
       dealerName: 'Autohub Mobility Sdn. Bhd.',
       type: '3S',
@@ -308,6 +366,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'jhr_johor_jaya',
+      latitude: 1.5432,
+      longitude: 103.8012,
       name: 'Chery Johor Jaya',
       dealerName: 'Desa Jaya Auto Sdn. Bhd.',
       type: '3S',
@@ -320,6 +380,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'jhr_batu_pahat',
+      latitude: 1.8542,
+      longitude: 102.9456,
       name: 'Chery Batu Pahat',
       dealerName: 'G-Mart Motor Sdn. Bhd.',
       type: '3S',
@@ -332,6 +394,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'jhr_muar',
+      latitude: 2.0512,
+      longitude: 102.5845,
       name: 'Chery Muar',
       dealerName: 'Autohub Mobility Sdn. Bhd.',
       type: '3S',
@@ -344,6 +408,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'ns_nilai',
+      latitude: 2.8125,
+      longitude: 101.7954,
       name: 'Chery Nilai 3S',
       dealerName: 'SS Mobile Sdn. Bhd.',
       type: '3S',
@@ -356,6 +422,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'jhr_medini',
+      latitude: 1.4285,
+      longitude: 103.6312,
       name: 'Chery Medini 4S',
       dealerName: 'Gagner Auto Sdn. Bhd.',
       type: '4S',
@@ -368,6 +436,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'jhr_kluang',
+      latitude: 2.0345,
+      longitude: 103.2985,
       name: 'Chery Kluang 3S',
       dealerName: 'Li Koon Auto Sdn. Bhd.',
       type: '3S',
@@ -382,6 +452,8 @@ class CheryServiceDirectory {
     // ---------------- EAST COAST ----------------
     CheryServiceCentre(
       id: 'phg_kuantan',
+      latitude: 3.8452,
+      longitude: 103.3215,
       name: 'Chery Kuantan',
       dealerName: 'EVenergy Auto Sdn. Bhd.',
       type: '4S',
@@ -394,6 +466,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'ktn_kota_bharu',
+      latitude: 6.1154,
+      longitude: 102.2542,
       name: 'Chery Kota Bharu',
       dealerName: 'Murni Cartrade Sdn. Bhd.',
       type: '3S',
@@ -406,6 +480,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'trg_kt',
+      latitude: 5.3854,
+      longitude: 103.0945,
       name: 'Chery Kuala Terengganu',
       dealerName: 'Dua Puncak Auto Sdn. Bhd.',
       type: '3S',
@@ -420,6 +496,8 @@ class CheryServiceDirectory {
     // ---------------- EAST MALAYSIA (SABAH & SARAWAK) ----------------
     CheryServiceCentre(
       id: 'sbh_kk',
+      latitude: 5.9685,
+      longitude: 116.1125,
       name: 'Chery Kota Kinabalu',
       dealerName: 'Universal Chery Sdn. Bhd.',
       type: '3S',
@@ -432,6 +510,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'sbh_tawau',
+      latitude: 4.2542,
+      longitude: 117.8965,
       name: 'Chery Tawau',
       dealerName: 'Universal Chery Sdn. Bhd.',
       type: '3S',
@@ -444,6 +524,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'sbh_sandakan',
+      latitude: 5.8642,
+      longitude: 118.0625,
       name: 'Chery Sandakan',
       dealerName: 'Universal Chery Sdn. Bhd.',
       type: '3S',
@@ -456,6 +538,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'swk_kuching',
+      latitude: 1.5125,
+      longitude: 110.3154,
       name: 'Chery Kuching (Batu Kawa)',
       dealerName: 'HMBC Sdn. Bhd.',
       type: '3S',
@@ -468,6 +552,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'swk_sibu',
+      latitude: 2.2845,
+      longitude: 111.8312,
       name: 'Chery Sibu',
       dealerName: 'HMBC Sdn. Bhd.',
       type: '3S',
@@ -480,6 +566,8 @@ class CheryServiceDirectory {
     ),
     CheryServiceCentre(
       id: 'swk_miri',
+      latitude: 4.4325,
+      longitude: 114.0152,
       name: 'Chery Miri',
       dealerName: 'HMBC Sdn. Bhd.',
       type: '3S',
@@ -505,6 +593,9 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _selectedRegion = 'All';
   String _selectedType = 'All'; // 'All', '4S', '3S'
+  bool _sortByNearest = false;
+  Position? _userPosition;
+  bool _isLocatingGps = false;
 
   final List<String> _regions = [
     'All',
@@ -516,9 +607,145 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _attemptSilentLocation();
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// Attempts silent check for active GPS coordinates from SmartTripTracker or device GNSS
+  Future<void> _attemptSilentLocation() async {
+    try {
+      final tracker = SmartTripTracker.instance;
+      if (tracker.breadcrumbs.isNotEmpty) {
+        final last = tracker.breadcrumbs.last;
+        if (last.latitude != null && last.longitude != null) {
+          if (mounted) {
+            setState(() {
+              _userPosition = Position(
+                latitude: last.latitude!,
+                longitude: last.longitude!,
+                timestamp: DateTime.now(),
+                accuracy: 10,
+                altitude: 0,
+                altitudeAccuracy: 0,
+                heading: 0,
+                headingAccuracy: 0,
+                speed: 0,
+                speedAccuracy: 0,
+              );
+              _sortByNearest = true;
+            });
+          }
+          return;
+        }
+      }
+
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
+        final pos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium, timeLimit: Duration(seconds: 4)),
+        );
+        if (mounted) {
+          setState(() {
+            _userPosition = pos;
+            _sortByNearest = true;
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  /// Interactive request to enable GPS sorting and acquire fix
+  Future<void> _requestGpsSort() async {
+    setState(() {
+      _isLocatingGps = true;
+    });
+
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+          setState(() => _isLocatingGps = false);
+          AppNotification.show(
+            context,
+            title: 'GPS Service Disabled',
+            message: 'Please turn on Location Services on your phone to find nearby centres.',
+            type: NotificationType.warning,
+            icon: Icons.location_off,
+          );
+        }
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) {
+            setState(() => _isLocatingGps = false);
+            AppNotification.show(
+              context,
+              title: 'Permission Denied',
+              message: 'Location access is needed to sort Chery service centres by distance.',
+              type: NotificationType.warning,
+              icon: Icons.location_off,
+            );
+          }
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          setState(() => _isLocatingGps = false);
+          AppNotification.show(
+            context,
+            title: 'Permission Blocked',
+            message: 'Please enable Location in Android Settings for TiggoMate.',
+            type: NotificationType.warning,
+            icon: Icons.settings,
+          );
+        }
+        return;
+      }
+
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 8)),
+      );
+
+      if (mounted) {
+        setState(() {
+          _userPosition = pos;
+          _sortByNearest = true;
+          _isLocatingGps = false;
+        });
+
+        AppNotification.show(
+          context,
+          title: 'Nearby GPS Active',
+          message: 'Showing authorised Chery service centres ordered by closest driving distance.',
+          type: NotificationType.success,
+          icon: Icons.near_me_rounded,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLocatingGps = false);
+        AppNotification.show(
+          context,
+          title: 'Location Fix Timeout',
+          message: 'Could not obtain GPS lock indoors. Showing all nationwide centres.',
+          type: NotificationType.info,
+          icon: Icons.info_outline,
+        );
+      }
+    }
   }
 
   Future<void> _makePhoneCall(String phoneNumber) async {
@@ -534,22 +761,30 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
     }
   }
 
-  Future<void> _openMaps(String name, String address) async {
-    final query = Uri.encodeComponent('$name, $address');
-    final Uri geoUri = Uri.parse('geo:0,0?q=$query');
-    final Uri webMapsUri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
+  Future<void> _openMaps(CheryServiceCentre centre) async {
+    final lat = centre.latitude;
+    final lng = centre.longitude;
+    final name = centre.name;
+    final address = centre.address;
+
+    final Uri navUri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&destination_place_id=&travelmode=driving');
+    final Uri geoUri = Uri.parse('geo:$lat,$lng?q=$lat,$lng(${Uri.encodeComponent(name)})');
+    final Uri webSearchUri = Uri.parse('https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent('$name, $address')}');
 
     try {
-      bool launched = await launchUrl(geoUri, mode: LaunchMode.externalApplication);
+      bool launched = await launchUrl(navUri, mode: LaunchMode.externalApplication);
       if (!launched) {
-        launched = await launchUrl(webMapsUri, mode: LaunchMode.externalApplication);
+        launched = await launchUrl(geoUri, mode: LaunchMode.externalApplication);
+      }
+      if (!launched) {
+        launched = await launchUrl(webSearchUri, mode: LaunchMode.externalApplication);
       }
       if (!launched) {
         _copyToClipboard(address, 'Address copied: $address');
       }
     } catch (_) {
       try {
-        final launched = await launchUrl(webMapsUri, mode: LaunchMode.externalApplication);
+        final launched = await launchUrl(webSearchUri, mode: LaunchMode.externalApplication);
         if (!launched) {
           _copyToClipboard(address, 'Address copied: $address');
         }
@@ -573,8 +808,10 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final accent = context.tokens.accent;
+    final onAccent = context.tokens.onAccent;
     final query = _searchController.text.trim().toLowerCase();
-    final filtered = CheryServiceDirectory.centres.where((centre) {
+    List<CheryServiceCentre> filtered = CheryServiceDirectory.centres.where((centre) {
       final matchesRegion = _selectedRegion == 'All' || centre.region == _selectedRegion;
       final matchesType = _selectedType == 'All' || centre.type == _selectedType;
       final matchesQuery = query.isEmpty ||
@@ -585,37 +822,54 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
       return matchesRegion && matchesType && matchesQuery;
     }).toList();
 
+    // Sort by proximity when GPS is active
+    if (_sortByNearest && _userPosition != null) {
+      filtered.sort((a, b) {
+        final distA = a.distanceTo(_userPosition!.latitude, _userPosition!.longitude);
+        final distB = b.distanceTo(_userPosition!.latitude, _userPosition!.longitude);
+        return distA.compareTo(distB);
+      });
+    }
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final accent = context.tokens.accent;
-    final onAccent = context.tokens.onAccent;
+
+    // Determine nearest centre if GPS is available
+    CheryServiceCentre? closestCentre;
+    if (_userPosition != null && filtered.isNotEmpty) {
+      closestCentre = filtered.reduce((a, b) {
+        final distA = a.distanceTo(_userPosition!.latitude, _userPosition!.longitude);
+        final distB = b.distanceTo(_userPosition!.latitude, _userPosition!.longitude);
+        return distA < distB ? a : b;
+      });
+    }
 
     Widget content = Column(
       children: [
         // 24/7 Roadside Assistance Banner
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
           child: Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: isDark
-                    ? [accent.withValues(alpha: 0.15), const Color(0xFF131922)]
-                    : [accent.withValues(alpha: 0.1), const Color(0xFFF0FDF4)],
+                    ? const [Color(0xFF1B2A32), Color(0xFF131922)]
+                    : const [Color(0xFFE6FFFA), Color(0xFFF0FDF4)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: accent.withValues(alpha: isDark ? 0.3 : 0.5)),
+              border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: isDark ? 0.3 : 0.5)),
             ),
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.15),
+                    color: const Color(0xFF00D2AA).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(Icons.support_agent, color: accent, size: 26),
+                  child: const Icon(Icons.support_agent, color: Color(0xFF00D2AA), size: 26),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -636,10 +890,10 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                 ),
                 ElevatedButton.icon(
                   onPressed: () => _makePhoneCall(CheryServiceDirectory.tollFreeCareline),
-                  icon: Icon(Icons.call, size: 14, color: onAccent),
-                  label: Text('Call', style: TextStyle(fontWeight: FontWeight.bold, color: onAccent, fontSize: 12)),
+                  icon: const Icon(Icons.call, size: 14, color: Colors.black87),
+                  label: const Text('Call', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87, fontSize: 12)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: accent,
+                    backgroundColor: const Color(0xFF00D2AA),
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     minimumSize: Size.zero,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -650,42 +904,205 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
           ),
         ),
 
-        // Search Bar
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          child: TextField(
-            controller: _searchController,
-            onChanged: (val) => setState(() {}),
-            style: TextStyle(color: isDark ? Colors.white : const Color(0xFF111827), fontSize: 13),
-            decoration: InputDecoration(
-              hintText: 'Search city, dealer, or location (e.g. Puchong, Tampoi, Ipoh)...',
-              hintStyle: TextStyle(fontSize: 12.5, color: isDark ? Colors.white38 : const Color(0xFF9CA3AF)),
-              prefixIcon: Icon(Icons.search, size: 20, color: accent),
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
-                      icon: Icon(Icons.clear, size: 18, color: isDark ? Colors.white60 : const Color(0xFF6B7280)),
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() {});
-                      },
-                    )
-                  : null,
-              filled: true,
-              fillColor: isDark ? const Color(0xFF131922) : Colors.white,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              border: OutlineInputBorder(
+        // Nearest Service Centre Hero Banner (Shown when GPS position is available)
+        if (closestCentre != null && _sortByNearest)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF121A20) : const Color(0xFFF0FDF4),
                 borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0)),
+                border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: 0.45)),
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: accent),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.near_me_rounded, color: Color(0xFF00D2AA), size: 14),
+                          const SizedBox(width: 5),
+                          Text(
+                            'NEAREST SERVICE CENTRE',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.6,
+                              color: isDark ? const Color(0xFF00D2AA) : const Color(0xFF0D9488),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00D2AA).withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: 0.4)),
+                        ),
+                        child: Text(
+                          '${closestCentre.distanceTo(_userPosition!.latitude, _userPosition!.longitude).toStringAsFixed(1)} km away',
+                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF00D2AA)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              closestCentre.name,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : const Color(0xFF111827),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${closestCentre.dealerName} • ${closestCentre.type} Hub',
+                              style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : const Color(0xFF6B7280)),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton(
+                        onPressed: () => BookServiceAppointmentSheet.show(context, preselectedCentre: closestCentre),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF00D2AA),
+                          side: const BorderSide(color: Color(0xFF00D2AA)),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          minimumSize: Size.zero,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: const Text('Book', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(width: 6),
+                      ElevatedButton.icon(
+                        onPressed: () => _openMaps(closestCentre!),
+                        icon: const Icon(Icons.directions, size: 12, color: Colors.black87),
+                        label: const Text('Go', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF00D2AA),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          minimumSize: Size.zero,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
+          ),
+
+        // Search Bar & GPS Proximity Button
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (val) => setState(() {}),
+                  style: TextStyle(color: isDark ? Colors.white : const Color(0xFF111827), fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: 'Search city, dealer, or state (e.g. Puchong, Ipoh)...',
+                    hintStyle: TextStyle(fontSize: 12.5, color: isDark ? Colors.white38 : const Color(0xFF9CA3AF)),
+                    prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF00D2AA)),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(Icons.clear, size: 18, color: isDark ? Colors.white60 : const Color(0xFF6B7280)),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {});
+                            },
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF131922) : Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: Color(0xFF00D2AA)),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // GPS Nearby Action Button
+              InkWell(
+                onTap: () {
+                  if (_userPosition == null) {
+                    _requestGpsSort();
+                  } else {
+                    setState(() {
+                      _sortByNearest = !_sortByNearest;
+                    });
+                  }
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  height: 44,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: _sortByNearest
+                        ? const Color(0xFF00D2AA)
+                        : (isDark ? const Color(0xFF131922) : const Color(0xFFF1F5F9)),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _sortByNearest
+                          ? const Color(0xFF00D2AA)
+                          : (isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0)),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      if (_isLocatingGps)
+                        const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF00D2AA)),
+                        )
+                      else
+                        Icon(
+                          Icons.near_me_rounded,
+                          size: 16,
+                          color: _sortByNearest ? Colors.black87 : const Color(0xFF00D2AA),
+                        ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _sortByNearest ? 'GPS: On' : 'Nearby',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: _sortByNearest ? Colors.black87 : (isDark ? Colors.white70 : const Color(0xFF374151)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
 
@@ -704,15 +1121,15 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                       reg,
                       style: TextStyle(
                         fontSize: 11.5,
-                        color: isSelected ? onAccent : (isDark ? Colors.white70 : const Color(0xFF4B5563)),
+                        color: isSelected ? Colors.black : (isDark ? Colors.white70 : const Color(0xFF4B5563)),
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                       ),
                     ),
                     selected: isSelected,
                     onSelected: (val) => setState(() => _selectedRegion = reg),
                     backgroundColor: isDark ? const Color(0xFF131922) : const Color(0xFFF1F5F9),
-                    selectedColor: accent,
-                    side: BorderSide(color: isSelected ? accent : (isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0))),
+                    selectedColor: const Color(0xFF00D2AA),
+                    side: BorderSide(color: isSelected ? const Color(0xFF00D2AA) : (isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0))),
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   ),
                 );
@@ -745,15 +1162,23 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
           ),
         ),
 
-        // Count indicator
+        // Count indicator & sorting status
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Showing ${filtered.length} authorised centres',
-                style: TextStyle(fontSize: 11.5, color: isDark ? Colors.white54 : const Color(0xFF6B7280), fontWeight: FontWeight.w600),
+                _sortByNearest && _userPosition != null
+                    ? 'Showing ${filtered.length} centres • Sorted by nearest GPS'
+                    : 'Showing ${filtered.length} authorised centres',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: (_sortByNearest && _userPosition != null)
+                      ? const Color(0xFF00D2AA)
+                      : (isDark ? Colors.white54 : const Color(0xFF6B7280)),
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               InkWell(
                 onTap: () async {
@@ -763,10 +1188,10 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                   }
                 },
                 child: Row(
-                  children: [
-                    Text('Official Portal', style: TextStyle(fontSize: 11, color: accent, fontWeight: FontWeight.bold)),
-                    const SizedBox(width: 2),
-                    Icon(Icons.open_in_new, size: 12, color: accent),
+                  children: const [
+                    Text('Official Portal', style: TextStyle(fontSize: 11, color: Color(0xFF00D2AA), fontWeight: FontWeight.bold)),
+                    SizedBox(width: 2),
+                    Icon(Icons.open_in_new, size: 12, color: Color(0xFF00D2AA)),
                   ],
                 ),
               ),
@@ -793,7 +1218,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                             _selectedType = 'All';
                           });
                         },
-                        child: Text('Reset Filters', style: TextStyle(color: accent)),
+                        child: const Text('Reset Filters', style: TextStyle(color: Color(0xFF00D2AA))),
                       ),
                     ],
                   ),
@@ -827,8 +1252,10 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
   Widget _buildCentreCard(CheryServiceCentre centre) {
     final is4S = centre.type == '4S';
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final accent = context.tokens.accent;
-    final onAccent = context.tokens.onAccent;
+
+    final distanceKm = (_userPosition != null)
+        ? centre.distanceTo(_userPosition!.latitude, _userPosition!.longitude)
+        : null;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -837,7 +1264,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top Row: Name, Badges
+            // Top Row: Name, Proximity & Badges
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -857,18 +1284,45 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                     ],
                   ),
                 ),
-                // Badge
+                // Distance Pill (when GPS is active)
+                if (distanceKm != null) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00D2AA).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: 0.45)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.near_me, size: 10, color: Color(0xFF00D2AA)),
+                        const SizedBox(width: 3),
+                        Text(
+                          '${distanceKm.toStringAsFixed(1)} km',
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF00D2AA),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                // 4S / 3S Badge
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: is4S
                         ? const Color(0xFF2F81F7).withValues(alpha: 0.2)
-                        : accent.withValues(alpha: 0.2),
+                        : const Color(0xFF00D2AA).withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: is4S
                           ? const Color(0xFF2F81F7).withValues(alpha: 0.6)
-                          : accent.withValues(alpha: 0.6),
+                          : const Color(0xFF00D2AA).withValues(alpha: 0.6),
                     ),
                   ),
                   child: Text(
@@ -876,7 +1330,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: is4S ? const Color(0xFF58A6FF) : accent,
+                      color: is4S ? const Color(0xFF58A6FF) : const Color(0xFF00D2AA),
                     ),
                   ),
                 ),
@@ -889,7 +1343,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
               spacing: 6,
               runSpacing: 4,
               children: [
-                _buildCapabilityBadge(Icons.bolt, 'PHEV / HV Diagnostic Ready', accent),
+                _buildCapabilityBadge(Icons.bolt, 'PHEV / HV Diagnostic Ready', const Color(0xFF00D2AA)),
                 if (centre.hasBodyPaint)
                   _buildCapabilityBadge(Icons.format_paint, 'Body & Paint (B&P)', const Color(0xFF2F81F7)),
                 _buildCapabilityBadge(Icons.location_on_outlined, centre.state, isDark ? Colors.white54 : const Color(0xFF6B7280)),
@@ -913,60 +1367,68 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
             ),
             const SizedBox(height: 6),
 
-            // Hours Row
+            // Phone & Hours Row
             Row(
               children: [
-                Icon(Icons.schedule, size: 14, color: isDark ? Colors.white38 : const Color(0xFF9CA3AF)),
+                const Icon(Icons.phone_outlined, size: 14, color: Color(0xFF00D2AA)),
                 const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    centre.operatingHours,
-                    style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : const Color(0xFF9CA3AF)),
-                  ),
+                Text(
+                  centre.phone,
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF111827)),
+                ),
+                const Spacer(),
+                Icon(Icons.schedule, size: 13, color: isDark ? Colors.white38 : const Color(0xFF9CA3AF)),
+                const SizedBox(width: 4),
+                Text(
+                  centre.operatingHours.split('•').first.trim(),
+                  style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : const Color(0xFF9CA3AF)),
                 ),
               ],
             ),
-            Divider(height: 20, color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0)),
+            Divider(height: 18, color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0)),
 
-            // Action Row
+            // Action Buttons Row (3 equal width buttons)
             Row(
               children: [
-                // Phone display
                 Expanded(
-                  child: Row(
-                    children: [
-                      Icon(Icons.phone_outlined, size: 14, color: accent),
-                      const SizedBox(width: 6),
-                      Text(
-                        centre.phone,
-                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF111827)),
-                      ),
-                    ],
-                  ),
-                ),
-                // Call Button
-                OutlinedButton.icon(
-                  onPressed: () => _makePhoneCall(centre.phone),
-                  icon: Icon(Icons.call, size: 13, color: accent),
-                  label: Text('Call', style: TextStyle(fontSize: 11.5, color: accent, fontWeight: FontWeight.bold)),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: accent),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    minimumSize: Size.zero,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  child: OutlinedButton.icon(
+                    onPressed: () => _makePhoneCall(centre.phone),
+                    icon: const Icon(Icons.call, size: 13, color: Color(0xFF00D2AA)),
+                    label: const Text('Call', style: TextStyle(fontSize: 11.5, color: Color(0xFF00D2AA), fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFF00D2AA)),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      minimumSize: Size.zero,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
-                // Navigate Button
-                ElevatedButton.icon(
-                  onPressed: () => _openMaps(centre.name, centre.address),
-                  icon: Icon(Icons.directions, size: 13, color: onAccent),
-                  label: Text('Map', style: TextStyle(fontSize: 11.5, color: onAccent, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: accent,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    minimumSize: Size.zero,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => BookServiceAppointmentSheet.show(context, preselectedCentre: centre),
+                    icon: const Icon(Icons.event_available_rounded, size: 13, color: Color(0xFF2F81F7)),
+                    label: const Text('Book', style: TextStyle(fontSize: 11.5, color: Color(0xFF2F81F7), fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFF2F81F7)),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      minimumSize: Size.zero,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _openMaps(centre),
+                    icon: const Icon(Icons.directions, size: 13, color: Colors.black87),
+                    label: const Text('Map', style: TextStyle(fontSize: 11.5, color: Colors.black87, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00D2AA),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      minimumSize: Size.zero,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
                   ),
                 ),
               ],

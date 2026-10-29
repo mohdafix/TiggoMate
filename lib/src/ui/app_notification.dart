@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../firebase/firebase_sync_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 
@@ -208,6 +209,7 @@ class VehicleAlertsManager extends ChangeNotifier {
     }
     notifyListeners();
     await _persist();
+    unawaited(FirebaseSyncService.instance.syncAlert(alert));
   }
 
   Future<void> markAllAsRead() async {

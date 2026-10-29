@@ -1,3 +1,5 @@
+import 'src/ui/book_service_appointment_sheet.dart';
+import 'src/service/service_appointment_manager.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -51,6 +53,7 @@ void main() async {
 
   try {
     await VehicleAlertsManager.instance.init();
+  await ServiceAppointmentManager.instance.load();
   } catch (e) {
     debugPrint('VehicleAlertsManager.init warning: $e');
   }
@@ -1336,6 +1339,32 @@ class MaintenanceTab extends StatefulWidget {
 }
 
 class _MaintenanceTabState extends State<MaintenanceTab> {
+  void _confirmCancelAppointment(BuildContext context, ServiceAppointment apt) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF131922) : Colors.white,
+        title: const Text('Cancel Appointment?'),
+        content: Text('Are you sure you want to cancel your service booking at ' + apt.centreName + ' on ' + apt.formattedDate + '?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Keep Appointment'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ServiceAppointmentManager.instance.cancelAppointment(apt.id);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            child: const Text('Cancel Booking'),
+          ),
+        ],
+      ),
+    );
+  }
+
   int _activeSubTab = 0; // 0: Schedule & Pricing, 1: Chery Service Centres
   int _selectedMilestoneIndex = 0; // Default to 1,000 km or upcoming
   int _filterIndex = 0; // 0: All, 1: Free Labour, 2: Major
@@ -1874,6 +1903,249 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
               ),
             ],
           ),
+        ),
+        const SizedBox(height: 16),
+
+// Service Appointment / Milestone Reminder Area
+        ListenableBuilder(
+          listenable: ServiceAppointmentManager.instance,
+          builder: (context, _) {
+            final upcoming = ServiceAppointmentManager.instance.upcomingAppointment;
+            if (upcoming != null) {
+              return Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F1E1B) : const Color(0xFFE6FFFA),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: 0.6)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00D2AA).withValues(alpha: 0.2),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.event_available_rounded, size: 16, color: Color(0xFF00D2AA)),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'CONFIRMED SERVICE APPOINTMENT',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.6,
+                                color: isDark ? const Color(0xFF00D2AA) : const Color(0xFF0D9488),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00D2AA),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            upcoming.daysUntil == 0
+                                ? 'TODAY'
+                                : (upcoming.daysUntil == 1 ? 'TOMORROW' : 'In ${upcoming.daysUntil} days'),
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      upcoming.serviceType,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : const Color(0xFF111827),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.calendar_today_rounded, size: 12, color: isDark ? Colors.white70 : const Color(0xFF4B5563)),
+                        const SizedBox(width: 5),
+                        Text(
+                          '${upcoming.formattedDate} • ${upcoming.timeSlot}',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : const Color(0xFF374151)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Icon(Icons.storefront_rounded, size: 12, color: isDark ? Colors.white70 : const Color(0xFF4B5563)),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            '${upcoming.centreName} (${upcoming.centreAddress})',
+                            style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : const Color(0xFF6B7280)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        const Icon(Icons.notifications_active_outlined, size: 12, color: Color(0xFF00D2AA)),
+                        const SizedBox(width: 5),
+                        Text(
+                          'Reminder: ${upcoming.formattedReminder}',
+                          style: const TextStyle(fontSize: 11, color: Color(0xFF00D2AA), fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                    if (upcoming.notes.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        'Notes: "${upcoming.notes}"',
+                        style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: isDark ? Colors.white54 : const Color(0xFF6B7280)),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () => ServiceAppointmentManager.instance.launchDeviceCalendar(upcoming),
+                          icon: const Icon(Icons.calendar_month_rounded, size: 12, color: Color(0xFF00D2AA)),
+                          label: const Text('Add to Calendar', style: TextStyle(fontSize: 11, color: Color(0xFF00D2AA), fontWeight: FontWeight.bold)),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFF00D2AA)),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            minimumSize: Size.zero,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton(
+                          onPressed: () => BookServiceAppointmentSheet.show(context, existingAppointment: upcoming),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            minimumSize: Size.zero,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: const Text('Reschedule', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: () => _confirmCancelAppointment(context, upcoming),
+                          child: const Text('Cancel', style: TextStyle(color: Colors.redAccent, fontSize: 11)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            // Default Milestone reminder banner with direct "Book Service" button
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFFF1B343).withValues(alpha: 0.08) : const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark ? const Color(0xFFF1B343).withValues(alpha: 0.3) : const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: (isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706)).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.build_circle_outlined, size: 20, color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'NEXT DUE: 1,000 KM INSPECTION',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.8,
+                                color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '160 km Left',
+                                style: TextStyle(
+                                  color: isDark ? Colors.black87 : Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 9,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'CarLinko Telematics Activation & 3DHT Diagnostic Scan (FOC)',
+                          style: TextStyle(color: isDark ? Colors.white70 : const Color(0xFF4B5563), fontSize: 11.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () => BookServiceAppointmentSheet.show(
+                          context,
+                          initialServiceType: '1,000 km 1st Inspection & Activation (FOC)',
+                        ),
+                        icon: const Icon(Icons.event_available_rounded, size: 12),
+                        label: const Text('Book', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF00D2AA),
+                          foregroundColor: Colors.black87,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          minimumSize: Size.zero,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      InkWell(
+                        onTap: () => setState(() => _activeSubTab = 1),
+                        child: Text(
+                          'Find 3S/4S >',
+                          style: TextStyle(fontSize: 10, color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309), fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
         ),
         const SizedBox(height: 16),
 

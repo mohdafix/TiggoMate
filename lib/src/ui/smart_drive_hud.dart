@@ -65,6 +65,8 @@ class _SmartDriveHudSheetState extends State<SmartDriveHudSheet> with SingleTick
         fuelPrice: widget.fuelPrice,
       );
     }
+    // Proactively connect to real device GNSS hardware
+    _tracker.startLiveGpsTracking();
   }
 
   @override
@@ -175,7 +177,9 @@ class _SmartDriveHudSheetState extends State<SmartDriveHudSheet> with SingleTick
               Navigator.pop(ctx); // Close dialog
               final saved = await _tracker.finishAndSaveTrip(
                 title: titleController.text.trim(),
-                highwayNote: 'Smart Live GPS • ${_tracker.evRatio.round()}% EV Split',
+                highwayNote: _tracker.hasRealGpsFix
+                    ? 'Live GNSS • ${_tracker.evRatio.round()}% EV Split'
+                    : 'Smart Drive Sim • ${_tracker.evRatio.round()}% EV Split',
               );
 
               if (mounted) {
