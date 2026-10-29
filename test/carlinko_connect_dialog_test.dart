@@ -130,4 +130,50 @@ void main() {
 
     repo.dispose();
   });
+
+  testWidgets('CarlinkoConnectDialog renders cleanly in Tesla Light mode with light background', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repo = LiveCarLinkoRepository();
+    repo.setPreActivationMode(account: 'linexsg@gmail.com');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.lightTheme,
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (_) => CarlinkoConnectDialog(
+                    repository: repo,
+                    currentAccount: 'linexsg@gmail.com',
+                    onConnected: () {},
+                  ),
+                );
+              },
+              child: const Text('Open Dialog'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open Dialog'));
+    await tester.pumpAndSettle();
+
+    final dialogFinder = find.byType(Dialog);
+    expect(dialogFinder, findsOneWidget);
+    final Dialog dialog = tester.widget(dialogFinder);
+    expect(dialog.backgroundColor, Colors.white);
+
+    expect(find.text('CarLinko Telematics Cloud'), findsOneWidget);
+    expect(find.text('SESSION CONNECTED & ACTIVE'), findsOneWidget);
+
+    repo.dispose();
+  });
 }

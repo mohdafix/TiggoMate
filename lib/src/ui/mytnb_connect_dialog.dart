@@ -138,8 +138,10 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Dialog(
-      backgroundColor: const Color(0xFF131922),
+      backgroundColor: isDark ? const Color(0xFF131922) : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: ValueListenableBuilder<MyTnbAccount?>(
         valueListenable: widget.repository.selectedAccountNotifier,
@@ -170,19 +172,32 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'myTNB Smart Meter',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
                           ),
                           Text(
                             isLoggedIn ? 'Live Credential Sync Active' : 'Direct Credential Sync',
-                            style: TextStyle(fontSize: 12, color: isLoggedIn ? const Color(0xFF00D2AA) : Colors.white60),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isLoggedIn
+                                  ? const Color(0xFF00D2AA)
+                                  : (isDark ? Colors.white60 : const Color(0xFF64748B)),
+                            ),
                           ),
                         ],
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white54, size: 20),
+                      icon: Icon(
+                        Icons.close,
+                        color: isDark ? Colors.white54 : const Color(0xFF64748B),
+                        size: 20,
+                      ),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ],
@@ -190,9 +205,9 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
                 const SizedBox(height: 18),
 
                 if (isLoggedIn)
-                  _buildConnectedView(account, session)
+                  _buildConnectedView(account, session, isDark)
                 else
-                  _buildLoginForm(),
+                  _buildLoginForm(isDark),
 
                 // Status Message / Error Banner
                 if (_statusMessage != null) ...[
@@ -253,7 +268,7 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
     );
   }
 
-  Widget _buildConnectedView(MyTnbAccount account, MyTnbSession session) {
+  Widget _buildConnectedView(MyTnbAccount account, MyTnbSession session, bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -262,9 +277,13 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFF0D1219),
+            color: isDark ? const Color(0xFF0D1219) : const Color(0xFFF8FAFC),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: 0.3)),
+            border: Border.all(
+              color: account.isSmartMeter
+                  ? const Color(0xFF00D2AA).withValues(alpha: 0.3)
+                  : (isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0)),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -275,7 +294,11 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
                   Expanded(
                     child: Text(
                       account.accountDesc.isNotEmpty ? account.accountDesc : 'TNB Account',
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
                     ),
                   ),
                   Container(
@@ -283,10 +306,12 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
                     decoration: BoxDecoration(
                       color: account.isSmartMeter
                           ? const Color(0xFF00D2AA).withValues(alpha: 0.2)
-                          : Colors.white12,
+                          : (isDark ? Colors.white12 : const Color(0xFFF1F5F9)),
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
-                        color: account.isSmartMeter ? const Color(0xFF00D2AA) : Colors.white24,
+                        color: account.isSmartMeter
+                            ? const Color(0xFF00D2AA)
+                            : (isDark ? Colors.white24 : const Color(0xFFCBD5E1)),
                       ),
                     ),
                     child: Row(
@@ -295,7 +320,9 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
                         Icon(
                           account.isSmartMeter ? Icons.sensors : Icons.speed,
                           size: 11,
-                          color: account.isSmartMeter ? const Color(0xFF00D2AA) : Colors.white60,
+                          color: account.isSmartMeter
+                              ? const Color(0xFF00D2AA)
+                              : (isDark ? Colors.white60 : const Color(0xFF64748B)),
                         ),
                         const SizedBox(width: 4),
                         Text(
@@ -303,7 +330,9 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
                           style: TextStyle(
                             fontSize: 9.5,
                             fontWeight: FontWeight.bold,
-                            color: account.isSmartMeter ? const Color(0xFF00D2AA) : Colors.white60,
+                            color: account.isSmartMeter
+                                ? const Color(0xFF00D2AA)
+                                : (isDark ? Colors.white60 : const Color(0xFF64748B)),
                           ),
                         ),
                       ],
@@ -314,13 +343,19 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
               const SizedBox(height: 4),
               Text(
                 'CA No: ${account.accountNumber} • ${account.ownerName}',
-                style: const TextStyle(fontSize: 11.5, color: Colors.white54),
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: isDark ? Colors.white54 : const Color(0xFF64748B),
+                ),
               ),
               if (account.address.isNotEmpty) ...[
                 const SizedBox(height: 2),
                 Text(
                   account.address,
-                  style: const TextStyle(fontSize: 10.5, color: Colors.white38),
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -339,6 +374,7 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
                 '${account.currentUsageKwh.toStringAsFixed(1)} kWh',
                 Icons.electric_bolt,
                 const Color(0xFF00D2AA),
+                isDark,
               ),
             ),
             const SizedBox(width: 8),
@@ -348,6 +384,7 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
                 'RM ${account.currentCharges.toStringAsFixed(2)}',
                 Icons.receipt_long,
                 const Color(0xFFFF9F1C),
+                isDark,
               ),
             ),
           ],
@@ -361,6 +398,7 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
                 'RM ${account.effectiveTariff.toStringAsFixed(3)}/kWh',
                 Icons.analytics_outlined,
                 const Color(0xFF58A6FF),
+                isDark,
               ),
             ),
             const SizedBox(width: 8),
@@ -369,7 +407,8 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
                 'PROJECTED BILL',
                 'RM ${account.projectedCostRm.toStringAsFixed(2)}',
                 Icons.trending_up,
-                Colors.white70,
+                isDark ? Colors.white70 : const Color(0xFF475569),
+                isDark,
               ),
             ),
           ],
@@ -379,12 +418,15 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
         // Reading timestamp pill
         Row(
           children: [
-            const Icon(Icons.access_time, size: 12, color: Colors.white38),
+            Icon(Icons.access_time, size: 12, color: isDark ? Colors.white38 : const Color(0xFF94A3B8)),
             const SizedBox(width: 5),
             Expanded(
               child: Text(
                 'Telemetry: ${account.lastReadingTime}',
-                style: const TextStyle(fontSize: 10.5, color: Colors.white38),
+                style: TextStyle(
+                  fontSize: 10.5,
+                  color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
+                ),
               ),
             ),
             if (account.isDemo)
@@ -425,10 +467,22 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: _isLoading ? null : _handleRefresh,
-                icon: const Icon(Icons.refresh, size: 16, color: Colors.white70),
-                label: const Text('Refresh', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                icon: Icon(
+                  Icons.refresh,
+                  size: 16,
+                  color: isDark ? Colors.white70 : const Color(0xFF475569),
+                ),
+                label: Text(
+                  'Refresh',
+                  style: TextStyle(
+                    color: isDark ? Colors.white70 : const Color(0xFF475569),
+                    fontSize: 12,
+                  ),
+                ),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF232D3D)),
+                  side: BorderSide(
+                    color: isDark ? const Color(0xFF232D3D) : const Color(0xFFCBD5E1),
+                  ),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
@@ -440,7 +494,9 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
                 icon: const Icon(Icons.logout, size: 16, color: Color(0xFFF85149)),
                 label: const Text('Sign Out', style: TextStyle(color: Color(0xFFF85149), fontSize: 12)),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF232D3D)),
+                  side: BorderSide(
+                    color: isDark ? const Color(0xFF232D3D) : const Color(0xFFCBD5E1),
+                  ),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
@@ -451,13 +507,15 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
     );
   }
 
-  Widget _buildTelemetryStat(String label, String value, IconData icon, Color color) {
+  Widget _buildTelemetryStat(String label, String value, IconData icon, Color color, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: const Color(0xFF0D1219),
+        color: isDark ? const Color(0xFF0D1219) : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF232D3D)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -466,7 +524,14 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
             children: [
               Icon(icon, size: 12, color: color),
               const SizedBox(width: 4),
-              Text(label, style: const TextStyle(fontSize: 8.5, color: Colors.white38, fontWeight: FontWeight.bold)),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 8.5,
+                  color: isDark ? Colors.white38 : const Color(0xFF64748B),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 4),
@@ -476,13 +541,17 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
     );
   }
 
-  Widget _buildLoginForm() {
+  Widget _buildLoginForm(bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Sign in with your myTNB account (from www.mytnb.com.my or the myTNB mobile app) to automatically link your smart meter readings and domestic tariff tier.',
-          style: TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? Colors.white70 : const Color(0xFF334155),
+            height: 1.4,
+          ),
         ),
         const SizedBox(height: 16),
 
@@ -492,18 +561,27 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
           keyboardType: TextInputType.emailAddress,
           decoration: InputDecoration(
             labelText: 'myTNB Email Address',
-            labelStyle: const TextStyle(color: Colors.white54, fontSize: 13),
-            prefixIcon: const Icon(Icons.email_outlined, color: Colors.white54, size: 18),
+            labelStyle: TextStyle(
+              color: isDark ? Colors.white54 : const Color(0xFF64748B),
+              fontSize: 13,
+            ),
+            prefixIcon: Icon(
+              Icons.email_outlined,
+              color: isDark ? Colors.white54 : const Color(0xFF64748B),
+              size: 18,
+            ),
             filled: true,
-            fillColor: const Color(0xFF0D1219),
+            fillColor: isDark ? const Color(0xFF0D1219) : const Color(0xFFF8FAFC),
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFF232D3D)),
+              borderSide: BorderSide(
+                color: isDark ? const Color(0xFF232D3D) : const Color(0xFFCBD5E1),
+              ),
             ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFF00D2AA)),
+            focusedBorder: const OutlineInputBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+              borderSide: BorderSide(color: Color(0xFF00D2AA)),
             ),
           ),
         ),
@@ -515,22 +593,35 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
           obscureText: _obscurePassword,
           decoration: InputDecoration(
             labelText: 'myTNB Password',
-            labelStyle: const TextStyle(color: Colors.white54, fontSize: 13),
-            prefixIcon: const Icon(Icons.lock_outline, color: Colors.white54, size: 18),
+            labelStyle: TextStyle(
+              color: isDark ? Colors.white54 : const Color(0xFF64748B),
+              fontSize: 13,
+            ),
+            prefixIcon: Icon(
+              Icons.lock_outline,
+              color: isDark ? Colors.white54 : const Color(0xFF64748B),
+              size: 18,
+            ),
             suffixIcon: IconButton(
-              icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, color: Colors.white38, size: 18),
+              icon: Icon(
+                _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
+                size: 18,
+              ),
               onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
             ),
             filled: true,
-            fillColor: const Color(0xFF0D1219),
+            fillColor: isDark ? const Color(0xFF0D1219) : const Color(0xFFF8FAFC),
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFF232D3D)),
+              borderSide: BorderSide(
+                color: isDark ? const Color(0xFF232D3D) : const Color(0xFFCBD5E1),
+              ),
             ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFF00D2AA)),
+            focusedBorder: const OutlineInputBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+              borderSide: BorderSide(color: Color(0xFF00D2AA)),
             ),
           ),
         ),
@@ -556,7 +647,9 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
             label: const Text('Use Demo Smart Meter (Test Mode)', style: TextStyle(color: Color(0xFF58A6FF), fontSize: 12)),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(double.infinity, 40),
-              side: const BorderSide(color: Color(0xFF232D3D)),
+              side: BorderSide(
+                color: isDark ? const Color(0xFF232D3D) : const Color(0xFFCBD5E1),
+              ),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
@@ -564,15 +657,19 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
         const SizedBox(height: 12),
 
         // Security Footnote
-        const Row(
+        Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.shield_outlined, size: 13, color: Colors.white38),
-            SizedBox(width: 6),
+            Icon(Icons.shield_outlined, size: 13, color: isDark ? Colors.white38 : const Color(0xFF94A3B8)),
+            const SizedBox(width: 6),
             Expanded(
               child: Text(
                 'Direct SSL handshake with myTNB servers. Your credentials are sent directly to myTNB authentication endpoints and are never stored on external cloud servers.',
-                style: TextStyle(fontSize: 10, color: Colors.white38, height: 1.3),
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isDark ? Colors.white38 : const Color(0xFF64748B),
+                  height: 1.3,
+                ),
               ),
             ),
           ],

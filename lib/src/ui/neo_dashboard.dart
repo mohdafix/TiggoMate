@@ -819,7 +819,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
               child: GestureDetector(
                 onTap: _openAuthSheet,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: colors.tileBg,
                     borderRadius: BorderRadius.circular(20),
@@ -833,8 +833,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
-                        width: 7,
-                        height: 7,
+                        width: 6,
+                        height: 6,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: _telemetry.isCharging
@@ -842,25 +842,26 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                               : (AuthService().currentUser.isAuthenticated ? colors.evTeal : const Color(0xFF2F81F7)),
                         ),
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 5),
                       Icon(
                         AuthService().currentUser.isAuthenticated
                             ? Icons.account_circle_outlined
                             : Icons.login_rounded,
-                        size: 15,
+                        size: 14,
                         color: AuthService().currentUser.isAuthenticated
                             ? colors.evTeal
                             : const Color(0xFF2F81F7),
                       ),
-                      const SizedBox(width: 5),
+                      const SizedBox(width: 4),
                       Flexible(
                         child: Text(
                           AuthService().currentUser.isAuthenticated
                               ? AuthService().currentUser.displayName
                               : 'Log In',
                           overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             fontWeight: FontWeight.bold,
                             color: AuthService().currentUser.isAuthenticated
                                 ? colors.evTeal
@@ -877,7 +878,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                               ? colors.evTeal
                               : (colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFD97706));
                           return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                             decoration: BoxDecoration(
                               color: isCharging
                                   ? colors.evTeal.withValues(alpha: 0.2)
@@ -895,13 +896,13 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                                     shape: BoxShape.circle,
                                   ),
                                 ),
-                                const SizedBox(width: 4),
+                                const SizedBox(width: 3),
                                 Text(
                                   isCharging
                                       ? '⚡ 3.3kW'
-                                      : (isBound ? 'Live CAN-Bus' : 'Pending Car Bind'),
+                                      : (isBound ? 'Live CAN-Bus' : 'Pending Bind'),
                                   style: TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 9.5,
                                     fontWeight: FontWeight.bold,
                                     color: badgeColor,
                                   ),

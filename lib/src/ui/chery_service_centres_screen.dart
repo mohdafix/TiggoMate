@@ -1237,7 +1237,8 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Chery Service Network', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFF0D1117),
+        backgroundColor: isDark ? const Color(0xFF0D1117) : Colors.white,
+        foregroundColor: isDark ? Colors.white : const Color(0xFF0F172A),
         elevation: 0,
       ),
       body: content,
