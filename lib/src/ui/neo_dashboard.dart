@@ -13,6 +13,7 @@ import 'chery_service_centres_screen.dart';
 import 'vehicle_radar_sheet.dart';
 import 'smart_charging_sheet.dart';
 import 'dart:async';
+import 'dart:convert';
 import 'app_notification.dart';
 import 'smart_drive_hud.dart';
 import 'widgets_shortcuts_sheet.dart';
@@ -59,6 +60,9 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
   bool _isWindowsVented = false;
   bool _isTrunkOpen = false;
   bool _spendingExpanded = false;
+  double _homeAcCost = 0.0;
+  double _petrolCost = 0.0;
+  double _publicEvCost = 0.0;
 
   String get _selectedVehicleColorKey => VehicleSkinManager.instance.currentSkinKey;
 
@@ -102,6 +106,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
           _isAdvancedView = prefs.getBool('tiggomate_ui_mode_advanced') ?? false;
         });
         _syncWidgetTelemetry();
+        _loadExpenses();
       }
     });
 
@@ -134,6 +139,33 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     _quickActionSubscription?.cancel();
     _pulseController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadExpenses() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rawExpenses = prefs.getString('tm_logged_expenses_v2');
+      if (rawExpenses != null && rawExpenses.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(rawExpenses);
+        double ac = 0.0;
+        double pet = 0.0;
+        double pub = 0.0;
+        for (final item in decoded) {
+          final amt = (item['amountRm'] as num?)?.toDouble() ?? 0.0;
+          final type = item['type'] as String?;
+          if (type == 'home_ac') ac += amt;
+          if (type == 'petrol') pet += amt;
+          if (type == 'public_ev') pub += amt;
+        }
+        if (mounted) {
+          setState(() {
+            _homeAcCost = ac;
+            _petrolCost = pet;
+            _publicEvCost = pub;
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   void _handleComponentTap(String part) {
@@ -643,6 +675,11 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
   }
 
   void _handleRemoteCommand(String action) {
+    if (!widget.repository.isVehicleBound) {
+      _showNotification('⚠️ Pending Car Bind: Please connect and bind CarLinko to control vehicle.');
+      _openCarlinkoConnect();
+      return;
+    }
     if (action == 'lock') {
       final willLock = !_isDoorsLocked;
       setState(() => _isDoorsLocked = willLock);
@@ -763,11 +800,11 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     final colors = AppColors(context);
-    final double homeAcCost = 84.5 * widget.tnbTariff;
-    final double petrolCost = 28.7 * widget.fuelPrice;
-    final double totalSpend = homeAcCost + petrolCost;
-    const double iceEquivalent = 165.40;
-    final double savings = iceEquivalent - totalSpend;
+    final double homeAcCost = _homeAcCost;
+    final double petrolCost = _petrolCost;
+    final double totalSpend = homeAcCost + petrolCost + _publicEvCost;
+    final double iceEquivalent = totalSpend > 0 ? totalSpend * 1.6 : 0.0;
+    final double savings = iceEquivalent > totalSpend ? iceEquivalent - totalSpend : 0.0;
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -834,43 +871,39 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       const SizedBox(width: 6),
                       Builder(
                         builder: (context) {
-                          final isCloudActive = widget.repository.isCloudConnected;
+                          final isBound = widget.repository.isVehicleBound;
+                          final isCharging = isBound && _telemetry.isCharging;
+                          final Color badgeColor = isBound
+                              ? colors.evTeal
+                              : (colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFD97706));
                           return Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: _telemetry.isCharging
+                              color: isCharging
                                   ? colors.evTeal.withValues(alpha: 0.2)
-                                  : (isCloudActive
-                                      ? colors.evTeal.withValues(alpha: 0.15)
-                                      : Colors.orange.withValues(alpha: 0.15)),
+                                  : badgeColor.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                if (isCloudActive) ...[
-                                  Container(
-                                    width: 5,
-                                    height: 5,
-                                    decoration: BoxDecoration(
-                                      color: colors.evTeal,
-                                      shape: BoxShape.circle,
-                                    ),
+                                Container(
+                                  width: 5,
+                                  height: 5,
+                                  decoration: BoxDecoration(
+                                    color: badgeColor,
+                                    shape: BoxShape.circle,
                                   ),
-                                  const SizedBox(width: 4),
-                                ],
+                                ),
+                                const SizedBox(width: 4),
                                 Text(
-                                  _telemetry.isCharging
+                                  isCharging
                                       ? '⚡ 3.3kW'
-                                      : (isCloudActive
-                                          ? (widget.repository.isPreActivationMode ? 'Cloud Active' : 'Connected')
-                                          : 'Standby'),
+                                      : (isBound ? 'Live CAN-Bus' : 'Pending Car Bind'),
                                   style: TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
-                                    color: _telemetry.isCharging
-                                        ? colors.evTeal
-                                        : (isCloudActive ? colors.evTeal : Colors.orangeAccent),
+                                    color: badgeColor,
                                   ),
                                 ),
                               ],
@@ -1154,12 +1187,12 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: widget.repository.isCloudConnected
+                      color: widget.repository.isVehicleBound
                           ? colors.evTeal.withValues(alpha: 0.12)
                           : (colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFB45309)).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
-                        color: widget.repository.isCloudConnected
+                        color: widget.repository.isVehicleBound
                             ? colors.evTeal.withValues(alpha: 0.35)
                             : (colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFB45309)).withValues(alpha: 0.35),
                       ),
@@ -1168,25 +1201,25 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          widget.repository.isCloudConnected
+                          widget.repository.isVehicleBound
                               ? Icons.cloud_done
-                              : Icons.cloud_off_outlined,
+                              : (widget.repository.isCloudConnected ? Icons.cloud_queue_rounded : Icons.cloud_off_outlined),
                           size: 13,
-                          color: widget.repository.isCloudConnected
+                          color: widget.repository.isVehicleBound
                               ? colors.evTeal
                               : (colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFB45309)),
                         ),
                         const SizedBox(width: 5),
                         Text(
-                          widget.repository.isCloudConnected
-                              ? (widget.repository.isPreActivationMode
-                                  ? 'CarLinko Cloud Active'
-                                  : 'Live Telematics Synced')
-                              : 'CarLinko Standby • Tap to Connect',
+                          widget.repository.isVehicleBound
+                              ? 'Live Telematics Synced'
+                              : (widget.repository.isCloudConnected
+                                  ? 'Pending Car Bind'
+                                  : 'Pending Car Bind • Tap to Connect'),
                           style: TextStyle(
                             fontSize: 10.5,
                             fontWeight: FontWeight.bold,
-                            color: widget.repository.isCloudConnected
+                            color: widget.repository.isVehicleBound
                                 ? colors.evTeal
                                 : (colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFB45309)),
                           ),
@@ -1195,7 +1228,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         Icon(
                           Icons.chevron_right,
                           size: 13,
-                          color: widget.repository.isCloudConnected
+                          color: widget.repository.isVehicleBound
                               ? colors.evTeal
                               : (colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFB45309)),
                         ),
@@ -1624,6 +1657,77 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
               ),
 
             const SizedBox(height: 10),
+
+            // Pending Car Bind Notice Banner
+            if (!widget.repository.isVehicleBound) ...[
+              InkWell(
+                onTap: _openCarlinkoConnect,
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: (colors.isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706)).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: (colors.isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706)).withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.link_off_rounded,
+                        color: colors.isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309),
+                        size: 22,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Pending Car Bind',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: colors.isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              widget.repository.isCloudConnected
+                                  ? 'CarLinko account connected. Awaiting VIN binding by Chery centre to stream live telematics.'
+                                  : 'Connect your Chery CarLinko account to stream live battery, range, and vehicle telemetry.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: colors.textSecondary,
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: colors.isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          widget.repository.isCloudConnected ? 'Check Bind' : 'Bind Car',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
 
             // ---------------- 3. PORSCHE / AUDI PRECISION DIGITAL INSTRUMENT CLUSTER ----------------
             _buildPrecisionDualEnergyCluster(colors),
@@ -2098,8 +2202,16 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                                       Icon(_isDoorsLocked ? Icons.lock : Icons.lock_open, size: 10, color: colors.evTeal),
                                       const SizedBox(width: 4),
                                       Text(
-                                        _isDoorsLocked ? 'SECURED' : 'UNLOCKED',
-                                        style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: colors.evTeal),
+                                        widget.repository.isVehicleBound
+                                            ? (_isDoorsLocked ? 'SECURED' : 'UNLOCKED')
+                                            : 'PENDING BIND',
+                                        style: TextStyle(
+                                          fontSize: 8.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: widget.repository.isVehicleBound
+                                              ? colors.evTeal
+                                              : (colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFD97706)),
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -2151,14 +2263,24 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         children: [
                           Icon(Icons.battery_charging_full, size: 16, color: colors.evTeal),
                           const SizedBox(width: 6),
-                          Text('12V Aux: ${_telemetry.volt12.toStringAsFixed(2)}V (Healthy)', style: TextStyle(fontSize: 12, color: colors.textSecondary)),
+                          Text(
+                            widget.repository.isVehicleBound && _telemetry.volt12 > 0
+                                ? '12V Aux: ${_telemetry.volt12.toStringAsFixed(2)}V (Healthy)'
+                                : '12V Aux: -- V (Pending Bind)',
+                            style: TextStyle(fontSize: 12, color: colors.textSecondary),
+                          ),
                         ],
                       ),
                       Row(
                         children: [
                           Icon(Icons.speed, size: 16, color: colors.textMuted),
                           const SizedBox(width: 6),
-                          Text('Odo: ${_telemetry.odometerKm} km', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colors.textPrimary)),
+                          Text(
+                            widget.repository.isVehicleBound && _telemetry.odometerKm > 0
+                                ? 'Odo: ${_telemetry.odometerKm} km'
+                                : 'Odo: -- km',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colors.textPrimary),
+                          ),
                         ],
                       ),
                     ],
@@ -2218,7 +2340,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                           alignment: Alignment.center,
                           children: [
                             CircularProgressIndicator(
-                              value: 0.45,
+                              value: totalSpend > 0 ? (homeAcCost / totalSpend).clamp(0.0, 1.0) : 0.0,
                               strokeWidth: 7,
                               backgroundColor: const Color(0xFF2F81F7),
                               color: colors.accent,
@@ -2242,7 +2364,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                             const SizedBox(height: 4),
                             _buildLegendRow('⛽ Petrol (RON95)', 'RM ${petrolCost.toStringAsFixed(2)}', const Color(0xFF2F81F7)),
                             const SizedBox(height: 4),
-                            _buildLegendRow('🔌 Public DC EV', 'RM 0.00', Colors.purpleAccent),
+                            _buildLegendRow('🔌 Public DC EV', 'RM ${_publicEvCost.toStringAsFixed(2)}', Colors.purpleAccent),
                           ],
                         ),
                       ),
@@ -2270,6 +2392,18 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
   }
 
   Widget _buildPrecisionDualEnergyCluster(AppColors colors) {
+    final bool isBound = widget.repository.isVehicleBound;
+    final String battText = isBound ? '${_telemetry.batteryPct}% EV' : '-- % EV';
+    final double battProgress = isBound ? (_telemetry.batteryPct / 100.0).clamp(0.0, 1.0) : 0.0;
+    final String evRangeText = isBound ? '${_telemetry.electricRangeKm} km' : '-- km';
+    final String totalRangeText = isBound ? '${_telemetry.totalRangeKm} km' : '-- km';
+    final int estimatedFuelPct = isBound
+        ? ((_telemetry.fuelRangeKm / 1020.0) * 100).clamp(0, 100).round()
+        : 0;
+    final String fuelText = isBound ? '$estimatedFuelPct% Fuel' : '-- % Fuel';
+    final double fuelProgress = isBound ? (_telemetry.fuelRangeKm / 838.0).clamp(0.0, 1.0) : 0.0;
+    final String fuelRangeText = isBound ? '${_telemetry.fuelRangeKm} km' : '-- km';
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
@@ -2319,7 +2453,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                           height: 20,
                           child: CustomPaint(
                             painter: _MiniArcDialPainter(
-                              progress: _telemetry.batteryPct / 100.0,
+                              progress: battProgress,
                               color: colors.evTeal,
                               trackColor: colors.isDark ? Colors.white12 : Colors.black12,
                             ),
@@ -2330,7 +2464,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          '${_telemetry.batteryPct}% EV',
+                          battText,
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
@@ -2342,7 +2476,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '${_telemetry.electricRangeKm} km',
+                      evRangeText,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
@@ -2367,7 +2501,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        _telemetry.isCharging ? '⚡ 3.3 kW AC' : '18.3 kWh LFP',
+                        isBound && _telemetry.isCharging ? '⚡ 3.3 kW AC' : '18.3 kWh LFP',
                         style: TextStyle(
                           fontSize: 8.5,
                           fontWeight: FontWeight.w600,
@@ -2394,7 +2528,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    '${_telemetry.totalRangeKm} km',
+                    totalRangeText,
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
@@ -2422,19 +2556,21 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(2),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            flex: _telemetry.electricRangeKm.clamp(1, 999),
-                            child: Container(color: colors.evTeal),
-                          ),
-                          const SizedBox(width: 1),
-                          Expanded(
-                            flex: _telemetry.fuelRangeKm.clamp(1, 999),
-                            child: Container(color: colors.petrolAmber),
-                          ),
-                        ],
-                      ),
+                      child: isBound
+                          ? Row(
+                              children: [
+                                Expanded(
+                                  flex: _telemetry.electricRangeKm.clamp(1, 999),
+                                  child: Container(color: colors.evTeal),
+                                ),
+                                const SizedBox(width: 1),
+                                Expanded(
+                                  flex: _telemetry.fuelRangeKm.clamp(1, 999),
+                                  child: Container(color: colors.petrolAmber),
+                                ),
+                              ],
+                            )
+                          : const SizedBox.shrink(),
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -2474,7 +2610,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          '82% Fuel',
+                          fuelText,
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
@@ -2488,7 +2624,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                           height: 20,
                           child: CustomPaint(
                             painter: _MiniArcDialPainter(
-                              progress: 0.82,
+                              progress: fuelProgress,
                               color: colors.petrolAmber,
                               trackColor: colors.isDark ? Colors.white12 : Colors.black12,
                             ),
@@ -2501,7 +2637,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '${_telemetry.fuelRangeKm} km',
+                      fuelRangeText,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
@@ -2646,6 +2782,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     required VoidCallback onTap,
   }) {
     final colors = AppColors(context);
+    final hasData = widget.repository.isVehicleBound && kpa > 0;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -2661,12 +2798,16 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colors.textSecondary)),
             const SizedBox(height: 2),
             Text(
-              kpa.toStringAsFixed(0),
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: colors.evTeal),
+              hasData ? kpa.toStringAsFixed(0) : '--',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: hasData ? colors.evTeal : colors.textMuted,
+              ),
             ),
             Text('kPa', style: TextStyle(fontSize: 9, color: colors.textMuted)),
             const SizedBox(height: 2),
-            Text('${tempC.toStringAsFixed(0)}°C', style: TextStyle(fontSize: 9.5, color: colors.textSecondary)),
+            Text(hasData ? '${tempC.toStringAsFixed(0)}°C' : '-- °C', style: TextStyle(fontSize: 9.5, color: colors.textSecondary)),
           ],
         ),
       ),

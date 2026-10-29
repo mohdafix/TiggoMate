@@ -109,21 +109,6 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
     }
   }
 
-  void _handleUseMock() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('tm_carlinko_status', 'Demo');
-    } catch (_) {}
-
-    if (widget.repository is AppVehicleRepository) {
-      (widget.repository as AppVehicleRepository).useMockMode();
-    } else {
-      widget.repository.disconnect();
-    }
-    widget.onConnected();
-    if (mounted) Navigator.of(context).pop();
-  }
-
   Future<void> _handleConnect() async {
     final acc = _accountController.text.trim();
     final pwd = _passwordController.text;
@@ -161,7 +146,7 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
           _isError = false;
           _showLoginForm = false;
           _statusMessage = widget.repository.isPreActivationMode
-              ? 'Connected to CarLinko Cloud! Pre-Activation mode is active.'
+              ? 'Connected to CarLinko Cloud! Pending Car Bind (Awaiting 3S/4S Pairing).'
               : 'Connected successfully! Vehicle telemetry synced.';
         });
         widget.onConnected();
@@ -295,15 +280,17 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
                 icon: Icons.cell_tower,
                 label: 'Telematics Pipeline',
                 value: isPreActivation
-                    ? 'Pre-Activation (3S/4S Pairing Pending)'
+                    ? 'Pending Car Bind (Pairing Required)'
                     : 'Live CAN-Bus Sync',
-                accentColor: isPreActivation ? t.accent : t.ok,
+                accentColor: isPreActivation ? const Color(0xFFF1B343) : t.ok,
               ),
               const Divider(height: 18, color: Colors.white12),
               _buildDetailRow(
                 icon: Icons.access_time_rounded,
                 label: 'Last Sync',
-                value: 'Active (${telemetry.lastUpdated.hour.toString().padLeft(2, '0')}:${telemetry.lastUpdated.minute.toString().padLeft(2, '0')})',
+                value: telemetry.isBound
+                    ? 'Active (${telemetry.lastUpdated.hour.toString().padLeft(2, '0')}:${telemetry.lastUpdated.minute.toString().padLeft(2, '0')})'
+                    : 'Awaiting Vehicle Binding',
                 accentColor: t.ink2,
               ),
             ],
@@ -316,19 +303,19 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: t.accent.withValues(alpha: 0.08),
+              color: const Color(0xFFF1B343).withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: t.accent.withValues(alpha: 0.25)),
+              border: Border.all(color: const Color(0xFFF1B343).withValues(alpha: 0.25)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.verified_outlined, color: t.accent, size: 20),
+                const Icon(Icons.info_outline_rounded, color: Color(0xFFF1B343), size: 20),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Pre-Activation Active: Your CarLinko account is verified. Telematics is ready to switch to live CAN-bus data once your Chery 3S/4S centre pairs your VIN during the 1,000 km inspection.',
-                    style: TextStyle(fontSize: 11, color: t.accent.withValues(alpha: 0.9), height: 1.35),
+                    'Pending Car Bind: Your CarLinko account is verified. Live CAN-bus telematics and vehicle remote controls will automatically stream once your Chery centre completes vehicle VIN pairing.',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFFE5B56A), height: 1.35),
                   ),
                 ),
               ],
@@ -643,30 +630,14 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
           ),
         ),
         const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _loading ? null : _handleUseMock,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: t.ink2,
-                  side: BorderSide(color: t.border),
-                  padding: const EdgeInsets.symmetric(vertical: 11),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                icon: const Icon(Icons.cloud_queue_rounded, size: 16),
-                label: const Text('Offline Standby', style: TextStyle(fontSize: 12)),
-              ),
+        Center(
+          child: TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
-            const SizedBox(width: 8),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-              ),
-              child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
-            ),
-          ],
+            child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+          ),
         ),
       ],
     );

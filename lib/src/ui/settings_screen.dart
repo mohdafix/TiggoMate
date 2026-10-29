@@ -555,7 +555,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _showCarLinkoStatusPicker() {
     const states = [
       ['Active', 'Live Connected CarLinko', 'Real telemetry broadcast with active cloud sync'],
-      ['Unactivated', 'Standby (Awaiting Vehicle Pairing)', 'Awaiting dealer VIN binding on delivery or handover'],
+      ['Unactivated', 'Pending Car Bind', 'Awaiting dealer VIN binding on delivery or handover'],
     ];
     showModalBottomSheet(
       context: context,
@@ -719,7 +719,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: 'Telematics Connection State',
               subtitle: _carLinkoStatus == 'Active'
                   ? 'Active (Live Connected CarLinko)'
-                  : 'Standby (Awaiting Vehicle Pairing)',
+                  : 'Pending Car Bind (Awaiting Vehicle Pairing)',
               trailing: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
@@ -727,7 +727,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  _carLinkoStatus.toUpperCase(),
+                  _carLinkoStatus == 'Active' ? 'ACTIVE' : 'PENDING BIND',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.bold,

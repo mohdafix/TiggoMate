@@ -118,6 +118,7 @@ void main() {
             body: MyTnbConnectDialog(
               repository: repo,
               currentTariff: 0.57,
+              showDemoMode: true,
               onTariffUpdated: (rate, acc) {
                 updatedTariff = rate;
                 updatedAccount = acc;

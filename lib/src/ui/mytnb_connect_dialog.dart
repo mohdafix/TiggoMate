@@ -5,12 +5,14 @@ class MyTnbConnectDialog extends StatefulWidget {
   final MyTnbRepository repository;
   final double currentTariff;
   final void Function(double updatedTariff, MyTnbAccount? account) onTariffUpdated;
+  final bool showDemoMode;
 
   const MyTnbConnectDialog({
     super.key,
     required this.repository,
     required this.currentTariff,
     required this.onTariffUpdated,
+    this.showDemoMode = false,
   });
 
   @override
@@ -88,7 +90,7 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
           } else if (e is MyTnbAuthException) {
             _errorMessage = e.message;
           } else {
-            _errorMessage = 'Connection error: $e. You can tap "Use Demo Smart Meter" to test all features immediately.';
+            _errorMessage = 'Connection error: $e. Please verify your credentials and network connection.';
           }
         });
       }
@@ -546,19 +548,19 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
               ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black87))
               : const Text('Direct myTNB Sign In', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14)),
         ),
-        const SizedBox(height: 10),
-
-        // Demo Account Quick Test Button
-        OutlinedButton.icon(
-          onPressed: _isLoading ? null : () => _handleLogin(isDemo: true),
-          icon: const Icon(Icons.smart_toy_outlined, color: Color(0xFF58A6FF), size: 16),
-          label: const Text('Use Demo Smart Meter (Test Mode)', style: TextStyle(color: Color(0xFF58A6FF), fontSize: 12)),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size(double.infinity, 40),
-            side: const BorderSide(color: Color(0xFF232D3D)),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        if (widget.showDemoMode) ...[
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: _isLoading ? null : () => _handleLogin(isDemo: true),
+            icon: const Icon(Icons.smart_toy_outlined, color: Color(0xFF58A6FF), size: 16),
+            label: const Text('Use Demo Smart Meter (Test Mode)', style: TextStyle(color: Color(0xFF58A6FF), fontSize: 12)),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 40),
+              side: const BorderSide(color: Color(0xFF232D3D)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
           ),
-        ),
+        ],
         const SizedBox(height: 12),
 
         // Security Footnote

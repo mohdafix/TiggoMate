@@ -19,7 +19,6 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     final repo = MockVehicleRepository();
-    bool connectedCalled = false;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -33,7 +32,7 @@ void main() {
                   builder: (_) => CarlinkoConnectDialog(
                     repository: repo,
                     currentAccount: 'linexsg@gmail.com',
-                    onConnected: () => connectedCalled = true,
+                    onConnected: () {},
                   ),
                 );
               },
@@ -53,23 +52,18 @@ void main() {
     expect(find.text('Chery CarLinko Cloud Standby: Connect with your official CarLinko account. Once your dealer binds the vehicle VIN, live telematics and remote controls automatically sync in real time.'), findsOneWidget);
     expect(find.text('Single Session Notice: Chery CarLinko permits only one active mobile session. Connecting live here may log out your official phone app.'), findsOneWidget);
     expect(find.text('Connect Cloud'), findsOneWidget);
-    expect(find.text('Offline Standby'), findsOneWidget);
     expect(find.text('Cancel'), findsOneWidget);
 
     // No overflow exception thrown
     expect(tester.takeException(), isNull);
 
-    // Tap "Offline Standby" after ensuring it is visible
-    await tester.ensureVisible(find.text('Offline Standby'));
+    // Tap "Cancel" after ensuring it is visible
+    await tester.ensureVisible(find.text('Cancel'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Offline Standby'));
+    await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
 
-    expect(connectedCalled, isTrue);
     expect(find.text('CarLinko Telematics Cloud'), findsNothing);
-
-    final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getString('tm_carlinko_status'), equals('Demo'));
 
     repo.dispose();
   });
@@ -114,12 +108,14 @@ void main() {
     // Verify Connected View is presented
     expect(find.text('SESSION CONNECTED & ACTIVE'), findsOneWidget);
     expect(find.text('linexsg@gmail.com'), findsOneWidget);
-    expect(find.text('Pre-Activation (3S/4S Pairing Pending)'), findsOneWidget);
+    expect(find.text('Pending Car Bind (Pairing Required)'), findsOneWidget);
     expect(find.text('Refresh Cloud Sync'), findsOneWidget);
     expect(find.text('Switch Account'), findsOneWidget);
     expect(find.text('Disconnect'), findsOneWidget);
 
     // Tap Refresh Cloud Sync
+    await tester.ensureVisible(find.text('Refresh Cloud Sync'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Refresh Cloud Sync'));
     await tester.pumpAndSettle();
     expect(connectedCalled, isTrue);

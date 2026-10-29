@@ -69,12 +69,12 @@ void main() {
   });
 
   group('VehicleRepository Mock and State Tests', () {
-    test('MockVehicleRepository provides verified Malaysian Tiggo 7 PHEV initial state', () {
-      final repo = MockVehicleRepository();
+    test('MockVehicleRepository provides verified Malaysian Tiggo 7 PHEV sample state when requested', () {
+      final repo = MockVehicleRepository(withSampleData: true);
       expect(repo.connectionStatus, equals(VehicleConnectionStatus.connected));
 
       final t = repo.currentTelemetry;
-      expect(t.isSimulated, isTrue);
+      expect(t.isBound, isTrue);
       expect(t.batteryPct, equals(78));
       expect(t.electricRangeKm, equals(82));
       expect(t.totalRangeKm, equals(920));
@@ -84,8 +84,17 @@ void main() {
       repo.dispose();
     });
 
-    test('MockVehicleRepository toggleCharging updates telemetry reactively', () async {
+    test('MockVehicleRepository default is pending car bind', () {
       final repo = MockVehicleRepository();
+      expect(repo.isVehicleBound, isFalse);
+      expect(repo.currentTelemetry.isBound, isFalse);
+      expect(repo.currentTelemetry.batteryPct, equals(0));
+      expect(repo.currentTelemetry.dataSourceLabel, equals('Pending Car Bind'));
+      repo.dispose();
+    });
+
+    test('MockVehicleRepository toggleCharging updates telemetry reactively', () async {
+      final repo = MockVehicleRepository(withSampleData: true);
 
       expect(repo.currentTelemetry.isCharging, isFalse);
 
@@ -116,32 +125,23 @@ void main() {
       expect(liveRepo.connectionStatus, equals(VehicleConnectionStatus.connected));
       expect(liveRepo.isPreActivation, isTrue);
       expect(liveRepo.account, equals('linexsg@gmail.com'));
-      expect(liveRepo.currentTelemetry.isSimulated, isTrue);
-      expect(liveRepo.currentTelemetry.dataSourceLabel, contains('CarLinko Cloud Active • Pre-Activation'));
+      expect(liveRepo.isVehicleBound, isFalse);
+      expect(liveRepo.currentTelemetry.dataSourceLabel, contains('Pending Car Bind'));
       liveRepo.dispose();
     });
 
-    test('AppVehicleRepository operates in verified pre-activation simulation mode and restores active', () {
+    test('AppVehicleRepository operates in real live mode and reflects pending car bind', () {
       final sharedRepo = AppVehicleRepository.instance;
-      expect(sharedRepo.isPreActivationMode, isTrue);
-      expect(sharedRepo.isLiveActive, isFalse);
-      expect(sharedRepo.currentTelemetry.isSimulated, isTrue);
-
-      sharedRepo.toggleCharging(true);
-      expect(sharedRepo.currentTelemetry.isCharging, isTrue);
-
-      sharedRepo.toggleCharging(false);
-      expect(sharedRepo.currentTelemetry.isCharging, isFalse);
+      expect(sharedRepo.isLiveActive, isTrue);
+      expect(sharedRepo.isVehicleBound, isFalse);
 
       sharedRepo.setPreActivationActive(account: 'linexsg@gmail.com');
       expect(sharedRepo.isLiveActive, isTrue);
       expect(sharedRepo.isPreActivation, isTrue);
+      expect(sharedRepo.isPreActivationMode, isTrue);
+      expect(sharedRepo.isVehicleBound, isFalse);
       expect(sharedRepo.connectionStatus, equals(VehicleConnectionStatus.connected));
-      expect(sharedRepo.currentTelemetry.dataSourceLabel, contains('Pre-Activation'));
-
-      sharedRepo.useMockMode();
-      expect(sharedRepo.isLiveActive, isFalse);
-      expect(sharedRepo.currentTelemetry.isSimulated, isTrue);
+      expect(sharedRepo.currentTelemetry.dataSourceLabel, contains('Pending Car Bind'));
     });
   });
 

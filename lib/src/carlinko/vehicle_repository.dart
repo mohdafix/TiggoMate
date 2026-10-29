@@ -8,7 +8,9 @@ abstract class VehicleRepository {
   VehicleConnectionStatus get connectionStatus;
   bool get isCloudConnected;
   bool get isPreActivationMode;
+  bool get isVehicleBound;
   String? get connectedAccount;
+  String? get vehicleId;
   Future<void> refresh();
   Future<void> connect({required String account, required String password, String region = 'sea'});
   Future<void> disconnect();
@@ -17,42 +19,19 @@ abstract class VehicleRepository {
   void dispose();
 }
 
-/// Simulated mock repository for the Malaysian Chery Tiggo 7 PHEV CSH.
-/// Active before the vehicle's CarLinko account is activated at the 1,000 km dealership service.
+/// Simulated mock repository for automated unit testing.
 class MockVehicleRepository implements VehicleRepository {
   final _controller = StreamController<VehicleTelemetry>.broadcast();
   VehicleTelemetry _current;
-  VehicleConnectionStatus _status = VehicleConnectionStatus.connected;
+  VehicleConnectionStatus _status = VehicleConnectionStatus.disconnected;
 
-  MockVehicleRepository()
-      : _current = VehicleTelemetry(
-          batteryPct: 78,
-          electricRangeKm: 82,
-          fuelRangeKm: 838,
-          totalRangeKm: 920,
-          odometerKm: 3420,
-          volt12: 12.82,
-          speedKmH: 0.0,
-          isCharging: false,
-          chargePowerKw: 0.0,
-          chargeRemainMin: null,
-          acOn: false,
-          acTemp: 22,
-          doorsOpen: false,
-          trunkOpen: false,
-          windowsOpen: false,
-          tyreFlPressureKpa: 235.0,
-          tyreFrPressureKpa: 234.0,
-          tyreRlPressureKpa: 236.0,
-          tyreRrPressureKpa: 235.0,
-          tyreFlTempC: 32.0,
-          tyreFrTempC: 33.0,
-          tyreRlTempC: 31.0,
-          tyreRrTempC: 31.0,
-          lastUpdated: DateTime.now(),
-          isSimulated: true,
-          dataSourceLabel: 'CarLinko Cloud Standby (Awaiting Vehicle Pairing)',
-        );
+  MockVehicleRepository({bool withSampleData = false})
+      : _current = withSampleData
+            ? VehicleTelemetry.sampleData()
+            : VehicleTelemetry.unbound(label: 'Pending Car Bind'),
+        _status = withSampleData
+            ? VehicleConnectionStatus.connected
+            : VehicleConnectionStatus.disconnected;
 
   @override
   Stream<VehicleTelemetry> get telemetryStream => _controller.stream;
@@ -64,77 +43,32 @@ class MockVehicleRepository implements VehicleRepository {
   VehicleConnectionStatus get connectionStatus => _status;
 
   @override
-  bool get isCloudConnected => false;
+  bool get isCloudConnected => _current.isBound;
 
   @override
   bool get isPreActivationMode => false;
 
   @override
+  bool get isVehicleBound => _current.isBound;
+
+  @override
   String? get connectedAccount => null;
 
   @override
+  String? get vehicleId => null;
+
+  @override
   Future<void> refresh() async {
-    final now = DateTime.now();
-    _current = VehicleTelemetry(
-      batteryPct: _current.batteryPct,
-      electricRangeKm: _current.electricRangeKm,
-      fuelRangeKm: _current.fuelRangeKm,
-      totalRangeKm: _current.totalRangeKm,
-      odometerKm: _current.odometerKm,
-      volt12: 12.82,
-      speedKmH: _current.speedKmH,
-      isCharging: _current.isCharging,
-      chargePowerKw: _current.isCharging ? 6.6 : 0.0,
-      chargeRemainMin: _current.isCharging ? 38 : null,
-      acOn: _current.acOn,
-      acTemp: _current.acTemp,
-      doorsOpen: _current.doorsOpen,
-      trunkOpen: _current.trunkOpen,
-      windowsOpen: _current.windowsOpen,
-      tyreFlPressureKpa: 235.0,
-      tyreFrPressureKpa: 234.0,
-      tyreRlPressureKpa: 236.0,
-      tyreRrPressureKpa: 235.0,
-      tyreFlTempC: 32.0,
-      tyreFrTempC: 33.0,
-      tyreRlTempC: 31.0,
-      tyreRrTempC: 31.0,
-      lastUpdated: now,
-      isSimulated: true,
-      dataSourceLabel: 'CarLinko Cloud Standby (Awaiting Vehicle Pairing)',
-    );
     _controller.add(_current);
   }
 
   @override
   void toggleCharging(bool charging) {
-    _current = VehicleTelemetry(
-      batteryPct: _current.batteryPct,
-      electricRangeKm: _current.electricRangeKm,
-      fuelRangeKm: _current.fuelRangeKm,
-      totalRangeKm: _current.totalRangeKm,
-      odometerKm: _current.odometerKm,
-      volt12: _current.volt12,
-      speedKmH: 0.0,
+    _current = _current.copyWith(
       isCharging: charging,
       chargePowerKw: charging ? 6.6 : 0.0,
       chargeRemainMin: charging ? 38 : null,
-      acOn: _current.acOn,
-      acTemp: _current.acTemp,
-      doorsOpen: _current.doorsOpen,
-      trunkOpen: _current.trunkOpen,
-      windowsOpen: _current.windowsOpen,
-      tyreFlPressureKpa: _current.tyreFlPressureKpa,
-      tyreFrPressureKpa: _current.tyreFrPressureKpa,
-      tyreRlPressureKpa: _current.tyreRlPressureKpa,
-      tyreRrPressureKpa: _current.tyreRrPressureKpa,
-      tyreFlTempC: _current.tyreFlTempC,
-      tyreFrTempC: _current.tyreFrTempC,
-      tyreRlTempC: _current.tyreRlTempC,
-      tyreRrTempC: _current.tyreRrTempC,
       lastUpdated: DateTime.now(),
-      isSimulated: true,
-      dataSourceLabel: 'CarLinko Cloud Standby (Awaiting Vehicle Pairing)',
     );
     _controller.add(_current);
   }
@@ -142,14 +76,17 @@ class MockVehicleRepository implements VehicleRepository {
   @override
   Future<void> connect({required String account, required String password, String region = 'sea'}) async {
     _status = VehicleConnectionStatus.connecting;
-    await Future.delayed(const Duration(milliseconds: 400));
+    await Future.delayed(const Duration(milliseconds: 100));
     _status = VehicleConnectionStatus.connected;
-    await refresh();
+    _current = VehicleTelemetry.unbound(label: 'Pending Car Bind');
+    _controller.add(_current);
   }
 
   @override
   Future<void> disconnect() async {
     _status = VehicleConnectionStatus.disconnected;
+    _current = VehicleTelemetry.unbound(label: 'Pending Car Bind • Disconnected');
+    _controller.add(_current);
   }
 
   @override
@@ -175,13 +112,10 @@ class LiveCarLinkoRepository implements VehicleRepository {
 
   LiveCarLinkoRepository({String region = 'sea', CarLinkoClient? client})
       : _client = client ?? CarLinkoClient(region: region),
-        _current = VehicleTelemetry(
-          lastUpdated: DateTime.now(),
-          isSimulated: false,
-          dataSourceLabel: 'CARLINKO DISCONNECTED',
-        );
+        _current = VehicleTelemetry.unbound(label: 'Pending Car Bind • Disconnected');
 
   CarLinkoClient get client => _client;
+  @override
   String? get vehicleId => _vehicleId;
   String? get account => _account;
   bool get isPreActivation => _isPreActivation;
@@ -202,6 +136,9 @@ class LiveCarLinkoRepository implements VehicleRepository {
   bool get isPreActivationMode => _isPreActivation;
 
   @override
+  bool get isVehicleBound => _vehicleId != null && _status == VehicleConnectionStatus.connected && !_isPreActivation;
+
+  @override
   String? get connectedAccount => _account;
 
   @override
@@ -220,39 +157,13 @@ class LiveCarLinkoRepository implements VehicleRepository {
       }
 
       if (vehicles.isEmpty) {
-        // The user has authenticated with valid CarLinko credentials,
+        // Authenticated with CarLinko cloud credentials,
         // but the Chery 3S/4S dealer has not yet bound/registered the VIN to the DMS.
-        // Maintain connected cloud status in Pre-Activation mode.
         _vehicleId = null;
         _isPreActivation = true;
         _status = VehicleConnectionStatus.connected;
-        _current = VehicleTelemetry(
-          batteryPct: 78,
-          electricRangeKm: 82,
-          fuelRangeKm: 838,
-          totalRangeKm: 920,
-          odometerKm: 3420,
-          volt12: 12.82,
-          speedKmH: 0.0,
-          isCharging: false,
-          chargePowerKw: 0.0,
-          chargeRemainMin: null,
-          acOn: false,
-          acTemp: 22,
-          doorsOpen: false,
-          trunkOpen: false,
-          windowsOpen: false,
-          tyreFlPressureKpa: 235.0,
-          tyreFrPressureKpa: 234.0,
-          tyreRlPressureKpa: 236.0,
-          tyreRrPressureKpa: 235.0,
-          tyreFlTempC: 32.0,
-          tyreFrTempC: 33.0,
-          tyreRlTempC: 31.0,
-          tyreRrTempC: 31.0,
-          lastUpdated: DateTime.now(),
-          isSimulated: true,
-          dataSourceLabel: 'CarLinko Cloud Active • Pre-Activation (Awaiting 3S/4S Pairing)',
+        _current = VehicleTelemetry.unbound(
+          label: 'CarLinko Cloud Active • Pending Car Bind (Awaiting 3S/4S Pairing)',
         );
         _controller.add(_current);
       } else {
@@ -276,33 +187,8 @@ class LiveCarLinkoRepository implements VehicleRepository {
     _account = account ?? _account;
     _isPreActivation = true;
     _status = VehicleConnectionStatus.connected;
-    _current = VehicleTelemetry(
-      batteryPct: 78,
-      electricRangeKm: 82,
-      fuelRangeKm: 838,
-      totalRangeKm: 920,
-      odometerKm: 3420,
-      volt12: 12.82,
-      speedKmH: 0.0,
-      isCharging: false,
-      chargePowerKw: 0.0,
-      chargeRemainMin: null,
-      acOn: false,
-      acTemp: 22,
-      doorsOpen: false,
-      trunkOpen: false,
-      windowsOpen: false,
-      tyreFlPressureKpa: 235.0,
-      tyreFrPressureKpa: 234.0,
-      tyreRlPressureKpa: 236.0,
-      tyreRrPressureKpa: 235.0,
-      tyreFlTempC: 32.0,
-      tyreFrTempC: 33.0,
-      tyreRlTempC: 31.0,
-      tyreRrTempC: 31.0,
-      lastUpdated: DateTime.now(),
-      isSimulated: true,
-      dataSourceLabel: 'CarLinko Cloud Active • Pre-Activation (Awaiting 3S/4S Pairing)',
+    _current = VehicleTelemetry.unbound(
+      label: 'CarLinko Cloud Active • Pending Car Bind',
     );
     _controller.add(_current);
   }
@@ -330,33 +216,8 @@ class LiveCarLinkoRepository implements VehicleRepository {
           }
         }
       }
-      _current = VehicleTelemetry(
-        batteryPct: _current.batteryPct,
-        electricRangeKm: _current.electricRangeKm,
-        fuelRangeKm: _current.fuelRangeKm,
-        totalRangeKm: _current.totalRangeKm,
-        odometerKm: _current.odometerKm,
-        volt12: 12.82,
-        speedKmH: 0.0,
-        isCharging: _current.isCharging,
-        chargePowerKw: _current.chargePowerKw,
-        chargeRemainMin: _current.chargeRemainMin,
-        acOn: _current.acOn,
-        acTemp: _current.acTemp,
-        doorsOpen: _current.doorsOpen,
-        trunkOpen: _current.trunkOpen,
-        windowsOpen: _current.windowsOpen,
-        tyreFlPressureKpa: _current.tyreFlPressureKpa,
-        tyreFrPressureKpa: _current.tyreFrPressureKpa,
-        tyreRlPressureKpa: _current.tyreRlPressureKpa,
-        tyreRrPressureKpa: _current.tyreRrPressureKpa,
-        tyreFlTempC: _current.tyreFlTempC,
-        tyreFrTempC: _current.tyreFrTempC,
-        tyreRlTempC: _current.tyreRlTempC,
-        tyreRrTempC: _current.tyreRrTempC,
-        lastUpdated: DateTime.now(),
-        isSimulated: true,
-        dataSourceLabel: 'CarLinko Cloud Active • Pre-Activation (Awaiting 3S/4S Pairing)',
+      _current = VehicleTelemetry.unbound(
+        label: 'CarLinko Cloud Active • Pending Car Bind',
       );
       _status = VehicleConnectionStatus.connected;
       _controller.add(_current);
@@ -380,35 +241,8 @@ class LiveCarLinkoRepository implements VehicleRepository {
 
   @override
   void toggleCharging(bool charging) {
-    if (_isPreActivation) {
-      _current = VehicleTelemetry(
-        batteryPct: _current.batteryPct,
-        electricRangeKm: _current.electricRangeKm,
-        fuelRangeKm: _current.fuelRangeKm,
-        totalRangeKm: _current.totalRangeKm,
-        odometerKm: _current.odometerKm,
-        volt12: _current.volt12,
-        speedKmH: 0.0,
-        isCharging: charging,
-        chargePowerKw: charging ? 6.6 : 0.0,
-        chargeRemainMin: charging ? 38 : null,
-        acOn: _current.acOn,
-        acTemp: _current.acTemp,
-        doorsOpen: _current.doorsOpen,
-        trunkOpen: _current.trunkOpen,
-        windowsOpen: _current.windowsOpen,
-        tyreFlPressureKpa: _current.tyreFlPressureKpa,
-        tyreFrPressureKpa: _current.tyreFrPressureKpa,
-        tyreRlPressureKpa: _current.tyreRlPressureKpa,
-        tyreRrPressureKpa: _current.tyreRrPressureKpa,
-        tyreFlTempC: _current.tyreFlTempC,
-        tyreFrTempC: _current.tyreFrTempC,
-        tyreRlTempC: _current.tyreRlTempC,
-        tyreRrTempC: _current.tyreRrTempC,
-        lastUpdated: DateTime.now(),
-        isSimulated: true,
-        dataSourceLabel: 'CarLinko Cloud Active • Pre-Activation (Awaiting 3S/4S Pairing)',
-      );
+    if (_vehicleId != null) {
+      _current = _current.copyWith(isCharging: charging);
       _controller.add(_current);
     }
   }
@@ -420,11 +254,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
     _account = null;
     _isPreActivation = false;
     _status = VehicleConnectionStatus.disconnected;
-    _current = VehicleTelemetry(
-      lastUpdated: DateTime.now(),
-      isSimulated: false,
-      dataSourceLabel: 'CARLINKO DISCONNECTED',
-    );
+    _current = VehicleTelemetry.unbound(label: 'Pending Car Bind • Disconnected');
     _controller.add(_current);
   }
 
@@ -442,7 +272,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
         return false;
       }
     }
-    return true;
+    return false;
   }
 
   @override
@@ -452,13 +282,13 @@ class LiveCarLinkoRepository implements VehicleRepository {
 }
 
 /// Unified App-level repository managing the shared instance across the entire application.
-/// Defaults to verified Mock/Simulation mode for pre-activation vehicles.
 class AppVehicleRepository implements VehicleRepository {
   static final AppVehicleRepository instance = AppVehicleRepository._internal();
   AppVehicleRepository._internal() {
-    _current = _mockRepo.currentTelemetry;
-    _mockSubscription = _mockRepo.telemetryStream.listen((data) {
-      if (!_isLiveActive) {
+    _isLiveActive = true;
+    _current = _liveRepo.currentTelemetry;
+    _liveSubscription = _liveRepo.telemetryStream.listen((data) {
+      if (_isLiveActive) {
         _current = data;
         _controller.add(data);
       }
@@ -472,15 +302,21 @@ class AppVehicleRepository implements VehicleRepository {
   StreamSubscription<VehicleTelemetry>? _mockSubscription;
   StreamSubscription<VehicleTelemetry>? _liveSubscription;
 
-  bool _isLiveActive = false;
+  bool _isLiveActive = true;
   bool get isLiveActive => _isLiveActive;
   bool get isPreActivation => isPreActivationMode;
 
   @override
-  bool get isCloudConnected => _isLiveActive && _liveRepo.isCloudConnected;
+  bool get isCloudConnected => _isLiveActive ? _liveRepo.isCloudConnected : _mockRepo.isCloudConnected;
 
   @override
-  bool get isPreActivationMode => !_isLiveActive || _liveRepo.isPreActivationMode;
+  bool get isPreActivationMode => _isLiveActive ? _liveRepo.isPreActivationMode : _mockRepo.isPreActivationMode;
+
+  @override
+  bool get isVehicleBound => _isLiveActive ? _liveRepo.isVehicleBound : _mockRepo.isVehicleBound;
+
+  @override
+  String? get vehicleId => _isLiveActive ? _liveRepo.vehicleId : _mockRepo.vehicleId;
 
   @override
   String? get connectedAccount => _isLiveActive ? _liveRepo.connectedAccount : null;
@@ -563,9 +399,8 @@ class AppVehicleRepository implements VehicleRepository {
       });
       _controller.add(_current);
     } catch (e) {
-      // Keep verified simulated mode safe on activation failure
-      _isLiveActive = false;
-      _current = _mockRepo.currentTelemetry;
+      _isLiveActive = true;
+      _current = _liveRepo.currentTelemetry;
       _controller.add(_current);
       rethrow;
     }
@@ -574,8 +409,8 @@ class AppVehicleRepository implements VehicleRepository {
   @override
   Future<void> disconnect() async {
     await _liveRepo.disconnect();
-    _isLiveActive = false;
-    _current = _mockRepo.currentTelemetry;
+    _isLiveActive = true;
+    _current = _liveRepo.currentTelemetry;
     _controller.add(_current);
   }
 

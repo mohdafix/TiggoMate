@@ -377,7 +377,7 @@ class TripsLogbookScreen extends StatefulWidget {
 
 class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
   final String _selectedMonth = "October 2026";
-  late TripRecord _featuredTrip;
+  TripRecord? _featuredTrip;
   List<TripRecord> _trips = [];
   List<ExpenseRecord> _customExpenses = [];
   int _tripFilterIndex = 0; // 0: All, 1: Pure EV, 2: Hybrid
@@ -402,37 +402,8 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
   }
 
   void _initDefaultTrips() {
-    _trips = [
-      TripRecord(
-        id: 'trip_1',
-        title: 'Bangsar ➔ Putrajaya Sentral',
-        timestamp: 'Today 08:15 AM',
-        distanceKm: 34.2,
-        durationMinutes: 36,
-        evDistanceKm: 26.5,
-        hevDistanceKm: 7.7,
-        electricKwh: 4.8,
-        petrolLitres: 0.5,
-        costRm: 3.15,
-        avgSpeedKmh: 58.0,
-        highwayNote: 'MEX Highway • 77% EV Ratio',
-        routePoints: const [
-          Offset(0.18, 0.22),
-          Offset(0.24, 0.24),
-          Offset(0.35, 0.28),
-          Offset(0.48, 0.32),
-          Offset(0.56, 0.44),
-          Offset(0.58, 0.60),
-          Offset(0.54, 0.72),
-          Offset(0.52, 0.84),
-        ],
-        evPointCount: 5,
-      ),
-      kMalaysianTripPresets[0], // Office Commute
-      kMalaysianTripPresets[4], // Weekend Roadtrip Ipoh
-      kMalaysianTripPresets[3], // Mid Valley Shopping
-    ];
-    _featuredTrip = _trips[0];
+    _trips = [];
+    _featuredTrip = null;
   }
 
   Future<void> _loadStoredData() async {
@@ -451,7 +422,7 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
         final List<dynamic> decodedTrips = jsonDecode(rawTrips);
         final loaded = decodedTrips.map((t) => TripRecord.fromJson(t as Map<String, dynamic>)).toList();
         setState(() {
-          _trips = [...loaded, ..._trips];
+          _trips = loaded;
           if (_trips.isNotEmpty) _featuredTrip = _trips[0];
         });
       }
@@ -508,17 +479,15 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
 
   // Monthly Aggregates
   double get _totalDistanceKm {
-    return _trips.fold(0.0, (acc, t) => acc + t.distanceKm) + 1152.6;
+    return _trips.fold(0.0, (acc, t) => acc + t.distanceKm);
   }
 
   double get _homeAcSpend {
-    final custom = _customExpenses.where((e) => e.type == 'home_ac').fold(0.0, (acc, e) => acc + e.amountRm);
-    return 42.10 + custom;
+    return _customExpenses.where((e) => e.type == 'home_ac').fold(0.0, (acc, e) => acc + e.amountRm);
   }
 
   double get _petrolSpend {
-    final custom = _customExpenses.where((e) => e.type == 'petrol').fold(0.0, (acc, e) => acc + e.amountRm);
-    return 106.40 + custom;
+    return _customExpenses.where((e) => e.type == 'petrol').fold(0.0, (acc, e) => acc + e.amountRm);
   }
 
   double get _publicEvSpend {
@@ -529,10 +498,11 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
 
   // Real-world comparison vs equivalent 1.5L Turbo ICE SUV running 7.8 L/100km at RM 2.05/L
   double get _monthlySavings {
+    if (_totalDistanceKm <= 0) return 0.0;
     final iceLitres = (_totalDistanceKm / 100.0) * 7.8;
     final iceCost = iceLitres * widget.fuelPrice;
     final diff = iceCost - _totalSpend;
-    return diff > 0 ? diff : 185.00;
+    return diff > 0 ? diff : 0.0;
   }
 
   void _showAddTripPresetModal() {
@@ -1042,154 +1012,193 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
           ),
 
           // ---------------- FEATURED RECENT TRIP CARD WITH VECTOR MAP ----------------
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Recent Trip',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white70 : const Color(0xFF374151),
+          if (_featuredTrip == null) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0D1219) : Colors.white,
+                borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0),
+                  width: AppDesignTokens.borderWidth,
                 ),
               ),
-              Text(
-                _featuredTrip.highwayNote,
-                style: const TextStyle(fontSize: 11, color: Color(0xFF00D2AA), fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-
-          Card(
-            elevation: 0,
-            color: isDark ? const Color(0xFF0D1219) : Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
-              side: BorderSide(
-                color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0),
-                width: AppDesignTokens.borderWidth,
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(AppDesignTokens.spaceMd),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '${_featuredTrip.title} • ${_featuredTrip.timestamp}',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? Colors.white : const Color(0xFF111827),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Stylized Route Map Canvas
-                  Container(
-                    height: 140,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF090E15) : const Color(0xFFF3F4F6),
-                      borderRadius: BorderRadius.circular(AppDesignTokens.radiusMedium),
-                      border: Border.all(
-                        color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0),
-                        width: AppDesignTokens.borderWidth,
-                      ),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: Stack(
-                        children: [
-                          CustomPaint(
-                            size: const Size(double.infinity, 140),
-                            painter: _DarkVectorMapPainter(
-                              routePoints: _featuredTrip.routePoints,
-                              evPointCount: _featuredTrip.evPointCount,
-                              isDark: isDark,
-                            ),
-                          ),
-                          // Route Legend Overlay
-                          Positioned(
-                            bottom: 8,
-                            left: 10,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: isDark ? Colors.black.withValues(alpha: 0.75) : Colors.white.withValues(alpha: 0.9),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF00D2AA))),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'EV Drive',
-                                    style: TextStyle(fontSize: 9.5, color: isDark ? Colors.white70 : const Color(0xFF374151), fontWeight: FontWeight.w600),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFFFF9F1C))),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '1.5T Hybrid',
-                                    style: TextStyle(fontSize: 9.5, color: isDark ? Colors.white70 : const Color(0xFF374151), fontWeight: FontWeight.w600),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                  Icon(Icons.route_outlined, size: 36, color: isDark ? Colors.white30 : Colors.black26),
+                  const SizedBox(height: 10),
+                  Text(
+                    'No Driving Trips Logged Yet',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF111827),
                     ),
                   ),
-                  const SizedBox(height: 14),
-
-                  // Trip Telemetry Quad
-                  Row(
-                    children: [
-                      _buildTripStatCol(
-                        value: '${_featuredTrip.distanceKm} km',
-                        subtext: '${_featuredTrip.evDistanceKm} km EV',
-                        isDark: isDark,
-                      ),
-                      _buildStatDivider(isDark),
-                      _buildTripStatCol(
-                        value: '${_featuredTrip.durationMinutes} min',
-                        subtext: 'Avg ${_featuredTrip.avgSpeedKmh.toStringAsFixed(0)} km/h',
-                        isDark: isDark,
-                      ),
-                      _buildStatDivider(isDark),
-                      _buildTripStatCol(
-                        value: '${_featuredTrip.electricKwh} kWh',
-                        subtext: _featuredTrip.petrolLitres > 0 ? '+ ${_featuredTrip.petrolLitres}L' : '0L Petrol',
-                        highlightColor: const Color(0xFF00D2AA),
-                        isDark: isDark,
-                      ),
-                      _buildStatDivider(isDark),
-                      _buildTripStatCol(
-                        value: 'RM ${_featuredTrip.costRm.toStringAsFixed(2)}',
-                        subtext: 'RM ${(_featuredTrip.costRm / (_featuredTrip.distanceKm > 0 ? _featuredTrip.distanceKm : 1)).toStringAsFixed(2)}/km',
-                        highlightColor: isDark ? Colors.white : const Color(0xFF111827),
-                        isDark: isDark,
-                      ),
-                    ],
+                  const SizedBox(height: 4),
+                  Text(
+                    'Driving trips will appear here automatically when CarLinko CAN-bus telematics syncs.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: isDark ? Colors.white60 : const Color(0xFF6B7280),
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 20),
+            const SizedBox(height: 16),
+          ] else ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Recent Trip',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white70 : const Color(0xFF374151),
+                  ),
+                ),
+                Text(
+                  _featuredTrip!.highwayNote,
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF00D2AA), fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            Card(
+              elevation: 0,
+              color: isDark ? const Color(0xFF0D1219) : Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
+                side: BorderSide(
+                  color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0),
+                  width: AppDesignTokens.borderWidth,
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(AppDesignTokens.spaceMd),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${_featuredTrip!.title} • ${_featuredTrip!.timestamp}',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.white : const Color(0xFF111827),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Stylized Route Map Canvas
+                    Container(
+                      height: 140,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF090E15) : const Color(0xFFF3F4F6),
+                        borderRadius: BorderRadius.circular(AppDesignTokens.radiusMedium),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0),
+                          width: AppDesignTokens.borderWidth,
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Stack(
+                          children: [
+                            CustomPaint(
+                              size: const Size(double.infinity, 140),
+                              painter: _DarkVectorMapPainter(
+                                routePoints: _featuredTrip!.routePoints,
+                                evPointCount: _featuredTrip!.evPointCount,
+                                isDark: isDark,
+                              ),
+                            ),
+                            // Route Legend Overlay
+                            Positioned(
+                              bottom: 8,
+                              left: 10,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: isDark ? Colors.black.withValues(alpha: 0.75) : Colors.white.withValues(alpha: 0.9),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF00D2AA))),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'EV Drive',
+                                      style: TextStyle(fontSize: 9.5, color: isDark ? Colors.white70 : const Color(0xFF374151), fontWeight: FontWeight.w600),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFFFF9F1C))),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '1.5T Hybrid',
+                                      style: TextStyle(fontSize: 9.5, color: isDark ? Colors.white70 : const Color(0xFF374151), fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Trip Telemetry Quad
+                    Row(
+                      children: [
+                        _buildTripStatCol(
+                          value: '${_featuredTrip!.distanceKm} km',
+                          subtext: '${_featuredTrip!.evDistanceKm} km EV',
+                          isDark: isDark,
+                        ),
+                        _buildStatDivider(isDark),
+                        _buildTripStatCol(
+                          value: '${_featuredTrip!.durationMinutes} min',
+                          subtext: 'Avg ${_featuredTrip!.avgSpeedKmh.toStringAsFixed(0)} km/h',
+                          isDark: isDark,
+                        ),
+                        _buildStatDivider(isDark),
+                        _buildTripStatCol(
+                          value: '${_featuredTrip!.electricKwh} kWh',
+                          subtext: _featuredTrip!.petrolLitres > 0 ? '+ ${_featuredTrip!.petrolLitres}L' : '0L Petrol',
+                          highlightColor: const Color(0xFF00D2AA),
+                          isDark: isDark,
+                        ),
+                        _buildStatDivider(isDark),
+                        _buildTripStatCol(
+                          value: 'RM ${_featuredTrip!.costRm.toStringAsFixed(2)}',
+                          subtext: 'RM ${(_featuredTrip!.costRm / (_featuredTrip!.distanceKm > 0 ? _featuredTrip!.distanceKm : 1)).toStringAsFixed(2)}/km',
+                          highlightColor: isDark ? Colors.white : const Color(0xFF111827),
+                          isDark: isDark,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
 
           // ---------------- RECENT TRIPS LIST ----------------
           Row(
@@ -1247,7 +1256,7 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
             )
           else
             ..._filteredTrips.map((t) {
-              final isSelected = t.id == _featuredTrip.id;
+              final isSelected = t.id == _featuredTrip?.id;
               final isPureEv = t.evRatio >= 99.0;
 
               return Padding(

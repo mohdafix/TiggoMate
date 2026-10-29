@@ -1991,7 +1991,9 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
-                                '160 km Left',
+                                AppVehicleRepository.instance.isVehicleBound && AppVehicleRepository.instance.currentTelemetry.odometerKm > 0
+                                    ? '${(1000 - AppVehicleRepository.instance.currentTelemetry.odometerKm).clamp(0, 1000)} km Left'
+                                    : '1,000 km Due',
                                 style: TextStyle(
                                   color: isDark ? Colors.black87 : Colors.white,
                                   fontWeight: FontWeight.bold,

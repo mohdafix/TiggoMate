@@ -154,7 +154,7 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
 
-    final repo = MockVehicleRepository();
+    final repo = MockVehicleRepository(withSampleData: true);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -323,14 +323,7 @@ void main() {
     // Monthly summary
     expect(find.text('Monthly Summary'), findsOneWidget);
     expect(find.textContaining('Saved'), findsOneWidget);
-    expect(find.text('1,420'), findsOneWidget);
-
-    // Featured trip
-    expect(find.textContaining('Bangsar ➔ Putrajaya Sentral'), findsWidgets);
-    expect(find.text('34.2 km'), findsOneWidget);
-    expect(find.text('36 min'), findsOneWidget);
-    expect(find.text('4.8 kWh'), findsOneWidget);
-    expect(find.text('RM 3.15'), findsOneWidget);
+    expect(find.text('No Driving Trips Logged Yet'), findsOneWidget);
 
     // 1. Test Add Trip from Malaysian Presets (Zero Typing)
     await tester.tap(find.text('Add Trip'));
