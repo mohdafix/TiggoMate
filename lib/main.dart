@@ -1798,115 +1798,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
         ),
         const SizedBox(height: 14),
 
-        // Upcoming 1,000 km Milestone Reminder Banner (Clean, non-redundant)
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFFF1B343).withValues(alpha: 0.08) : const Color(0xFFFEF3C7),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isDark ? const Color(0xFFF1B343).withValues(alpha: 0.3) : const Color(0xFFF59E0B).withValues(alpha: 0.4),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: (isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706)).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(Icons.build_circle_outlined, size: 18, color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309)),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            'NEXT DUE: 1,000 KM INSPECTION',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.6,
-                              color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309),
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '160 km Left',
-                            style: TextStyle(
-                              color: isDark ? Colors.black87 : Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 9.5,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Text(
-                      'CarLinko Telematics Activation & 3DHT Diagnostic Scan (FOC)',
-                      style: TextStyle(color: isDark ? Colors.white70 : const Color(0xFF4B5563), fontSize: 11.5),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  InkWell(
-                    onTap: () => setState(() => _activeSubTab = 1),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: (isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706)).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: (isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706)).withValues(alpha: 0.35),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Find 3S/4S',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309),
-                            ),
-                          ),
-                          const SizedBox(width: 2),
-                          Icon(Icons.chevron_right, size: 14, color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-// Service Appointment / Milestone Reminder Area
+        // Service Appointment / Milestone Reminder Area
         ListenableBuilder(
           listenable: ServiceAppointmentManager.instance,
           builder: (context, _) {
@@ -2053,7 +1945,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
 
             // Default Milestone reminder banner with direct "Book Service" button
             return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFFF1B343).withValues(alpha: 0.08) : const Color(0xFFFEF3C7),
                 borderRadius: BorderRadius.circular(12),
@@ -2061,35 +1953,39 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                   color: isDark ? const Color(0xFFF1B343).withValues(alpha: 0.3) : const Color(0xFFF59E0B).withValues(alpha: 0.4),
                 ),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      color: (isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706)).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(Icons.build_circle_outlined, size: 20, color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309)),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: (isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706)).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.build_circle_outlined, size: 18, color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309)),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              'NEXT DUE: 1,000 KM INSPECTION',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.8,
-                                color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309),
+                            Flexible(
+                              child: Text(
+                                'NEXT DUE: 1,000 KM INSPECTION',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.6,
+                                  color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309),
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706),
                                 borderRadius: BorderRadius.circular(4),
@@ -2099,23 +1995,23 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                                 style: TextStyle(
                                   color: isDark ? Colors.black87 : Colors.white,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 9,
+                                  fontSize: 9.5,
                                 ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'CarLinko Telematics Activation & 3DHT Diagnostic Scan (FOC)',
-                          style: TextStyle(color: isDark ? Colors.white70 : const Color(0xFF4B5563), fontSize: 11.5),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                  const SizedBox(height: 8),
+                  Text(
+                    'CarLinko Telematics Activation & 3DHT Diagnostic Scan (FOC)',
+                    style: TextStyle(color: isDark ? Colors.white70 : const Color(0xFF4B5563), fontSize: 11.5),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       ElevatedButton.icon(
                         onPressed: () => BookServiceAppointmentSheet.show(
@@ -2132,12 +2028,34 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(width: 8),
                       InkWell(
                         onTap: () => setState(() => _activeSubTab = 1),
-                        child: Text(
-                          'Find 3S/4S >',
-                          style: TextStyle(fontSize: 10, color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309), fontWeight: FontWeight.bold),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: (isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706)).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: (isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706)).withValues(alpha: 0.35),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Find 3S/4S',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309),
+                                ),
+                              ),
+                              const SizedBox(width: 2),
+                              Icon(Icons.chevron_right, size: 13, color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309)),
+                            ],
+                          ),
                         ),
                       ),
                     ],
