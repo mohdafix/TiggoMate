@@ -45,12 +45,12 @@ void main() {
 
       // Marginal charging on top of 400 kWh household base
       final marginalCost = TnbTariffCalculator.calculatePhevChargeCost(
-        phevKwh: 19.27,
+        phevKwh: 18.3,
         currentHouseholdKwh: 400.0,
         isOffPeak: false,
       );
-      // In block 3 (400 to 419.27 kWh), rate is 0.516
-      expect(marginalCost, closeTo(19.27 * 0.516, 0.05));
+      // In block 3 (400 to 418.3 kWh), rate is 0.516
+      expect(marginalCost, closeTo(18.3 * 0.516, 0.05));
     });
   });
 

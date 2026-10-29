@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../auth/auth_service.dart';
 import 'app_notification.dart';
 

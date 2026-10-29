@@ -765,7 +765,7 @@ class _AssistantTabState extends State<AssistantTab> {
             "Owner: ${widget.settings.ownerName}, Vehicle Plate: ${widget.settings.carPlateNumber}, Nickname: ${widget.settings.vehicleNickname}.\n"
             "Vehicle Specs: 1.5L Turbo + 3-speed Dedicated Hybrid Transmission (3DHT) + Dual Electric Motors, 240 kW (326 PS) / 545 Nm system torque.\n"
             "Tyres & Wheels: 225/55 R19 99V tyres, 19-inch Aero Alloy Wheels (5x108 PCD). Cold Tyre Pressure: 230 kPa (2.3 bar / 33.4 psi) on all 4 tyres. Spare tyre: tyre repair sealant kit + 12V air compressor under boot luggage floor.\n"
-            "19.27 kWh LFP battery pack (80-100 km EV range), 51L petrol tank (~792-965 km combined range). Type 2 AC charging (3.3 kW, ~5.5 hours 0-100%). AUTO mode prioritizes EV until battery drops below ~20-25% SOC or hard acceleration.\n"
+            "18.3 kWh LFP battery pack (80-100 km EV range), 60L petrol tank (~1,000-1,200 km combined range). Type 2 AC charging (6.6 kW, ~2.8 hours 0-100%). AUTO mode prioritizes EV until battery drops below ~20-25% SOC or hard acceleration.\n"
             "Engine Oil: Fully Synthetic C5 0W-20 (4.7L, RM 270.00). Spark plugs: replaced every 30,000 km (RM 308.40). Major powertrain fluids: 40,000 km (3DHT transmission oil RM 399.20, coolant RM 141.80, brake fluid RM 100.00).\n"
             "Official Service Milestones (27 Aug 2026): 1k km (FOC), 10k km (RM 407.50), 20k km (RM 444.60, FOC labour), 30k km (RM 715.90), "
             "40k km (RM 1,085.60, FOC labour), 60k km (RM 753.00, FOC labour), 120k km (RM 1,644.00 major overhaul). Free labour at 1k, 20k, 40k, 60k, 80k, 100k km. TNB: RM ${widget.settings.tnbTariff}/kWh, RON95: RM ${widget.settings.fuelPrice}/L.\n"
@@ -873,10 +873,10 @@ class _AssistantTabState extends State<AssistantTab> {
       citations = [{"document": "Chery Tiggo 7 PHEV Malaysian Market Guide", "section": "Wheels & Tyres", "page": 184}];
     } else if (q.contains("battery") || q.contains("kwh") || q.contains("capacity") || q.contains("range") || (q.contains("charge") && !q.contains("cost"))) {
       answer = "### Chery Tiggo 7 PHEV CSH — Battery & Electric Driving Range\n\n"
-          "- **Traction Battery:** **19.27 kWh LFP (Lithium Iron Phosphate)** High-Safety Blade Cells\n"
-          "- **Pure Electric Driving Range:** **80 – 100 km (NEDC)** / **~80 km (WLTP)**\n"
-          "- **Total Combined Hybrid Range:** **~965+ km** (51L fuel tank + 19.27 kWh battery)\n"
-          "- **AC Charging Port:** **Type 2 Mennekes** (supports 3.3 kW single phase AC, ~5.5 hours 0-100%)\n"
+          "- **Traction Battery:** **18.3 kWh LFP (Lithium Iron Phosphate)** High-Safety Blade Cells\n"
+          "- **Pure Electric Driving Range:** **80 – 100 km (NEDC)** / **~90 km (WLTP)**\n"
+          "- **Total Combined Hybrid Range:** **~1,200 km** (60L fuel tank + 18.3 kWh battery)\n"
+          "- **AC Charging Port:** **Type 2 Mennekes** (supports 6.6 kW AC and 40 kW DC fast charging)\n"
           "- **Recommended Charging Habit:** Daily AC charging at home (TNB off-peak 10:00 PM – 08:00 AM @ RM 0.28/kWh = ~RM 4.20 full top-up)\n"
           "- **Battery Warranty:** **8 Years / 160,000 km** with 1-to-1 replacement if State of Health (SOH) drops below 70%\n\n"
           "> **Manual Citation:** *Chery Tiggo 7 PHEV Malaysian Market Guide*, Section: *High Voltage Hybrid System*, Page 42.";
@@ -903,7 +903,7 @@ class _AssistantTabState extends State<AssistantTab> {
           "- **Electric Drive:** Dual Electric Motors integrated with **3-speed DHT (Dedicated Hybrid Transmission)**\n"
           "- **Combined System Output:** **240 kW (326 PS) / 545 Nm Torque**\n"
           "- **0-100 km/h Acceleration:** **~7.5 seconds**\n"
-          "- **Fuel Tank:** 51 Litres (RON 95 minimum)\n"
+          "- **Fuel Tank:** 60 Litres (RON 95 minimum)\n"
           "- **Driving Modes:** EV Mode (Pure Electric), HEV Mode (Series/Parallel Hybrid), AUTO Mode (Intelligent Energy Management)\n\n"
           "> **Manual Citation:** *Chery Tiggo 7 PHEV Malaysian Market Guide*, Section: *Technical Specifications*, Page 12.";
       citations = [{"document": "Chery Tiggo 7 PHEV Malaysian Market Guide", "section": "Technical Specifications", "page": 12}];
@@ -1226,7 +1226,7 @@ class EnergyTab extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text('Up to 6.6 kW', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: accent)),
                 const SizedBox(height: 4),
-                const Text('0–100% full charge in ~2.8 hours on AC Wallbox (19.27 kWh pack)', style: TextStyle(fontSize: 12, color: Colors.white60)),
+                const Text('0–100% full charge in ~2.8 hours on AC Wallbox (18.3 kWh pack)', style: TextStyle(fontSize: 12, color: Colors.white60)),
               ],
             ),
           ),
@@ -2502,9 +2502,9 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                 _buildSpecRow('Powertrain', '1.5L Turbo + Dual Motors (CSH)', isDark),
                 _buildSpecRow('System Output', '240 kW (326 PS) / 545 Nm', isDark),
                 _buildSpecRow('Transmission', '3-speed Dedicated Hybrid (3DHT)', isDark),
-                _buildSpecRow('Battery Capacity', '19.27 kWh (usable ~18.3 kWh)', isDark),
+                _buildSpecRow('Battery Capacity', '18.3 kWh LFP Traction Battery', isDark),
                 _buildSpecRow('Electric Range', '80–100 km (NEDC rated 100 km)', isDark),
-                _buildSpecRow('Fuel Tank', '51 Litres (RON95 compatible)', isDark),
+                _buildSpecRow('Fuel Tank', '60 Litres (RON95 compatible)', isDark),
                 _buildSpecRow('Target Cold Tyre Pressure', '230 kPa (2.3 bar / 33.4 psi)', isDark),
                 _buildSpecRow('Vehicle Warranty', '7 Years / 150,000 km', isDark),
                 _buildSpecRow('Battery Warranty', '8 Years / 160,000 km', isDark),

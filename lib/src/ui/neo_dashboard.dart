@@ -391,7 +391,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text('Battery Pack Size', style: TextStyle(fontSize: 12, color: colors.textSecondary)),
-                        Text('19.27 kWh LFP (${_telemetry.batteryPct}% SoC)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colors.evTeal)),
+                        Text('18.3 kWh LFP (${_telemetry.batteryPct}% SoC)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colors.evTeal)),
                       ],
                     ),
                     Divider(height: 20, color: colors.border),
@@ -399,7 +399,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text('Full Charge Time (0-100%)', style: TextStyle(fontSize: 12, color: colors.textSecondary)),
-                        Text('~3.0 Hours (via 7kW Wallbox)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colors.textPrimary)),
+                        Text('~2.8 Hours (via 7kW Wallbox)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colors.textPrimary)),
                       ],
                     ),
                   ],
@@ -2367,7 +2367,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        _telemetry.isCharging ? '⚡ 3.3 kW AC' : '19.27 kWh LFP',
+                        _telemetry.isCharging ? '⚡ 3.3 kW AC' : '18.3 kWh LFP',
                         style: TextStyle(
                           fontSize: 8.5,
                           fontWeight: FontWeight.w600,
@@ -2526,7 +2526,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        '⛽ 51L Tank (RON95)',
+                        '⛽ 60L Tank (RON95)',
                         style: TextStyle(
                           fontSize: 8.5,
                           fontWeight: FontWeight.w600,
@@ -3055,7 +3055,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('19.27 kWh LFP Traction Battery', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          const Text('18.3 kWh LFP Traction Battery', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                           const SizedBox(height: 2),
                           Text('${_telemetry.batteryPct}% SoC • ${_telemetry.electricRangeKm} km EV Range • AC Type 2', style: TextStyle(fontSize: 11, color: colors.textSecondary)),
                         ],

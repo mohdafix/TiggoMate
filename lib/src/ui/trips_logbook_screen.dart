@@ -1704,9 +1704,9 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
     _petrolOdometer = widget.currentOdometer;
     _updatePetrolLitres(50.0);
 
-    // Calculate battery deficit: Tiggo 7 has 19.27 kWh pack
+    // Calculate battery deficit: Tiggo 7 has 18.3 kWh pack
     final deficitPct = (100 - widget.currentBatteryPct).clamp(0, 100);
-    _homeKwhToCharge = (deficitPct / 100.0) * 19.27;
+    _homeKwhToCharge = (deficitPct / 100.0) * 18.3;
     if (_homeKwhToCharge < 2.0) _homeKwhToCharge = 15.0; // fallback default
     _updateHomeAcCost();
   }
@@ -1897,7 +1897,7 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        _buildPresetAmountBtn('Full 51L', 51.0 * widget.fuelPrice, (51.0 * widget.fuelPrice).toStringAsFixed(0), isDark),
+                        _buildPresetAmountBtn('Full 60L', 60.0 * widget.fuelPrice, (60.0 * widget.fuelPrice).toStringAsFixed(0), isDark),
                         const SizedBox(width: 6),
                         _buildPresetAmountBtn('RM 50', 50.0, '24.4L', isDark),
                         const SizedBox(width: 6),
@@ -2068,7 +2068,7 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
                               children: [
                                 Text('Current Battery: ${widget.currentBatteryPct}% SoC', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF00D2AA))),
                                 Text(
-                                  'Deficit to 100%: ${(100 - widget.currentBatteryPct)}% (~${((100 - widget.currentBatteryPct) / 100 * 19.27).toStringAsFixed(1)} kWh needed)',
+                                  'Deficit to 100%: ${(100 - widget.currentBatteryPct)}% (~${((100 - widget.currentBatteryPct) / 100 * 18.3).toStringAsFixed(1)} kWh needed)',
                                   style: TextStyle(fontSize: 11, color: isDark ? Colors.white70 : const Color(0xFF4B5563)),
                                 ),
                               ],
@@ -2092,11 +2092,11 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
                       children: [
                         _buildHomeChargePresetBtn(
                           'Top to 100%',
-                          ((100 - widget.currentBatteryPct) / 100 * 19.27).clamp(3.0, 19.27),
+                          ((100 - widget.currentBatteryPct) / 100 * 18.3).clamp(3.0, 18.3),
                           isDark,
                         ),
                         const SizedBox(width: 6),
-                        _buildHomeChargePresetBtn('Full 19.3 kWh', 19.27, isDark),
+                        _buildHomeChargePresetBtn('Full 18.3 kWh', 18.3, isDark),
                         const SizedBox(width: 6),
                         _buildHomeChargePresetBtn('+ 10.0 kWh', 10.0, isDark),
                       ],
