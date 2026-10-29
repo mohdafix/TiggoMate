@@ -455,6 +455,7 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
           if (_trips.isNotEmpty) _featuredTrip = _trips[0];
         });
       }
+      unawaited(_syncFromCloud());
     } catch (_) {}
   }
 

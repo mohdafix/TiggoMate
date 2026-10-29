@@ -1,6 +1,3 @@
-import 'package:geolocator/geolocator.dart';
-import '../theme/app_tokens.dart';
-import 'book_service_appointment_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
@@ -808,8 +805,6 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final accent = context.tokens.accent;
-    final onAccent = context.tokens.onAccent;
     final query = _searchController.text.trim().toLowerCase();
     List<CheryServiceCentre> filtered = CheryServiceDirectory.centres.where((centre) {
       final matchesRegion = _selectedRegion == 'All' || centre.region == _selectedRegion;

@@ -1346,7 +1346,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
       builder: (ctx) => AlertDialog(
         backgroundColor: isDark ? const Color(0xFF131922) : Colors.white,
         title: const Text('Cancel Appointment?'),
-        content: Text('Are you sure you want to cancel your service booking at ' + apt.centreName + ' on ' + apt.formattedDate + '?'),
+        content: Text('Are you sure you want to cancel your service booking at ${apt.centreName} on ${apt.formattedDate}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
