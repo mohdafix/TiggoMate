@@ -187,9 +187,12 @@ void main() {
     expect(find.text('TIGGO GREY WOLF'), findsOneWidget);
     expect(find.text('VAG 7777'), findsOneWidget);
 
-    // Bound telemetry comes from the repository. Carousel opens on the 3D
-    // orbit view; swipe once to reach the TPMS top view.
-    expect(find.text('3D ORBIT VIEWER'), findsOneWidget);
+    // Carousel opens on Vehicle Livery (khaki white, set above).
+    expect(find.text('VEHICLE LIVERY'), findsOneWidget);
+    expect(find.textContaining('KHAKI WHITE'), findsOneWidget);
+
+    // Bound telemetry comes from the repository. Swipe once to reach the
+    // TPMS top view.
     await tester.drag(find.byType(PageView), const Offset(-800, 0));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
@@ -216,18 +219,18 @@ void main() {
     AppNotification.dismiss();
     await tester.pump(const Duration(seconds: 4));
 
-    // Swipe to the Vehicle Livery page and pick a skin from its swatches
-    await tester.drag(find.byType(PageView), const Offset(-800, 0));
+    // Swipe back to Vehicle Livery (the first page). It no longer offers a
+    // picker — paint is chosen in Settings/setup — so simulate that change
+    // directly and confirm this page just reflects it.
+    await tester.drag(find.byType(PageView), const Offset(800, 0));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('VEHICLE LIVERY'), findsOneWidget);
+    expect(find.text('CHOOSE IN SETTINGS'), findsOneWidget);
 
-    // PageView ignores taps until the swipe has fully settled
-    await tester.pump(const Duration(seconds: 1));
-    await tester.tap(find.bySemanticsLabel('Bloodstone Red'));
+    await VehicleSkinManager.instance.setSkin('bloodstone_red');
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
-    expect(VehicleSkinManager.instance.currentSkinKey, 'bloodstone_red');
     expect(find.textContaining('BLOODSTONE RED'), findsOneWidget);
 
     AppNotification.dismiss();
@@ -277,7 +280,7 @@ void main() {
     expect(find.text('Fuel --% · -- km'), findsOneWidget);
 
     // TPMS readings live on the carousel's TPMS page; swipe once from the
-    // default 3D-orbit-view page to reach it.
+    // default Vehicle Livery page to reach it.
     await tester.drag(find.byType(PageView), const Offset(-800, 0));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));

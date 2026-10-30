@@ -5,13 +5,15 @@ import '../carlinko/vehicle_skin.dart';
 import '../carlinko/vehicle_telemetry.dart';
 import 'blueprint_car_canvas.dart';
 
-/// Swipeable car card: 3D Orbit View → TPMS top view → Vehicle Livery.
+/// Swipeable car card: Vehicle Livery → TPMS top view → 3D Orbit View.
 class CarViewCarousel extends StatefulWidget {
   final VehicleTelemetry telemetry;
   final bool isBound;
   final Color accentColor;
+
+  /// The currently-chosen paint, set in Settings/setup — this card only
+  /// displays it, it doesn't offer a picker.
   final String selectedSkinKey;
-  final ValueChanged<String> onSkinSelected;
 
   /// Page to open on (lets the parent restore it after the card is rebuilt).
   final int initialPage;
@@ -23,7 +25,6 @@ class CarViewCarousel extends StatefulWidget {
     required this.isBound,
     required this.accentColor,
     required this.selectedSkinKey,
-    required this.onSkinSelected,
     this.initialPage = 0,
     this.onPageChanged,
   });
@@ -34,7 +35,7 @@ class CarViewCarousel extends StatefulWidget {
 
 class _CarViewCarouselState extends State<CarViewCarousel> {
   static const int _pageCount = 3;
-  static const int _orbitPage = 0;
+  static const int _orbitPage = 2;
 
   late final PageController _pageController;
   late int _page;
@@ -71,19 +72,19 @@ class _CarViewCarouselState extends State<CarViewCarousel> {
   }
 
   String get _label => const [
-        '3D ORBIT VIEWER',
-        'TOP VIEW · TPMS COLD',
         'VEHICLE LIVERY',
+        'TOP VIEW · TPMS COLD',
+        '3D ORBIT VIEWER',
       ][_page];
 
   String get _hint {
     switch (_page) {
       case 0:
-        return _orbitActive ? 'DRAG TO ORBIT' : 'TAP TO ORBIT';
+        return 'SET IN SETTINGS';
       case 1:
         return 'SPEC 230 KPA';
       default:
-        return 'TAP TO CHANGE';
+        return _orbitActive ? 'DRAG TO ORBIT' : 'TAP TO ORBIT';
     }
   }
 
@@ -135,25 +136,22 @@ class _CarViewCarouselState extends State<CarViewCarousel> {
               physics: _orbitActive ? const NeverScrollableScrollPhysics() : null,
               onPageChanged: _onPageChanged,
               children: [
-                _OrbitViewerPanel(
-                  active: _orbitActive,
-                  background: cardBg,
-                  accentColor: widget.accentColor,
-                  onActivate: () => setState(() => _orbitActive = true),
-                  onDeactivate: () => setState(() => _orbitActive = false),
+                _VehicleLiveryPanel(
+                  selectedKey: widget.selectedSkinKey,
+                  textMuted: textMuted,
+                  textPrimary: textPrimary,
                 ),
                 BlueprintCarStage(
                   telemetry: widget.telemetry,
                   isBound: widget.isBound,
                   accentColor: widget.accentColor,
                 ),
-                _VehicleLiveryPanel(
-                  selectedKey: widget.selectedSkinKey,
-                  onSelected: widget.onSkinSelected,
+                _OrbitViewerPanel(
+                  active: _orbitActive,
+                  background: cardBg,
                   accentColor: widget.accentColor,
-                  borderCol: borderCol,
-                  textMuted: textMuted,
-                  textPrimary: textPrimary,
+                  onActivate: () => setState(() => _orbitActive = true),
+                  onDeactivate: () => setState(() => _orbitActive = false),
                 ),
               ],
             ),
@@ -179,17 +177,11 @@ class _CarViewCarouselState extends State<CarViewCarousel> {
 
 class _VehicleLiveryPanel extends StatelessWidget {
   final String selectedKey;
-  final ValueChanged<String> onSelected;
-  final Color accentColor;
-  final Color borderCol;
   final Color textMuted;
   final Color textPrimary;
 
   const _VehicleLiveryPanel({
     required this.selectedKey,
-    required this.onSelected,
-    required this.accentColor,
-    required this.borderCol,
     required this.textMuted,
     required this.textPrimary,
   });
@@ -226,84 +218,18 @@ class _VehicleLiveryPanel extends StatelessWidget {
             color: textPrimary,
           ),
         ),
-        const SizedBox(height: 8),
-        // Plain Row (not a ListView), so horizontal drags still reach the PageView
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            for (final s in kOfficialVehicleSkins)
-              _SkinSwatch(
-                skin: s,
-                selected: s.key == selectedKey,
-                accentColor: accentColor,
-                borderCol: borderCol,
-                // Haptics + persistence already happen in _updateVehicleColor
-                onTap: s.key == selectedKey ? null : () => onSelected(s.key),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _SkinSwatch extends StatelessWidget {
-  final VehicleSkinOption skin;
-  final bool selected;
-  final Color accentColor;
-  final Color borderCol;
-  final VoidCallback? onTap;
-
-  const _SkinSwatch({
-    required this.skin,
-    required this.selected,
-    required this.accentColor,
-    required this.borderCol,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: skin.name,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: selected ? accentColor : borderCol,
-                width: selected ? 2 : 1,
-              ),
-              boxShadow: [
-                BoxShadow(color: skin.primaryColor.withValues(alpha: 0.3), blurRadius: 6),
-              ],
-            ),
-            // Same look as the bottom sheet: dual-tone shows a roof band on top
-            child: ClipOval(
-              child: skin.isDualTone
-                  ? Stack(
-                      children: [
-                        Container(color: skin.primaryColor),
-                        Align(
-                          alignment: Alignment.topCenter,
-                          child: Container(height: 11, color: skin.secondaryColor),
-                        ),
-                      ],
-                    )
-                  : Container(color: skin.primaryColor),
-            ),
+        const SizedBox(height: 4),
+        // The color itself is chosen in Settings/setup, not from this card.
+        Text(
+          'CHOOSE IN SETTINGS',
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 9.5,
+            letterSpacing: 1.0,
+            color: textMuted,
           ),
         ),
-      ),
+      ],
     );
   }
 }

@@ -117,14 +117,8 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
 
-      // The skin render lives on the carousel's Vehicle Livery page (3rd page:
-      // 3D Orbit -> TPMS -> Livery), so swipe twice to reach it.
-      await tester.drag(find.byType(PageView), const Offset(-500, 0));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-      await tester.drag(find.byType(PageView), const Offset(-500, 0));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
+      // The skin render lives on the carousel's Vehicle Livery page, which
+      // is now the first/default page (Livery -> TPMS -> 3D Orbit).
       expect(find.text('VEHICLE LIVERY'), findsOneWidget);
 
       // Verify initial car image is khaki white
