@@ -782,14 +782,16 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
   }
 
   void _syncWidgetTelemetry() {
-    final fuelPct = ((_telemetry.fuelRangeKm / 838.0) * 100).round().clamp(0, 100);
+    final isBound = widget.repository.isVehicleBound;
+    final values = HomeWidgetValues.fromTelemetry(_telemetry, isBound: isBound);
     HomeWidgetService.instance.syncWidgetTelemetry(
       vehicleName: widget.vehicleNickname.isNotEmpty ? widget.vehicleNickname : 'Tiggo 7 PHEV',
-      batterySoc: _telemetry.batteryPct,
-      batteryRange: _telemetry.electricRangeKm,
-      fuelLevel: fuelPct,
-      fuelRange: _telemetry.fuelRangeKm,
-      totalRange: _telemetry.totalRangeKm,
+      isBound: isBound,
+      batterySoc: values.batterySoc,
+      batteryRange: values.batteryRange,
+      fuelLevel: values.fuelLevel,
+      fuelRange: values.fuelRange,
+      totalRange: values.totalRange,
       isLocked: _isDoorsLocked,
       isCharging: _telemetry.isCharging,
       isClimateOn: _isAcActive,
@@ -797,14 +799,16 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
   }
 
   void _openWidgetsShortcutsSheet() {
-    final fuelPct = ((_telemetry.fuelRangeKm / 838.0) * 100).round().clamp(0, 100);
+    final isBound = widget.repository.isVehicleBound;
+    final values = HomeWidgetValues.fromTelemetry(_telemetry, isBound: isBound);
     WidgetsShortcutsSheet.show(
       context,
-      batterySoc: _telemetry.batteryPct,
-      batteryRange: _telemetry.electricRangeKm,
-      fuelLevel: fuelPct,
-      fuelRange: _telemetry.fuelRangeKm,
-      totalRange: _telemetry.totalRangeKm,
+      isBound: isBound,
+      batterySoc: values.batterySoc,
+      batteryRange: values.batteryRange,
+      fuelLevel: values.fuelLevel,
+      fuelRange: values.fuelRange,
+      totalRange: values.totalRange,
       isLocked: _isDoorsLocked,
       isCharging: _telemetry.isCharging,
       isClimateOn: _isAcActive,
@@ -850,6 +854,13 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     return _buildCyberDashboard(context);
   }
 
+  String _syncAgeText() {
+    final age = DateTime.now().difference(_telemetry.lastUpdated);
+    if (age.inMinutes < 1) return '${age.inSeconds.clamp(0, 59)}s';
+    if (age.inHours < 1) return '${age.inMinutes}m';
+    return '${age.inHours}h';
+  }
+
   Widget _buildCyberDashboard(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgCol = isDark ? const Color(0xFF0A0B0E) : const Color(0xFFF6F8FA);
@@ -861,14 +872,19 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     const orangeAccent = Color(0xFFFF6E40);
 
     final isBound = widget.repository.isVehicleBound;
-    final totalRange = isBound && _telemetry.totalRangeKm > 0 ? _telemetry.totalRangeKm : 686;
-    final evRange = isBound && _telemetry.electricRangeKm > 0 ? _telemetry.electricRangeKm : 22;
-    final fuelRange = isBound && _telemetry.fuelRangeKm > 0 ? _telemetry.fuelRangeKm : 664;
-    final evPct = isBound && _telemetry.batteryPct > 0 ? _telemetry.batteryPct : 24;
-    final fuelPct = (fuelRange / 838.0 * 100).round().clamp(10, 100);
+    final evRange = _telemetry.electricRangeKm;
+    final fuelRange = _telemetry.fuelRangeKm;
+    final fuelPct = (fuelRange / 838.0 * 100).round().clamp(0, 100);
 
     final totalRangeSum = (evRange + fuelRange) > 0 ? (evRange + fuelRange) : 1;
-    final evFraction = (evRange / totalRangeSum).clamp(0.05, 0.95);
+    final hasFuelRange = isBound && fuelRange > 0;
+    final evFraction = hasFuelRange ? (evRange / totalRangeSum).clamp(0.05, 0.95) : 0.5;
+
+    final totalRangeText = hasFuelRange ? '${_telemetry.totalRangeKm}' : '--';
+    final evRangeText = isBound ? 'EV ${_telemetry.batteryPct}% · $evRange km' : 'EV --% · -- km';
+    final fuelRangeText = hasFuelRange ? 'Fuel $fuelPct% · $fuelRange km' : 'Fuel --% · -- km';
+    final evBarCol = isBound ? limeAccent : borderCol;
+    final fuelBarCol = hasFuelRange ? orangeAccent : borderCol;
 
     return Scaffold(
       backgroundColor: bgCol,
@@ -921,6 +937,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                               visualDensity: VisualDensity.compact,
                               padding: const EdgeInsets.all(6),
                               constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                              tooltip: 'Vehicle Alerts & History',
                               icon: Icon(Icons.notifications_outlined, size: 22, color: textPrimary),
                               onPressed: () => VehicleAlertsSheet.show(context),
                             ),
@@ -1078,7 +1095,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                           Flexible(
                             child: Text(
                               isBound
-                                  ? 'LIVE CarLinko · synced 12s ago'
+                                  ? 'LIVE CarLinko · synced ${_syncAgeText()} ago'
                                   : 'Pending Car Bind · Awaiting VIN pairing',
                               style: TextStyle(
                                 fontFamily: 'monospace',
@@ -1094,7 +1111,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'P · Parked',
+                      !isBound ? '--' : (_telemetry.isParked ? 'P · Parked' : 'D · Driving'),
                       style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 11,
@@ -1169,7 +1186,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                               color: textPrimary,
                             ),
                             children: [
-                              TextSpan(text: '$totalRange'),
+                              TextSpan(text: totalRangeText),
                               TextSpan(
                                 text: ' km',
                                 style: TextStyle(
@@ -1194,12 +1211,12 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                           children: [
                             Expanded(
                               flex: (evFraction * 100).round(),
-                              child: Container(color: limeAccent),
+                              child: Container(color: evBarCol),
                             ),
                             const SizedBox(width: 2),
                             Expanded(
                               flex: ((1.0 - evFraction) * 100).round(),
-                              child: Container(color: orangeAccent),
+                              child: Container(color: fuelBarCol),
                             ),
                           ],
                         ),
@@ -1213,10 +1230,10 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       children: [
                         Row(
                           children: [
-                            Container(width: 8, height: 8, color: limeAccent),
+                            Container(width: 8, height: 8, color: evBarCol),
                             const SizedBox(width: 6),
                             Text(
-                              'EV $evPct% · $evRange km',
+                              evRangeText,
                               style: TextStyle(
                                 fontFamily: 'monospace',
                                 fontSize: 11.5,
@@ -1228,10 +1245,10 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         ),
                         Row(
                           children: [
-                            Container(width: 8, height: 8, color: orangeAccent),
+                            Container(width: 8, height: 8, color: fuelBarCol),
                             const SizedBox(width: 6),
                             Text(
-                              'Fuel $fuelPct% · $fuelRange km',
+                              fuelRangeText,
                               style: TextStyle(
                                 fontFamily: 'monospace',
                                 fontSize: 11.5,
@@ -1255,9 +1272,9 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 Expanded(
                   child: _buildCyberRemoteCard(
                     title: 'DOORS',
-                    value: _isDoorsLocked ? 'Locked' : 'Unlocked',
-                    icon: _isDoorsLocked ? '🔒' : '🔓',
-                    isActive: _isDoorsLocked,
+                    value: !isBound ? '--' : (_isDoorsLocked ? 'Locked' : 'Unlocked'),
+                    icon: !isBound ? null : (_isDoorsLocked ? '🔒' : '🔓'),
+                    isActive: isBound && _isDoorsLocked,
                     limeAccent: limeAccent,
                     cardCol: cardCol,
                     borderCol: borderCol,
@@ -1270,7 +1287,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 Expanded(
                   child: _buildCyberRemoteCard(
                     title: 'CLIMATE',
-                    value: _isAcActive ? '${_telemetry.acTemp}°C' : 'Off → 22°',
+                    value: !isBound ? '--' : (_isAcActive ? '${_telemetry.acTemp}°C' : 'Off → 22°'),
                     icon: null,
                     isActive: _isAcActive,
                     limeAccent: limeAccent,
@@ -1285,7 +1302,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 Expanded(
                   child: _buildCyberRemoteCard(
                     title: 'WINDOWS',
-                    value: _isWindowsVented ? 'Vented' : 'Closed',
+                    value: !isBound ? '--' : (_isWindowsVented ? 'Vented' : 'Closed'),
                     icon: null,
                     isActive: _isWindowsVented,
                     limeAccent: limeAccent,
@@ -1305,7 +1322,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 Expanded(
                   child: _buildCyberRemoteCard(
                     title: 'TRUNK',
-                    value: _isTrunkOpen ? 'Open' : 'Closed',
+                    value: !isBound ? '--' : (_isTrunkOpen ? 'Open' : 'Closed'),
                     icon: null,
                     isActive: _isTrunkOpen,
                     limeAccent: limeAccent,
@@ -1320,7 +1337,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 Expanded(
                   child: _buildCyberRemoteCard(
                     title: 'LOCATE',
-                    value: '120 m NE',
+                    value: isBound ? 'Find car' : '--',
                     icon: null,
                     isActive: false,
                     limeAccent: limeAccent,
@@ -1335,7 +1352,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 Expanded(
                   child: _buildCyberRemoteCard(
                     title: 'ENGINE',
-                    value: _telemetry.engineOn ? 'Running' : 'Pre-cool',
+                    value: !isBound ? '--' : (_telemetry.engineOn ? 'Running' : 'Pre-cool'),
                     icon: null,
                     isActive: _telemetry.engineOn,
                     limeAccent: limeAccent,
@@ -3802,7 +3819,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      '120 m away • ${_telemetry.parkedDurationText}',
+                      _telemetry.parkedDurationText,
                       style: TextStyle(fontSize: 11, color: colors.textSecondary),
                     ),
                   ],

@@ -1,13 +1,19 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// Screen 4: Cyber Minimalist Daily Stacked EV/Fuel Bar Graph
 class DailyKmBarPainter extends CustomPainter {
+  /// Kilometres per day of the month, index 0 being the 1st.
+  final List<double> dailyEvKm;
+  final List<double> dailyFuelKm;
   final Color limeAccent;
   final Color orangeAccent;
   final Color gridLineColor;
   final Color textMuted;
 
   DailyKmBarPainter({
+    required this.dailyEvKm,
+    required this.dailyFuelKm,
     required this.limeAccent,
     required this.orangeAccent,
     required this.gridLineColor,
@@ -25,37 +31,27 @@ class DailyKmBarPainter extends CustomPainter {
       ..strokeWidth = 1.0;
     canvas.drawLine(Offset(0, bottomY), Offset(size.width, bottomY), linePaint);
 
-    // 16 daily columns matching Screen 4 in TiggoMate_Revamp.pdf
-    final dayData = [
-      {'day': '01', 'ev': 18.0, 'fuel': 0.0},
-      {'day': '', 'ev': 12.0, 'fuel': 0.0},
-      {'day': '', 'ev': 15.0, 'fuel': 4.0},
-      {'day': '', 'ev': 22.0, 'fuel': 0.0},
-      {'day': '', 'ev': 0.0, 'fuel': 0.0},
-      {'day': '08', 'ev': 14.0, 'fuel': 0.0},
-      {'day': '', 'ev': 16.0, 'fuel': 0.0},
-      {'day': '', 'ev': 38.0, 'fuel': 32.0},
-      {'day': '15', 'ev': 20.0, 'fuel': 0.0},
-      {'day': '', 'ev': 14.0, 'fuel': 0.0},
-      {'day': '', 'ev': 30.0, 'fuel': 60.0},
-      {'day': '22', 'ev': 18.0, 'fuel': 0.0},
-      {'day': '', 'ev': 15.0, 'fuel': 0.0},
-      {'day': '', 'ev': 16.0, 'fuel': 0.0},
-      {'day': '', 'ev': 24.0, 'fuel': 0.0},
-      {'day': '31', 'ev': 12.0, 'fuel': 0.0},
-    ];
+    final colCount = dailyEvKm.length;
+    if (colCount == 0) return;
 
-    const maxVal = 95.0;
-    final colCount = dayData.length;
-    final colW = (size.width / colCount).clamp(6.0, 16.0);
+    // Scale to the busiest day; a month with no driving just shows the baseline
+    double maxVal = 1.0;
+    for (int i = 0; i < colCount; i++) {
+      final total = dailyEvKm[i] + dailyFuelKm[i];
+      if (total > maxVal) maxVal = total;
+    }
+
+    final colW = (size.width / colCount).clamp(2.0, 16.0);
     final totalW = colCount * colW;
     final startX = (size.width - totalW) / 2;
 
     for (int i = 0; i < colCount; i++) {
-      final item = dayData[i];
-      final evVal = item['ev'] as double;
-      final fuelVal = item['fuel'] as double;
-      final dayLabel = item['day'] as String;
+      final evVal = dailyEvKm[i];
+      final fuelVal = dailyFuelKm[i];
+      final day = i + 1;
+      final dayLabel = (day == 1 || day == 8 || day == 15 || day == 22 || day == colCount)
+          ? day.toString().padLeft(2, '0')
+          : '';
 
       final x = startX + i * colW + colW * 0.15;
       final barW = colW * 0.7;
@@ -95,5 +91,11 @@ class DailyKmBarPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant DailyKmBarPainter oldDelegate) => false;
+  bool shouldRepaint(covariant DailyKmBarPainter oldDelegate) =>
+      !listEquals(oldDelegate.dailyEvKm, dailyEvKm) ||
+      !listEquals(oldDelegate.dailyFuelKm, dailyFuelKm) ||
+      oldDelegate.limeAccent != limeAccent ||
+      oldDelegate.orangeAccent != orangeAccent ||
+      oldDelegate.gridLineColor != gridLineColor ||
+      oldDelegate.textMuted != textMuted;
 }

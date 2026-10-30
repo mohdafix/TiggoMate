@@ -184,6 +184,16 @@ class _SmartDriveHudSheetState extends State<SmartDriveHudSheet> with SingleTick
 
               if (mounted) {
                 Navigator.pop(context); // Close HUD
+                if (saved == null) {
+                  AppNotification.show(
+                    context,
+                    title: 'Drive Not Saved',
+                    message: 'No distance was recorded, so nothing was added to your logbook.',
+                    type: NotificationType.info,
+                    icon: Icons.info_outline_rounded,
+                  );
+                  return;
+                }
                 widget.onTripSaved?.call(saved);
                 AppNotification.show(
                   context,

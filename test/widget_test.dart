@@ -1,11 +1,17 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tiggomate_app/main.dart';
 import 'package:tiggomate_app/src/carlinko/vehicle_repository.dart';
+import 'package:tiggomate_app/src/carlinko/vehicle_skin.dart';
 import 'package:tiggomate_app/src/carlinko/vehicle_telemetry.dart';
 import 'package:tiggomate_app/src/mytnb/mytnb_api.dart';
 import 'package:tiggomate_app/src/theme/app_theme.dart';
+import 'package:tiggomate_app/src/ui/ask_assistant_sheet.dart';
+import 'package:tiggomate_app/src/ui/energy_screen.dart';
 import 'package:tiggomate_app/src/ui/neo_dashboard.dart';
 import 'package:tiggomate_app/src/ui/trips_logbook_screen.dart';
 import 'package:tiggomate_app/src/ui/vehicle_radar_sheet.dart';
@@ -57,17 +63,18 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.textContaining('Chery Tiggo 7 PHEV CSH'), findsWidgets);
+    expect(find.text('CHERY TIGGO 7 PHEV CSH'), findsWidgets);
   });
 
   testWidgets('TiggoMate smoke test', (WidgetTester tester) async {
     await tester.pumpWidget(const TiggoMateApp());
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Tiggo Grey Wolf'), findsWidgets);
+    expect(find.text('TIGGO GREY WOLF'), findsWidgets);
     expect(find.textContaining('VAG 7777'), findsWidgets);
-    expect(find.textContaining('Ahmad Razak'), findsWidgets);
-    expect(find.textContaining('Chery Tiggo 7 PHEV CSH'), findsWidgets);
+    expect(find.text('CAR'), findsOneWidget);
+    expect(find.text('ASSISTANT'), findsOneWidget);
+    expect(find.text('SERVICE'), findsOneWidget);
   });
 
   testWidgets('MarkdownMessageView renders formatted text without raw markdown markers', (WidgetTester tester) async {
@@ -92,7 +99,7 @@ void main() {
     );
   });
 
-  testWidgets('MaintenanceTab renders official Service Schedule & Pricing Guide with vehicle plate', (WidgetTester tester) async {
+  testWidgets('MaintenanceTab renders next service and schedule pricing', (WidgetTester tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
@@ -106,11 +113,11 @@ void main() {
       ),
     );
 
-    expect(find.text('Service Schedule & Pricing'), findsOneWidget);
-    expect(find.text('27 Aug 2026 Gazette'), findsOneWidget);
-    expect(find.text('Chery Tiggo 7 PHEV CSH • VAG 7777 • Ahmad Razak'), findsOneWidget);
-    expect(find.text('COMPULSORY FEE'), findsOneWidget);
-    expect(find.text('RECOMMENDED TOTAL'), findsOneWidget);
+    expect(find.text('SCHEDULE & PRICING'), findsOneWidget);
+    expect(find.text('NEXT · MONTH 1'), findsOneWidget);
+    expect(find.text('1,000 km inspection'), findsOneWidget);
+    expect(find.text('SCHEDULE · TO 150,000 KM'), findsOneWidget);
+    expect(find.text('RM 407.50'), findsOneWidget);
   });
 
   testWidgets('SettingsScreen allows editing car plate number and saving', (WidgetTester tester) async {
@@ -146,14 +153,16 @@ void main() {
     expect(updated!.carPlateNumber, 'WXY 8888');
   });
 
-  testWidgets('NeoDashboard renders NeoCharge UI with interactive tyre TPMS modal', (WidgetTester tester) async {
+  testWidgets('NeoDashboard renders bound telemetry, remote deck, and paint studio', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
     });
+    final semantics = tester.ensureSemantics();
 
+    await VehicleSkinManager.instance.setSkin('khaki_white');
     final repo = MockVehicleRepository(withSampleData: true);
 
     await tester.pumpWidget(
@@ -175,82 +184,93 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Tiggo Grey Wolf'), findsOneWidget);
-    expect(find.text('Basic Glance'), findsOneWidget);
-    expect(find.text('Advanced Telemetry'), findsOneWidget);
-    expect(find.text('Vehicle Quick Status'), findsOneWidget);
-    expect(find.text('Direct TPMS Tire Pressures'), findsOneWidget);
-    expect(find.text('EV RANGE'), findsOneWidget);
+    expect(find.text('TIGGO GREY WOLF'), findsOneWidget);
+    expect(find.text('VAG 7777'), findsOneWidget);
 
-    // Verify CarLinko Dual-Energy glance banner
-    expect(find.text('78% EV'), findsOneWidget);
-    expect(find.text('82% Fuel'), findsOneWidget);
+    // Bound telemetry comes from the repository
+    expect(find.text('TOP VIEW · TPMS COLD'), findsOneWidget);
+    expect(find.text('235'), findsNWidgets(2));
     expect(find.text('TOTAL RANGE'), findsOneWidget);
+    expect(find.text('EV 78% · 82 km'), findsOneWidget);
+    expect(find.text('Fuel 100% · 838 km'), findsOneWidget);
 
-    // Verify CarLinko circular remote deck
-    expect(find.text('Doors'), findsOneWidget);
-    expect(find.text('Climate'), findsOneWidget);
-    expect(find.text('Windows'), findsOneWidget);
-    expect(find.text('Trunk'), findsOneWidget);
-    expect(find.text('Locate'), findsOneWidget);
+    // Remote deck
+    expect(find.text('DOORS'), findsOneWidget);
+    expect(find.text('CLIMATE'), findsOneWidget);
+    expect(find.text('WINDOWS'), findsOneWidget);
+    expect(find.text('TRUNK'), findsOneWidget);
+    expect(find.text('LOCATE'), findsOneWidget);
+    expect(find.text('ENGINE'), findsOneWidget);
 
     // Test tapping Doors remote button
-    await tester.tap(find.text('Doors'));
+    expect(find.text('Locked'), findsOneWidget);
+    await tester.tap(find.text('DOORS'));
     await tester.pump();
     expect(find.text('Unlocked'), findsOneWidget);
-
-    // Test tapping Climate remote button
-    await tester.tap(find.text('Climate'));
-    await tester.pump();
-    expect(find.text('22°C ON'), findsOneWidget);
-
-    // Test Dynamic 2D Vehicle Skin Customizer from Options Menu
+    expect(find.textContaining('CarLinko: Doors Unlocked'), findsOneWidget);
+    AppNotification.dismiss();
     await tester.pump(const Duration(seconds: 4));
-    await tester.tap(find.byType(PopupMenuButton<String>).first, warnIfMissed: false);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Vehicle Paint Studio'), findsOneWidget);
-    await tester.tap(find.text('Vehicle Paint Studio'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
 
-    // Verify Vehicle Paint & Skin Studio sheet
-    expect(find.text('Vehicle Paint & Skin Studio'), findsOneWidget);
-    expect(find.text('Phantom Grey'), findsWidgets);
-    expect(find.text('Bloodstone Red'), findsWidgets);
-    expect(find.textContaining('Dual-Tone'), findsWidgets);
-
-    // Select Bloodstone Red with contrasting black roof
-    await tester.tap(find.text('Bloodstone Red').first);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-
-    // Tap Confirm button
-    await tester.tap(find.textContaining('Set as Vehicle Skin'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-
-    // Verify confirmation toast
-    expect(find.textContaining('Chery Tiggo 7 PHEV skin set to Bloodstone Red'), findsOneWidget);
-
-    // Test switching to Advanced Telemetry mode
-    await tester.tap(find.text('Advanced Telemetry'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-
-    expect(find.text('SESSION COST'), findsOneWidget);
-    expect(find.text('Scheduled Charging'), findsOneWidget);
-    expect(find.text('Monthly Spending Breakdown'), findsOneWidget);
-
-    // Tap the 'Tyres' quick action button in Advanced mode
-    await tester.tap(find.text('Tyres'));
+    // Swipe to Paint Studio and pick a skin from its swatches
+    await tester.drag(find.byType(PageView), const Offset(-800, 0));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('VEHICLE PAINT STUDIO'), findsOneWidget);
 
-    // Verify Direct TPMS modal opens
-    expect(find.text('FL Tire Pressure'), findsOneWidget);
-    expect(find.text('235 kPa'), findsOneWidget);
-    expect(find.text('OPTIMAL'), findsOneWidget);
+    // PageView ignores taps until the swipe has fully settled
+    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(find.bySemanticsLabel('Bloodstone Red'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(VehicleSkinManager.instance.currentSkinKey, 'bloodstone_red');
+    expect(find.textContaining('BLOODSTONE RED'), findsOneWidget);
+
+    AppNotification.dismiss();
+    await tester.pump(const Duration(seconds: 4));
+    semantics.dispose();
+    repo.dispose();
+  });
+
+  testWidgets('NeoDashboard does not invent telemetry when no car is bound', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final repo = MockVehicleRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: NeoDashboard(
+            repository: repo,
+            ownerName: 'Ahmad Razak',
+            carPlateNumber: 'VAG 7777',
+            vehicleNickname: 'Tiggo Grey Wolf',
+            tnbTariff: 0.57,
+            fuelPrice: 2.05,
+            onOpenSettings: () {},
+            onOpenAssistant: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.textContaining('Pending Car Bind'), findsOneWidget);
+    expect(find.text('232'), findsNothing);
+    expect(find.text('EV 24% · 22 km'), findsNothing);
+    expect(find.text('Fuel 79% · 664 km'), findsNothing);
+    expect(find.text('120 m NE'), findsNothing);
+    expect(find.text('Locked'), findsNothing);
+
+    // Placeholders instead of readings
+    expect(find.text('EV --% · -- km'), findsOneWidget);
+    expect(find.text('Fuel --% · -- km'), findsOneWidget);
+    expect(find.text('kPa · --°'), findsNWidgets(4));
 
     repo.dispose();
   });
@@ -278,11 +298,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Schedule & Pricing'), findsOneWidget);
-    expect(find.textContaining('Service Centres ('), findsOneWidget);
+    expect(find.text('SCHEDULE & PRICING'), findsOneWidget);
+    expect(find.textContaining('SERVICE CENTRES ('), findsOneWidget);
 
     // Tap Service Centres sub-tab
-    await tester.tap(find.textContaining('Service Centres ('));
+    await tester.tap(find.textContaining('SERVICE CENTRES ('));
     await tester.pumpAndSettle();
 
     // Verify directory loaded
@@ -298,7 +318,7 @@ void main() {
     expect(find.text('Chery Segambut'), findsNothing);
   });
 
-  testWidgets('TripsLogbookScreen renders route map, telemetry stats, and logs expense', (WidgetTester tester) async {
+  testWidgets('TripsLogbookScreen logs trips and fuel, and opens export', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1080, 1920);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -315,18 +335,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Trips &'), findsOneWidget);
-    expect(find.text('Expense Log'), findsOneWidget);
-    expect(find.text('October 2026'), findsOneWidget);
-    expect(find.text('Log Fuel/Charge'), findsOneWidget);
-
-    // Monthly summary
-    expect(find.text('Monthly Summary'), findsOneWidget);
-    expect(find.textContaining('Saved'), findsOneWidget);
-    expect(find.text('No Driving Trips Logged Yet'), findsOneWidget);
+    expect(find.text('LOG'), findsOneWidget);
+    expect(find.text('ENTRIES'), findsOneWidget);
 
     // 1. Test Add Trip from Malaysian Presets (Zero Typing)
-    await tester.tap(find.text('Add Trip'));
+    await tester.tap(find.text('+ Trip'));
     await tester.pumpAndSettle();
 
     expect(find.text('Add Trip from Malaysian Presets'), findsOneWidget);
@@ -336,16 +349,17 @@ void main() {
     await tester.tap(find.textContaining('Airport Run'));
     await tester.pumpAndSettle();
 
-    // Verify confirmation and new trip featured
+    // Verify confirmation and that the trip was saved
     expect(find.textContaining('Added Trip: ✈️ Airport Run'), findsOneWidget);
-    expect(find.text('58.0 km'), findsOneWidget);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('tm_logged_trips_v2'), contains('Airport Run'));
 
     // Dismiss notification banner so top bar button is hit-testable
     AppNotification.dismiss();
     await tester.pumpAndSettle();
 
     // 2. Test 1-Tap Log Fuel/Charge (Zero Typing)
-    await tester.tap(find.text('Log Fuel/Charge'));
+    await tester.tap(find.text('+ Fuel'));
     await tester.pumpAndSettle();
 
     expect(find.text('1-Tap Fuel & Charge Logger'), findsOneWidget);
@@ -359,28 +373,13 @@ void main() {
     await tester.tap(saveBtn);
     await tester.pumpAndSettle();
 
-    // Verify confirmation snackbar
+    // Verify confirmation
     expect(find.textContaining('Logged Petronas Primax 95'), findsOneWidget);
 
-    // Scroll to verify logged item in list
-    final expenseSection = find.text('Logged Expenses & Fill-ups');
-    await tester.ensureVisible(expenseSection);
-    expect(expenseSection, findsOneWidget);
-    expect(find.text('Petronas Primax 95'), findsWidgets);
-
-    // 3. Test Trip Filter Chips
-    expect(find.textContaining('All Drives'), findsOneWidget);
-    expect(find.text('⚡ Pure EV (≥95%)'), findsOneWidget);
-    expect(find.textContaining('Hybrid / Highway'), findsOneWidget);
-
-    // Filter to Pure EV only
-    await tester.tap(find.text('⚡ Pure EV (≥95%)'));
-    await tester.pumpAndSettle();
-
-    // 4. Test Export Modal
+    // 3. Test Export Modal
     AppNotification.dismiss();
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Export'));
+    await tester.tap(find.byTooltip('Export CSV / PDF'));
     await tester.pumpAndSettle();
 
     expect(find.text('Export Logbook & Expenses'), findsOneWidget);
@@ -396,6 +395,357 @@ void main() {
     // Close export modal
     await tester.tap(find.byIcon(Icons.close));
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('TripsLogbookScreen shows logged records and real totals, not sample data', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: TripsLogbookScreen(
+            tnbTariff: 0.57,
+            fuelPrice: 2.05,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    bool richTextShows(String text) => tester
+        .widgetList<RichText>(find.byType(RichText))
+        .any((w) => w.text.toPlainText() == text);
+
+    // Empty log: nothing invented
+    expect(find.text('KL → Ipoh (NSE)'), findsNothing);
+    expect(find.text('No entries this month'), findsOneWidget);
+    expect(find.text('61%'), findsNothing);
+    expect(richTextShows('0 km'), isTrue);
+
+    await tester.tap(find.text('+ Trip'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Airport Run'));
+    await tester.pumpAndSettle();
+    AppNotification.dismiss();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('+ Fuel'));
+    await tester.pumpAndSettle();
+    final saveBtn = find.widgetWithText(ElevatedButton, 'Save Fill-up: RM 50.00 (24.4 L)');
+    await tester.ensureVisible(saveBtn);
+    await tester.tap(saveBtn);
+    await tester.pumpAndSettle();
+    AppNotification.dismiss();
+    await tester.pumpAndSettle();
+
+    // Both records and their totals now show
+    expect(find.textContaining('Airport Run'), findsOneWidget);
+    expect(find.text('Petronas Primax 95'), findsOneWidget);
+    expect(find.text('58 km'), findsOneWidget);
+    expect(find.text('RM 50.00'), findsOneWidget);
+    expect(richTextShows('58 km'), isTrue);
+    expect(richTextShows('RM 50'), isTrue);
+    expect(find.text('No entries this month'), findsNothing);
+
+    // Filters: a petrol fill-up counts as FUEL, not EV ('EV' is also the chart legend)
+    await tester.tap(find.text('FUEL'));
+    await tester.pumpAndSettle();
+    expect(find.text('Petronas Primax 95'), findsOneWidget);
+    await tester.tap(find.text('EV').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Petronas Primax 95'), findsNothing);
+
+    // Records stay in their own month
+    await tester.tap(find.text('ALL'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Previous month'));
+    await tester.pumpAndSettle();
+    expect(find.text('Petronas Primax 95'), findsNothing);
+    expect(find.text('No entries this month'), findsOneWidget);
+    await tester.tap(find.byTooltip('Next month'));
+    await tester.pumpAndSettle();
+    expect(find.text('Petronas Primax 95'), findsOneWidget);
+  });
+
+  testWidgets('TripsLogbookScreen header fits every month name on a narrow phone', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: TripsLogbookScreen(
+            tnbTariff: 0.57,
+            fuelPrice: 2.05,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    for (int i = 0; i < 12; i++) {
+      await tester.tap(find.byTooltip('Previous month'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
+  });
+
+  testWidgets('TripsLogbookScreen CSV export uses real dates', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        copied = (call.arguments as Map)['text'] as String;
+      }
+      return null;
+    });
+    addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: TripsLogbookScreen(
+            tnbTariff: 0.57,
+            fuelPrice: 2.05,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('+ Trip'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Airport Run'));
+    await tester.pumpAndSettle();
+    AppNotification.dismiss();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Export CSV / PDF'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('CSV Spreadsheet'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Copy CSV Data'));
+    await tester.pumpAndSettle();
+
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    expect(copied, contains('"$today"'));
+    expect(copied, isNot(contains('Just now')));
+  });
+
+  testWidgets('AskAssistantSheet answers last-trip questions from the real logbook', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    Future<bool> replyContains(String question, String expected) async {
+      await tester.enterText(find.byType(TextField), question);
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 500));
+      return tester
+          .widgetList<RichText>(find.byType(RichText))
+          .any((w) => w.text.toPlainText().contains(expected));
+    }
+
+    Future<void> pumpSheet() async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.darkTheme,
+          home: const Scaffold(body: AskAssistantSheet()),
+        ),
+      );
+      await tester.pump();
+    }
+
+    SharedPreferences.setMockInitialValues({});
+    await pumpSheet();
+    expect(await replyContains('last trip', 'You have no trips logged yet'), isTrue);
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    SharedPreferences.setMockInitialValues({
+      'tm_logged_trips_v2': jsonEncode([
+        {
+          'id': 'trip_$now',
+          'title': 'Ipoh run',
+          'timestamp': 'x',
+          'distanceKm': 40.0,
+          'durationMinutes': 30,
+          'evDistanceKm': 20.0,
+          'hevDistanceKm': 20.0,
+          'electricKwh': 3.0,
+          'petrolLitres': 1.5,
+          'costRm': 4.8,
+          'avgSpeedKmh': 80.0,
+          'highwayNote': '',
+          'routePoints': <List<double>>[],
+          'evPointCount': 0,
+        },
+      ]),
+    });
+    await pumpSheet();
+    expect(await replyContains('last trip', 'Ipoh run (40.0 km)'), isTrue);
+    expect(find.textContaining('Home → Bangsar South'), findsNothing);
+  });
+
+  testWidgets('EnergyScreen shows placeholders when the battery level is unknown', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: EnergyScreen(
+          telemetry: VehicleTelemetry.unbound(),
+          isCharging: false,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    bool richTextShows(String text) => tester
+        .widgetList<RichText>(find.byType(RichText))
+        .any((w) => w.text.toPlainText().startsWith(text));
+
+    expect(richTextShows('--'), isTrue);
+    expect(richTextShows('24'), isFalse);
+    expect(find.text('--:--'), findsOneWidget);
+    expect(find.text('-- kWh'), findsOneWidget);
+    expect(find.text('RM --'), findsNWidgets(3));
+  });
+
+  testWidgets('VehicleRadarSheet does not invent distance, position or lock state', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.lightTheme,
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () => VehicleRadarSheet.show(
+                context,
+                telemetry: VehicleTelemetry.fromBlobMap({}, isSimulated: false),
+                onHornFlash: () {},
+              ),
+              child: const Text('Open Radar'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open Radar'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('Location unavailable'), findsOneWidget);
+    expect(find.text('Coordinates unavailable'), findsOneWidget);
+    expect(find.text('120 m away (2m)'), findsNothing);
+    expect(find.text('Secured & Stationary'), findsNothing);
+    expect(find.text('Doors closed'), findsOneWidget);
+  });
+
+  testWidgets('VehicleRadarSheet ranks saved chargers by real distance from the car', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    Future<void> openChargersFor(VehicleTelemetry telemetry) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () => VehicleRadarSheet.show(context, telemetry: telemetry, onHornFlash: () {}),
+                child: const Text('Open Radar'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open Radar'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tap(find.text('Nearby Chargers'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+
+    // Parked right at one charger: it comes first, at zero distance
+    await openChargersFor(VehicleTelemetry(lastUpdated: DateTime.now(), latitude: 3.1091, longitude: 101.6612));
+    expect(find.text('Find Chargers Near Car'), findsOneWidget);
+    expect(find.text('0 m'), findsOneWidget);
+    expect(find.textContaining('Available'), findsNothing);
+    expect(find.textContaining('RM '), findsNothing);
+    expect(find.text('450 m'), findsNothing);
+    expect(
+      tester.getTopLeft(find.text('Shell Recharge - Pantai Sentral')).dy,
+      lessThan(tester.getTopLeft(find.text('ChargEV - Nexus Bangsar South')).dy),
+    );
+
+    // In Penang: the Bangsar South chargers are honestly far away
+    await tester.pumpWidget(const SizedBox());
+    await openChargersFor(VehicleTelemetry(lastUpdated: DateTime.now(), latitude: 5.4141, longitude: 100.3288));
+    expect(find.textContaining(RegExp(r'^\d{3} km$')), findsNWidgets(3));
+
+    // No position: no distances, and nothing to search around
+    await tester.pumpWidget(const SizedBox());
+    await openChargersFor(VehicleTelemetry(lastUpdated: DateTime.now()));
+    expect(find.text('Car location unavailable'), findsOneWidget);
+    expect(find.text('--'), findsNWidgets(3));
+  });
+
+  testWidgets('TripsLogbookScreen removes sample records saved by older builds', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    Map<String, dynamic> trip(String id, String title) => {
+          'id': id,
+          'title': title,
+          'timestamp': 'x',
+          'distanceKm': 10.0,
+          'durationMinutes': 10,
+          'evDistanceKm': 10.0,
+          'hevDistanceKm': 0.0,
+          'electricKwh': 2.0,
+          'petrolLitres': 0.0,
+          'costRm': 1.0,
+          'avgSpeedKmh': 40.0,
+          'highwayNote': '',
+          'routePoints': <List<double>>[],
+          'evPointCount': 0,
+        };
+    SharedPreferences.setMockInitialValues({
+      'tm_logged_trips_v2': jsonEncode([trip('trip_$now', 'My real drive'), trip('trip_3', 'KL → Ipoh (NSE)')]),
+    });
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: TripsLogbookScreen(
+            tnbTariff: 0.57,
+            fuelPrice: 2.05,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('My real drive'), findsOneWidget);
+    expect(find.text('KL → Ipoh (NSE)'), findsNothing);
   });
 
   testWidgets('VehicleRadarSheet renders circular radar HUD and navigation actions', (WidgetTester tester) async {

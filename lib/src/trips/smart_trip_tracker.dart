@@ -435,8 +435,9 @@ class SmartTripTracker extends ChangeNotifier {
     );
   }
 
-  /// Finish the trip, persist to SharedPreferences, and return a completed TripRecord
-  Future<TripRecord> finishAndSaveTrip({
+  /// Finish the trip, persist to SharedPreferences, and return a completed TripRecord.
+  /// Returns null without saving when no distance was measured.
+  Future<TripRecord?> finishAndSaveTrip({
     required String title,
     String? highwayNote,
   }) async {
@@ -447,8 +448,13 @@ class SmartTripTracker extends ChangeNotifier {
     _isPaused = false;
 
     final durationMins = (_elapsedSeconds / 60).round().clamp(1, 999);
-    final resolvedDistance = _totalDistanceKm > 0 ? _totalDistanceKm : 18.5;
-    final resolvedEvDist = _evDistanceKm > 0 ? _evDistanceKm : resolvedDistance * 0.75;
+    if (_totalDistanceKm <= 0) {
+      notifyListeners();
+      return null;
+    }
+
+    final resolvedDistance = _totalDistanceKm;
+    final resolvedEvDist = _evDistanceKm;
     final resolvedHevDist = (_totalDistanceKm - resolvedEvDist).clamp(0.0, resolvedDistance);
     final resolvedElectricKwh = _electricKwh > 0 ? _electricKwh : resolvedEvDist * 0.14;
     final resolvedPetrolLitres = _petrolLitres > 0 ? _petrolLitres : resolvedHevDist * 0.052;
@@ -457,15 +463,7 @@ class SmartTripTracker extends ChangeNotifier {
         : (resolvedElectricKwh * _tnbTariff) + (resolvedPetrolLitres * _fuelPrice);
 
     final evPoints = _breadcrumbs.where((b) => b.isEv).length;
-    final sampleRoute = _breadcrumbs.isNotEmpty
-        ? _breadcrumbs.map((b) => Offset(b.x, b.y)).toList()
-        : const [
-            Offset(0.18, 0.22),
-            Offset(0.35, 0.28),
-            Offset(0.56, 0.44),
-            Offset(0.54, 0.72),
-            Offset(0.48, 0.86),
-          ];
+    final route = _breadcrumbs.map((b) => Offset(b.x, b.y)).toList();
 
     final note = highwayNote ??
         (_hasRealGpsFix
@@ -483,10 +481,10 @@ class SmartTripTracker extends ChangeNotifier {
       electricKwh: double.parse(resolvedElectricKwh.toStringAsFixed(2)),
       petrolLitres: double.parse(resolvedPetrolLitres.toStringAsFixed(2)),
       costRm: double.parse(resolvedCost.toStringAsFixed(2)),
-      avgSpeedKmh: double.parse((avgSpeedKmh > 0 ? avgSpeedKmh : 56.0).toStringAsFixed(1)),
+      avgSpeedKmh: double.parse(avgSpeedKmh.toStringAsFixed(1)),
       highwayNote: note,
-      routePoints: sampleRoute,
-      evPointCount: evPoints > 0 ? evPoints : (sampleRoute.length * 0.7).round(),
+      routePoints: route,
+      evPointCount: evPoints,
     );
 
     // Save to SharedPreferences so it instantly appears in TripsLogbookScreen

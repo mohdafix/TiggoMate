@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tiggomate_app/src/carlinko/vehicle_telemetry.dart';
 import 'package:tiggomate_app/src/trips/smart_trip_tracker.dart';
 import 'package:tiggomate_app/src/widgets/home_widget_service.dart';
 import 'package:tiggomate_app/src/ui/widgets_shortcuts_sheet.dart';
@@ -65,7 +66,7 @@ void main() {
         highwayNote: 'Klang Valley Expressway (MEX)',
       );
 
-      expect(tripRecord.title, 'Putrajaya Sentral Commute');
+      expect(tripRecord!.title, 'Putrajaya Sentral Commute');
       expect(tripRecord.highwayNote, 'Klang Valley Expressway (MEX)');
       expect(tripRecord.routePoints, isNotEmpty);
       expect(tripRecord.costRm, isNonNegative);
@@ -75,6 +76,17 @@ void main() {
       final stored = prefs.getString('tm_logged_trips_v2');
       expect(stored, isNotNull);
       expect(stored!.contains('Putrajaya Sentral Commute'), isTrue);
+    });
+
+    test('finishAndSaveTrip saves nothing when no distance was measured', () async {
+      final tracker = SmartTripTracker.instance;
+      tracker.startDrive(title: 'Parked the whole time');
+
+      final tripRecord = await tracker.finishAndSaveTrip(title: 'Parked the whole time');
+
+      expect(tripRecord, isNull);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('tm_logged_trips_v2') ?? '', isNot(contains('Parked the whole time')));
     });
 
     test('GPS tracking controls and getters behave gracefully in headless environment', () async {
@@ -96,6 +108,50 @@ void main() {
       service.init();
 
       expect(service.onQuickAction, isNotNull);
+    });
+
+    test('HomeWidgetValues reports unknown readings instead of zero', () {
+      final unbound = HomeWidgetValues.fromTelemetry(VehicleTelemetry.unbound(), isBound: false);
+      expect(unbound.batterySoc, HomeWidgetValues.unknown);
+      expect(unbound.batteryRange, HomeWidgetValues.unknown);
+      expect(unbound.fuelLevel, HomeWidgetValues.unknown);
+      expect(unbound.fuelRange, HomeWidgetValues.unknown);
+      expect(unbound.totalRange, HomeWidgetValues.unknown);
+
+      // Bound car with no fuel data: battery is real, fuel stays unknown
+      final noFuel = HomeWidgetValues.fromTelemetry(
+        VehicleTelemetry.fromBlobMap({'battery_pct': 60, 'range_km': 50}, isSimulated: false),
+        isBound: true,
+      );
+      expect(noFuel.batterySoc, 60);
+      expect(noFuel.batteryRange, 50);
+      expect(noFuel.fuelLevel, HomeWidgetValues.unknown);
+      expect(noFuel.totalRange, HomeWidgetValues.unknown);
+
+      final sample = HomeWidgetValues.fromTelemetry(VehicleTelemetry.sampleData(), isBound: true);
+      expect(sample.fuelRange, 838);
+      expect(sample.fuelLevel, 100);
+
+      expect(HomeWidgetValues.format(HomeWidgetValues.unknown), '--');
+      expect(HomeWidgetValues.format(0), '0');
+    });
+
+    testWidgets('WidgetsShortcutsSheet preview shows placeholders for unknown readings', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(body: WidgetsShortcutsSheet()),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('--%'), findsNWidgets(2));
+      expect(find.text('-- km Fuel'), findsOneWidget);
+      expect(find.text('-- km'), findsOneWidget);
+      expect(find.text('0%'), findsNothing);
     });
 
     testWidgets('WidgetsShortcutsSheet renders widget preview and launcher shortcuts',

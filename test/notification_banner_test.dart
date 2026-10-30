@@ -101,13 +101,13 @@ void main() {
       final titleText = tester.widget<Text>(find.text('Security Alert'));
       expect(titleText.style?.color, Colors.white);
 
-      // Verify background container color is high-contrast dark slate (#161E2E)
+      // Verify background container color is the dark card surface (#12141A)
       final containers = tester.widgetList<Container>(find.byType(Container));
       final bannerContainer = containers.firstWhere(
         (c) => (c.decoration is BoxDecoration) &&
-               ((c.decoration as BoxDecoration).color == const Color(0xFF161E2E)),
+               ((c.decoration as BoxDecoration).color == const Color(0xFF12141A)),
       );
-      expect((bannerContainer.decoration as BoxDecoration).color, const Color(0xFF161E2E));
+      expect((bannerContainer.decoration as BoxDecoration).color, const Color(0xFF12141A));
 
       AppNotification.dismiss();
       await tester.pump();

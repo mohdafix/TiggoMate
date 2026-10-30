@@ -220,25 +220,29 @@ class VehicleTelemetry {
     final int batt = (m['battery_pct'] as num?)?.toInt() ?? 0;
     final int evRange = (m['range_km'] as num?)?.toInt() ?? 0;
     final int odo = (m['odometer'] as num?)?.toInt() ?? 0;
-    final double v12 = (m['volt12'] as num?)?.toDouble() ?? 12.6;
+    final double v12 = (m['volt12'] as num?)?.toDouble() ?? 0.0;
     final double spd = (m['speed'] as num?)?.toDouble() ?? 0.0;
     final bool charging = (m['charge_state'] as num?)?.toInt() == 1;
     final double pwr = (m['charge_power_kw'] as num?)?.toDouble() ?? 0.0;
     final int? remMin = (m['charge_remain_min'] as num?)?.toInt();
 
-    // TPMS
-    final double flP = (m['tyre_fl_pressure'] as num?)?.toDouble() ?? 230.0;
-    final double frP = (m['tyre_fr_pressure'] as num?)?.toDouble() ?? 230.0;
-    final double rlP = (m['tyre_rl_pressure'] as num?)?.toDouble() ?? 230.0;
-    final double rrP = (m['tyre_rr_pressure'] as num?)?.toDouble() ?? 230.0;
+    // TPMS: 0 means no reading, and the UI shows it as blank
+    final double flP = (m['tyre_fl_pressure'] as num?)?.toDouble() ?? 0.0;
+    final double frP = (m['tyre_fr_pressure'] as num?)?.toDouble() ?? 0.0;
+    final double rlP = (m['tyre_rl_pressure'] as num?)?.toDouble() ?? 0.0;
+    final double rrP = (m['tyre_rr_pressure'] as num?)?.toDouble() ?? 0.0;
 
-    final double flT = (m['tyre_fl_temp'] as num?)?.toDouble() ?? 30.0;
-    final double frT = (m['tyre_fr_temp'] as num?)?.toDouble() ?? 30.0;
-    final double rlT = (m['tyre_rl_temp'] as num?)?.toDouble() ?? 30.0;
-    final double rrT = (m['tyre_rr_temp'] as num?)?.toDouble() ?? 30.0;
+    final double flT = (m['tyre_fl_temp'] as num?)?.toDouble() ?? 0.0;
+    final double frT = (m['tyre_fr_temp'] as num?)?.toDouble() ?? 0.0;
+    final double rlT = (m['tyre_rl_temp'] as num?)?.toDouble() ?? 0.0;
+    final double rrT = (m['tyre_rr_temp'] as num?)?.toDouble() ?? 0.0;
 
-    // Fuel Range calculation based on Chery Tiggo 7 PHEV 51L fuel tank
-    final int estimatedFuelRange = (m['fuel_range_km'] as num?)?.toInt() ?? 838;
+    // 0 means unknown: the blob reports no fuel range unless it sends fuel_range_km
+    final int estimatedFuelRange = (m['fuel_range_km'] as num?)?.toInt() ?? 0;
+
+    final double lat = (m['lat'] as num?)?.toDouble() ?? 0.0;
+    final double lon = (m['lon'] as num?)?.toDouble() ?? 0.0;
+    final bool parked = (m['is_parked'] as bool?) ?? spd <= 0;
 
     return VehicleTelemetry(
       batteryPct: batt.clamp(0, 100),
@@ -253,11 +257,11 @@ class VehicleTelemetry {
       chargeRemainMin: remMin,
       acOn: m['ac_on'] == true,
       acTemp: (m['ac_temp'] as num?)?.toInt() ?? 23,
-      doorsOpen: (m['doors'] as num?)?.toInt() != 0,
-      trunkOpen: (m['trunk'] as num?)?.toInt() != 0,
-      windowsOpen: (m['windows'] as num?)?.toInt() != 0,
-      sunroofOpen: (m['sunroof'] as num?)?.toInt() != 0,
-      engineOn: (m['hv_state'] as num?)?.toInt() != 0,
+      doorsOpen: ((m['doors'] as num?)?.toInt() ?? 0) != 0,
+      trunkOpen: ((m['trunk'] as num?)?.toInt() ?? 0) != 0,
+      windowsOpen: ((m['windows'] as num?)?.toInt() ?? 0) != 0,
+      sunroofOpen: ((m['sunroof'] as num?)?.toInt() ?? 0) != 0,
+      engineOn: ((m['hv_state'] as num?)?.toInt() ?? 0) != 0,
       tyreFlPressureKpa: flP,
       tyreFrPressureKpa: frP,
       tyreRlPressureKpa: rlP,
@@ -266,18 +270,22 @@ class VehicleTelemetry {
       tyreFrTempC: frT,
       tyreRlTempC: rlT,
       tyreRrTempC: rrT,
-      latitude: (m['lat'] as num?)?.toDouble() ?? 3.1189,
-      longitude: (m['lon'] as num?)?.toDouble() ?? 101.6672,
-      headingDegrees: (m['heading'] as num?)?.toDouble() ?? 38.0,
-      locationName: (m['location_name'] as String?) ?? 'The Sphere, Bangsar South, KL',
-      isParked: (m['is_parked'] as bool?) ?? true,
-      parkedDurationText: (m['parked_duration'] as String?) ?? 'Parked 42m ago',
+      latitude: lat,
+      longitude: lon,
+      headingDegrees: (m['heading'] as num?)?.toDouble() ?? 0.0,
+      locationName: (m['location_name'] as String?) ??
+          (lat != 0.0 || lon != 0.0 ? 'Last reported position' : 'Location unavailable'),
+      isParked: parked,
+      parkedDurationText: (m['parked_duration'] as String?) ?? (parked ? 'Parked' : 'Moving'),
       lastUpdated: DateTime.now(),
       isSimulated: isSimulated,
       isBound: !isSimulated,
       dataSourceLabel: isSimulated ? 'Chery CarLinko Cloud • Simulated' : 'LIVE CARLINKO TELEMATICS',
     );
   }
+
+  /// False when the car has not reported a position.
+  bool get hasLocation => latitude != 0.0 || longitude != 0.0;
 
   /// Convert kPa to PSI for dual automotive readouts.
   static double kpaToPsi(double kpa) => kpa * 0.145038;

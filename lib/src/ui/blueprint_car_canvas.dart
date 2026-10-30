@@ -80,17 +80,20 @@ class BlueprintCarStage extends StatelessWidget {
     final textMuted = isDark ? const Color(0xFF717684) : const Color(0xFF64748B);
     final textPrimary = isDark ? Colors.white : const Color(0xFF0A0B0E);
 
-    final flKpa = isBound && telemetry.tyreFlPressureKpa > 0 ? telemetry.tyreFlPressureKpa.round() : 232;
-    final frKpa = isBound && telemetry.tyreFrPressureKpa > 0 ? telemetry.tyreFrPressureKpa.round() : 231;
-    final rlKpa = isBound && telemetry.tyreRlPressureKpa > 0 ? telemetry.tyreRlPressureKpa.round() : 228;
-    final rrKpa = isBound && telemetry.tyreRrPressureKpa > 0 ? telemetry.tyreRrPressureKpa.round() : 229;
+    // A missing reading stays blank rather than showing a plausible number
+    int? reading(double value) => isBound && value > 0 ? value.round() : null;
 
-    final flTemp = isBound && telemetry.tyreFlTempC > 0 ? telemetry.tyreFlTempC.round() : 31;
-    final frTemp = isBound && telemetry.tyreFrTempC > 0 ? telemetry.tyreFrTempC.round() : 31;
-    final rlTemp = isBound && telemetry.tyreRlTempC > 0 ? telemetry.tyreRlTempC.round() : 30;
-    final rrTemp = isBound && telemetry.tyreRrTempC > 0 ? telemetry.tyreRrTempC.round() : 30;
+    final flKpa = reading(telemetry.tyreFlPressureKpa);
+    final frKpa = reading(telemetry.tyreFrPressureKpa);
+    final rlKpa = reading(telemetry.tyreRlPressureKpa);
+    final rrKpa = reading(telemetry.tyreRrPressureKpa);
 
-    Widget readout(String label, int kpa, int temp, bool alignRight) => _TpmsCornerReadout(
+    final flTemp = reading(telemetry.tyreFlTempC);
+    final frTemp = reading(telemetry.tyreFrTempC);
+    final rlTemp = reading(telemetry.tyreRlTempC);
+    final rrTemp = reading(telemetry.tyreRrTempC);
+
+    Widget readout(String label, int? kpa, int? temp, bool alignRight) => _TpmsCornerReadout(
           label: label,
           kpa: kpa,
           tempC: temp,
@@ -124,8 +127,8 @@ class BlueprintCarStage extends StatelessWidget {
 
 class _TpmsCornerReadout extends StatelessWidget {
   final String label;
-  final int kpa;
-  final int tempC;
+  final int? kpa;
+  final int? tempC;
   final bool alignRight;
   final Color textMuted;
   final Color textPrimary;
@@ -155,7 +158,7 @@ class _TpmsCornerReadout extends StatelessWidget {
           ),
         ),
         Text(
-          '$kpa',
+          '${kpa ?? '--'}',
           style: TextStyle(
             fontFamily: 'monospace',
             fontSize: 22,
@@ -165,7 +168,7 @@ class _TpmsCornerReadout extends StatelessWidget {
           ),
         ),
         Text(
-          'kPa · $tempC°',
+          'kPa · ${tempC ?? '--'}°',
           style: TextStyle(
             fontFamily: 'monospace',
             fontSize: 10,

@@ -45,8 +45,8 @@ void main() {
     test('Dark theme creates valid ThemeData with Brightness.dark', () {
       final dark = AppTheme.darkTheme;
       expect(dark.brightness, equals(Brightness.dark));
-      expect(dark.scaffoldBackgroundColor, equals(const Color(0xFF090D12)));
-      expect(dark.colorScheme.surface, equals(const Color(0xFF131922)));
+      expect(dark.scaffoldBackgroundColor, equals(const Color(0xFF0A0B0E)));
+      expect(dark.colorScheme.surface, equals(const Color(0xFF12141A)));
     });
   });
 }

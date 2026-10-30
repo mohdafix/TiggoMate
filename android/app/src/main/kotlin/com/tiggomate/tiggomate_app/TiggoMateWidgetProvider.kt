@@ -24,6 +24,11 @@ class TiggoMateWidgetProvider : AppWidgetProvider() {
     companion object {
         const val PREFS_NAME = "tiggomate_widget_prefs"
 
+        // Matches HomeWidgetValues.unknown on the Dart side
+        private const val UNKNOWN = -1
+
+        private fun format(value: Int): String = if (value < 0) "--" else value.toString()
+
         fun updateAppWidget(
             context: Context,
             appWidgetManager: AppWidgetManager,
@@ -31,11 +36,12 @@ class TiggoMateWidgetProvider : AppWidgetProvider() {
         ) {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val vehicleName = prefs.getString("vehicle_name", "Tiggo 7 PHEV") ?: "Tiggo 7 PHEV"
-            val batterySoc = prefs.getInt("battery_soc", 78)
-            val batteryRange = prefs.getInt("battery_range", 95)
-            val fuelLevel = prefs.getInt("fuel_level", 82)
-            val fuelRange = prefs.getInt("fuel_range", 870)
-            val totalRange = prefs.getInt("total_range", 965)
+            val isBound = prefs.getBoolean("is_bound", false)
+            val batterySoc = prefs.getInt("battery_soc", UNKNOWN)
+            val batteryRange = prefs.getInt("battery_range", UNKNOWN)
+            val fuelLevel = prefs.getInt("fuel_level", UNKNOWN)
+            val fuelRange = prefs.getInt("fuel_range", UNKNOWN)
+            val totalRange = prefs.getInt("total_range", UNKNOWN)
             val isLocked = prefs.getBoolean("is_locked", true)
             val isCharging = prefs.getBoolean("is_charging", false)
             val isClimateOn = prefs.getBoolean("is_climate_on", false)
@@ -43,13 +49,14 @@ class TiggoMateWidgetProvider : AppWidgetProvider() {
             val views = RemoteViews(context.packageName, R.layout.tiggomate_widget)
 
             views.setTextViewText(R.id.widget_vehicle_name, vehicleName)
-            views.setTextViewText(R.id.widget_battery_soc, "$batterySoc%")
-            views.setTextViewText(R.id.widget_battery_range, "$batteryRange km EV")
-            views.setTextViewText(R.id.widget_total_range, "$totalRange km")
-            views.setTextViewText(R.id.widget_fuel_level, "$fuelLevel%")
-            views.setTextViewText(R.id.widget_fuel_range, "$fuelRange km Fuel")
+            views.setTextViewText(R.id.widget_battery_soc, "${format(batterySoc)}%")
+            views.setTextViewText(R.id.widget_battery_range, "${format(batteryRange)} km EV")
+            views.setTextViewText(R.id.widget_total_range, "${format(totalRange)} km")
+            views.setTextViewText(R.id.widget_fuel_level, "${format(fuelLevel)}%")
+            views.setTextViewText(R.id.widget_fuel_range, "${format(fuelRange)} km Fuel")
 
             val statusText = when {
+                !isBound -> "Not paired"
                 isCharging -> "⚡ Charging"
                 isClimateOn -> "❄️ Pre-cooling"
                 isLocked -> "🔒 Locked"
@@ -60,7 +67,7 @@ class TiggoMateWidgetProvider : AppWidgetProvider() {
             // Dynamic Action Button labels
             views.setTextViewText(
                 R.id.widget_btn_lock,
-                if (isLocked) "🔓 Unlock" else "🔒 Lock"
+                if (isBound && isLocked) "🔓 Unlock" else "🔒 Lock"
             )
             views.setTextViewText(
                 R.id.widget_btn_climate,

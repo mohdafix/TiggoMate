@@ -1,6 +1,40 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import '../carlinko/vehicle_telemetry.dart';
+
+/// Numbers shown on the home screen widget. [unknown] means there is no reading,
+/// and both the sheet preview and the native widget render it as "--".
+class HomeWidgetValues {
+  static const int unknown = -1;
+
+  final int batterySoc;
+  final int batteryRange;
+  final int fuelLevel;
+  final int fuelRange;
+  final int totalRange;
+
+  const HomeWidgetValues({
+    required this.batterySoc,
+    required this.batteryRange,
+    required this.fuelLevel,
+    required this.fuelRange,
+    required this.totalRange,
+  });
+
+  factory HomeWidgetValues.fromTelemetry(VehicleTelemetry telemetry, {required bool isBound}) {
+    final hasFuelRange = isBound && telemetry.fuelRangeKm > 0;
+    return HomeWidgetValues(
+      batterySoc: isBound ? telemetry.batteryPct : unknown,
+      batteryRange: isBound ? telemetry.electricRangeKm : unknown,
+      fuelLevel: hasFuelRange ? ((telemetry.fuelRangeKm / 838.0) * 100).round().clamp(0, 100) : unknown,
+      fuelRange: hasFuelRange ? telemetry.fuelRangeKm : unknown,
+      totalRange: hasFuelRange ? telemetry.totalRangeKm : unknown,
+    );
+  }
+
+  static String format(int value) => value < 0 ? '--' : '$value';
+}
 
 /// Service coordinating Android Native Home Screen Widgets & App Shortcuts
 /// via MethodChannel 'com.tiggomate/quick_actions'.
@@ -58,11 +92,12 @@ class HomeWidgetService {
   /// and triggers RemoteViews update for all installed home screen widgets.
   Future<bool> syncWidgetTelemetry({
     String vehicleName = 'Tiggo 7 PHEV',
-    int batterySoc = 78,
-    int batteryRange = 95,
-    int fuelLevel = 82,
-    int fuelRange = 870,
-    int totalRange = 965,
+    bool isBound = false,
+    int batterySoc = HomeWidgetValues.unknown,
+    int batteryRange = HomeWidgetValues.unknown,
+    int fuelLevel = HomeWidgetValues.unknown,
+    int fuelRange = HomeWidgetValues.unknown,
+    int totalRange = HomeWidgetValues.unknown,
     bool isLocked = true,
     bool isCharging = false,
     bool isClimateOn = false,
@@ -70,6 +105,7 @@ class HomeWidgetService {
     try {
       final success = await _channel.invokeMethod<bool>('updateWidgetData', {
         'vehicle_name': vehicleName,
+        'is_bound': isBound,
         'battery_soc': batterySoc,
         'battery_range': batteryRange,
         'fuel_level': fuelLevel,

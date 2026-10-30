@@ -139,7 +139,8 @@ void main() {
 
       // Should now show connected view with Bangi Smart Meter
       expect(find.text('SMART METER'), findsOneWidget);
-      expect(find.textContaining('220384918204'), findsOneWidget);
+      // The account number also appears in the account switcher dropdown.
+      expect(find.textContaining('CA No: 220384918204'), findsOneWidget);
       expect(find.text('482.6 kWh'), findsOneWidget);
       expect(find.textContaining('Apply Live Tariff'), findsOneWidget);
 

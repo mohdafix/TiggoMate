@@ -51,7 +51,7 @@ void main() {
     expect(find.text('CarLinko Telematics Cloud'), findsOneWidget);
     expect(find.text('Chery CarLinko Cloud Standby: Connect with your official CarLinko account. Once your dealer binds the vehicle VIN, live telematics and remote controls automatically sync in real time.'), findsOneWidget);
     expect(find.text('Single Session Notice: Chery CarLinko permits only one active mobile session. Connecting live here may log out your official phone app.'), findsOneWidget);
-    expect(find.text('Connect Cloud'), findsOneWidget);
+    expect(find.text('BIND CARLINKO CLOUD'), findsOneWidget);
     expect(find.text('Cancel'), findsOneWidget);
 
     // No overflow exception thrown
@@ -109,14 +109,14 @@ void main() {
     expect(find.text('SESSION CONNECTED & ACTIVE'), findsOneWidget);
     expect(find.text('linexsg@gmail.com'), findsOneWidget);
     expect(find.text('Pending Car Bind (Pairing Required)'), findsOneWidget);
-    expect(find.text('Refresh Cloud Sync'), findsOneWidget);
+    expect(find.text('REFRESH CLOUD SYNC'), findsOneWidget);
     expect(find.text('Switch Account'), findsOneWidget);
     expect(find.text('Disconnect'), findsOneWidget);
 
     // Tap Refresh Cloud Sync
-    await tester.ensureVisible(find.text('Refresh Cloud Sync'));
+    await tester.ensureVisible(find.text('REFRESH CLOUD SYNC'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Refresh Cloud Sync'));
+    await tester.tap(find.text('REFRESH CLOUD SYNC'));
     await tester.pumpAndSettle();
     expect(connectedCalled, isTrue);
     expect(find.text('Cloud telemetry refreshed successfully!'), findsOneWidget);

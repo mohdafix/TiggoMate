@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../ai/ai_service.dart';
 import '../theme/app_tokens.dart';
+import 'trips_logbook_screen.dart';
 
 /// Screen 6: Grounded Tiggo 7 PHEV AI Assistant Modal Sheet
 class AskAssistantSheet extends StatefulWidget {
@@ -375,8 +376,19 @@ class _AskAssistantSheetState extends State<AskAssistantSheet> {
         citation = 'T-Box Remote Dispatch';
       }
     } else if (lower.contains('cost') || lower.contains('last trip')) {
-      replyText =
-          'Last trip was **Home → Bangsar South (26 km)**. Driven 100% on EV using 5.1 kWh. Total electricity cost: **RM 1.43** (saved **RM 2.80** vs RON95 petrol).';
+      final lastTrip = await loadLatestSavedTrip();
+      if (!mounted) return;
+      if (lastTrip == null) {
+        replyText = 'You have no trips logged yet. Record a drive or add a trip from the **Log** tab and I can break down its cost.';
+      } else {
+        final energy = [
+          if (lastTrip.electricKwh > 0) '${lastTrip.electricKwh.toStringAsFixed(1)} kWh',
+          if (lastTrip.petrolLitres > 0) '${lastTrip.petrolLitres.toStringAsFixed(1)} L of petrol',
+        ].join(' and ');
+        replyText = 'Last trip was **${lastTrip.title} (${lastTrip.distanceKm.toStringAsFixed(1)} km)**. '
+            'Driven ${lastTrip.evRatio.round()}% on EV${energy.isEmpty ? '' : ' using $energy'}. '
+            'Total cost: **RM ${lastTrip.costRm.toStringAsFixed(2)}**.';
+      }
       citation = 'Trips Logbook';
     } else if (lower.contains('service') || lower.contains('1,000')) {
       replyText =

@@ -43,6 +43,7 @@ class MainActivity : FlutterActivity() {
                                 val prefs = getSharedPreferences(TiggoMateWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
                                 prefs.edit().apply {
                                     (args["vehicle_name"] as? String)?.let { putString("vehicle_name", it) }
+                                    (args["is_bound"] as? Boolean)?.let { putBoolean("is_bound", it) }
                                     (args["battery_soc"] as? Number)?.let { putInt("battery_soc", it.toInt()) }
                                     (args["battery_range"] as? Number)?.let { putInt("battery_range", it.toInt()) }
                                     (args["fuel_level"] as? Number)?.let { putInt("fuel_level", it.toInt()) }

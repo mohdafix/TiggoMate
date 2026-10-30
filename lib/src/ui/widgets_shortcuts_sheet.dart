@@ -4,6 +4,7 @@ import '../widgets/home_widget_service.dart';
 /// Modal sheet showcasing Android Home Screen Widget preview and
 /// App Launcher Quick Action Shortcuts.
 class WidgetsShortcutsSheet extends StatefulWidget {
+  final bool isBound;
   final int batterySoc;
   final int batteryRange;
   final int fuelLevel;
@@ -16,11 +17,12 @@ class WidgetsShortcutsSheet extends StatefulWidget {
 
   const WidgetsShortcutsSheet({
     super.key,
-    this.batterySoc = 78,
-    this.batteryRange = 95,
-    this.fuelLevel = 82,
-    this.fuelRange = 870,
-    this.totalRange = 965,
+    this.isBound = false,
+    this.batterySoc = HomeWidgetValues.unknown,
+    this.batteryRange = HomeWidgetValues.unknown,
+    this.fuelLevel = HomeWidgetValues.unknown,
+    this.fuelRange = HomeWidgetValues.unknown,
+    this.totalRange = HomeWidgetValues.unknown,
     this.isLocked = true,
     this.isCharging = false,
     this.isClimateOn = false,
@@ -29,11 +31,12 @@ class WidgetsShortcutsSheet extends StatefulWidget {
 
   static Future<void> show(
     BuildContext context, {
-    int batterySoc = 78,
-    int batteryRange = 95,
-    int fuelLevel = 82,
-    int fuelRange = 870,
-    int totalRange = 965,
+    bool isBound = false,
+    int batterySoc = HomeWidgetValues.unknown,
+    int batteryRange = HomeWidgetValues.unknown,
+    int fuelLevel = HomeWidgetValues.unknown,
+    int fuelRange = HomeWidgetValues.unknown,
+    int totalRange = HomeWidgetValues.unknown,
     bool isLocked = true,
     bool isCharging = false,
     bool isClimateOn = false,
@@ -44,6 +47,7 @@ class WidgetsShortcutsSheet extends StatefulWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => WidgetsShortcutsSheet(
+        isBound: isBound,
         batterySoc: batterySoc,
         batteryRange: batteryRange,
         fuelLevel: fuelLevel,
@@ -72,6 +76,7 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
     });
 
     final ok = await HomeWidgetService.instance.syncWidgetTelemetry(
+      isBound: widget.isBound,
       batterySoc: widget.batterySoc,
       batteryRange: widget.batteryRange,
       fuelLevel: widget.fuelLevel,
@@ -425,7 +430,7 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
                 child: Column(
                   children: [
                     Text(
-                      '${widget.batterySoc}%',
+                      '${HomeWidgetValues.format(widget.batterySoc)}%',
                       style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w900,
@@ -433,7 +438,7 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
                       ),
                     ),
                     Text(
-                      '${widget.batteryRange} km EV',
+                      '${HomeWidgetValues.format(widget.batteryRange)} km EV',
                       style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
                     ),
                   ],
@@ -453,7 +458,7 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
                   child: Column(
                     children: [
                       Text(
-                        '${widget.totalRange} km',
+                        '${HomeWidgetValues.format(widget.totalRange)} km',
                         style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w900,
@@ -479,7 +484,7 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
                 child: Column(
                   children: [
                     Text(
-                      '${widget.fuelLevel}%',
+                      '${HomeWidgetValues.format(widget.fuelLevel)}%',
                       style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w900,
@@ -487,7 +492,7 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
                       ),
                     ),
                     Text(
-                      '${widget.fuelRange} km Fuel',
+                      '${HomeWidgetValues.format(widget.fuelRange)} km Fuel',
                       style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
                     ),
                   ],

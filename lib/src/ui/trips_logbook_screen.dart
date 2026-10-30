@@ -377,8 +377,64 @@ class TripsLogbookScreen extends StatefulWidget {
   State<TripsLogbookScreen> createState() => _TripsLogbookScreenState();
 }
 
+/// IDs of the sample trips older builds seeded, which could get saved alongside real data.
+const Set<String> kLegacySampleTripIds = {'trip_1', 'trip_2', 'trip_3', 'trip_4'};
+
+final RegExp _epochMsPattern = RegExp(r'\d{13}');
+
+/// Real records carry their creation time in the ID, as epoch milliseconds.
+DateTime recordTimeFromId(String id) {
+  final match = _epochMsPattern.firstMatch(id);
+  return match == null ? DateTime.now() : DateTime.fromMillisecondsSinceEpoch(int.parse(match.group(0)!));
+}
+
+/// The most recent trip saved on this device, or null when none has been logged.
+Future<TripRecord?> loadLatestSavedTrip() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_TripsLogbookScreenState._kTripsStorageKey);
+    if (raw == null || raw.isEmpty) return null;
+    final trips = (jsonDecode(raw) as List<dynamic>)
+        .map((t) => TripRecord.fromJson(t as Map<String, dynamic>))
+        .where((t) => !kLegacySampleTripIds.contains(t.id))
+        .toList();
+    if (trips.isEmpty) return null;
+    trips.sort((a, b) => recordTimeFromId(b.id).compareTo(recordTimeFromId(a.id)));
+    return trips.first;
+  } catch (_) {
+    return null;
+  }
+}
+
+/// One row of the logbook's ENTRIES list: a trip or an expense.
+class _LogEntry {
+  final DateTime when;
+  final String title;
+  final String detail;
+  final String value;
+  final bool isEv;
+
+  const _LogEntry({
+    required this.when,
+    required this.title,
+    required this.detail,
+    required this.value,
+    required this.isEv,
+  });
+}
+
 class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
-  final String _selectedMonth = "October 2026";
+  static const List<String> _monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+
+  // IDs of the sample records older builds seeded, which could get saved alongside real data.
+  static const Set<String> _sampleTripIds = kLegacySampleTripIds;
+  static const Set<String> _sampleExpenseIds = {'exp_1', 'exp_2'};
+
+  DateTime _viewMonth = DateTime(DateTime.now().year, DateTime.now().month);
+  String get _selectedMonth => '${_monthNames[_viewMonth.month - 1]} ${_viewMonth.year}';
   TripRecord? _featuredTrip;
   List<TripRecord> _trips = [];
   List<ExpenseRecord> _customExpenses = [];
@@ -399,101 +455,7 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
   @override
   void initState() {
     super.initState();
-    _initDefaultTrips();
     _loadStoredData();
-  }
-
-  void _initDefaultTrips() {
-    _trips = [
-      const TripRecord(
-        id: 'trip_1',
-        title: 'Home → Bangsar South',
-        timestamp: '29 Oct',
-        distanceKm: 26.0,
-        durationMinutes: 32,
-        evDistanceKm: 26.0,
-        hevDistanceKm: 0.0,
-        electricKwh: 5.1,
-        petrolLitres: 0.0,
-        costRm: 1.43,
-        avgSpeedKmh: 48.0,
-        highwayNote: '100% EV',
-        routePoints: [],
-        evPointCount: 0,
-      ),
-      const TripRecord(
-        id: 'trip_2',
-        title: 'Shah Alam loop',
-        timestamp: '27 Oct',
-        distanceKm: 33.0,
-        durationMinutes: 45,
-        evDistanceKm: 29.0,
-        hevDistanceKm: 4.0,
-        electricKwh: 6.2,
-        petrolLitres: 0.3,
-        costRm: 2.35,
-        avgSpeedKmh: 44.0,
-        highwayNote: '88% EV',
-        routePoints: [],
-        evPointCount: 0,
-      ),
-      const TripRecord(
-        id: 'trip_3',
-        title: 'KL → Ipoh (NSE)',
-        timestamp: '20 Oct',
-        distanceKm: 212.0,
-        durationMinutes: 135,
-        evDistanceKm: 64.0,
-        hevDistanceKm: 148.0,
-        electricKwh: 12.0,
-        petrolLitres: 9.8,
-        costRm: 23.49,
-        avgSpeedKmh: 94.0,
-        highwayNote: '30% EV',
-        routePoints: [],
-        evPointCount: 0,
-      ),
-      const TripRecord(
-        id: 'trip_4',
-        title: 'Genting Highlands',
-        timestamp: '13 Oct',
-        distanceKm: 104.0,
-        durationMinutes: 80,
-        evDistanceKm: 8.0,
-        hevDistanceKm: 96.0,
-        electricKwh: 2.1,
-        petrolLitres: 7.2,
-        costRm: 15.35,
-        avgSpeedKmh: 78.0,
-        highwayNote: '8% EV',
-        routePoints: [],
-        evPointCount: 0,
-      ),
-    ];
-    _featuredTrip = _trips[0];
-
-    _customExpenses = [
-      const ExpenseRecord(
-        id: 'exp_1',
-        type: 'home_ac',
-        title: 'Home wallbox · off-peak',
-        date: '28 Oct',
-        amountRm: 2.87,
-        units: 10.3,
-        unitPrice: 0.28,
-        odometerKm: 1258,
-      ),
-      const ExpenseRecord(
-        id: 'exp_2',
-        type: 'petrol',
-        title: 'Petronas Tapah · RON95',
-        date: '20 Oct',
-        amountRm: 58.22,
-        units: 28.4,
-        unitPrice: 2.05,
-        odometerKm: 1046,
-      ),
-    ];
   }
 
   Future<void> _loadStoredData() async {
@@ -503,14 +465,20 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
       if (rawExpenses != null && rawExpenses.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(rawExpenses);
         setState(() {
-          _customExpenses = decoded.map((e) => ExpenseRecord.fromJson(e as Map<String, dynamic>)).toList();
+          _customExpenses = decoded
+              .map((e) => ExpenseRecord.fromJson(e as Map<String, dynamic>))
+              .where((e) => !_sampleExpenseIds.contains(e.id))
+              .toList();
         });
       }
 
       final rawTrips = prefs.getString(_kTripsStorageKey);
       if (rawTrips != null && rawTrips.isNotEmpty) {
         final List<dynamic> decodedTrips = jsonDecode(rawTrips);
-        final loaded = decodedTrips.map((t) => TripRecord.fromJson(t as Map<String, dynamic>)).toList();
+        final loaded = decodedTrips
+            .map((t) => TripRecord.fromJson(t as Map<String, dynamic>))
+            .where((t) => !_sampleTripIds.contains(t.id))
+            .toList();
         setState(() {
           _trips = loaded;
           if (_trips.isNotEmpty) _featuredTrip = _trips[0];
@@ -540,13 +508,13 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
         setState(() {
           final existingTripIds = _trips.map((t) => t.id).toSet();
           for (final t in cloudTrips) {
-            if (!existingTripIds.contains(t.id)) {
+            if (!existingTripIds.contains(t.id) && !_sampleTripIds.contains(t.id)) {
               _trips.add(t);
             }
           }
           final existingExpIds = _customExpenses.map((e) => e.id).toSet();
           for (final e in cloudExpenses) {
-            if (!existingExpIds.contains(e.id)) {
+            if (!existingExpIds.contains(e.id) && !_sampleExpenseIds.contains(e.id)) {
               _customExpenses.add(e);
             }
           }
@@ -565,23 +533,78 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
       final encoded = jsonEncode(_trips.map((t) => t.toJson()).toList());
       await prefs.setString(_kTripsStorageKey, encoded);
     } catch (_) {}
+    unawaited(FirebaseSyncService.instance.syncTrip(trip));
   }
+
+  DateTime _recordTime(String id) => recordTimeFromId(id);
+
+  bool _isInViewMonth(DateTime when) => when.year == _viewMonth.year && when.month == _viewMonth.month;
+
+  List<TripRecord> get _monthTrips => _trips.where((t) => _isInViewMonth(_recordTime(t.id))).toList();
+
+  List<ExpenseRecord> get _monthExpenses => _customExpenses.where((e) => _isInViewMonth(_recordTime(e.id))).toList();
+
+  bool get _isViewingCurrentMonth {
+    final now = DateTime.now();
+    return _viewMonth.year == now.year && _viewMonth.month == now.month;
+  }
+
+  void _shiftViewMonth(int delta) {
+    setState(() => _viewMonth = DateTime(_viewMonth.year, _viewMonth.month + delta));
+  }
+
+  /// Trips and expenses for the viewed month, newest first.
+  List<_LogEntry> get _monthEntries {
+    final entries = <_LogEntry>[
+      for (final t in _monthTrips)
+        _LogEntry(
+          when: _recordTime(t.id),
+          title: t.title,
+          detail: [
+            '${_formatKm(t.distanceKm)} km',
+            '${t.evRatio.round()}% EV',
+            if (t.electricKwh > 0) '${t.electricKwh.toStringAsFixed(1)} kWh',
+            if (t.petrolLitres > 0) '${t.petrolLitres.toStringAsFixed(1)} L',
+          ].join(' · '),
+          value: '${_formatKm(t.distanceKm)} km',
+          isEv: t.evRatio >= 50,
+        ),
+      for (final e in _monthExpenses)
+        _LogEntry(
+          when: _recordTime(e.id),
+          title: e.title,
+          detail: '${e.units.toStringAsFixed(1)} ${e.type == 'petrol' ? 'L' : 'kWh'} @ RM ${e.unitPrice.toStringAsFixed(2)}',
+          value: 'RM ${e.amountRm.toStringAsFixed(2)}',
+          isEv: e.type != 'petrol',
+        ),
+    ];
+    entries.sort((a, b) => b.when.compareTo(a.when));
+    return entries;
+  }
+
+  String _formatKm(double km) => km.toStringAsFixed(km % 1 == 0 ? 0 : 1);
+
+  String _formatEntryDate(DateTime when) => '${when.day} ${_monthNames[when.month - 1].substring(0, 3)}';
 
   // Monthly Aggregates
   double get _totalDistanceKm {
-    return _trips.fold(0.0, (acc, t) => acc + t.distanceKm);
+    return _monthTrips.fold(0.0, (acc, t) => acc + t.distanceKm);
+  }
+
+  double get _totalEvDistanceKm {
+    return _monthTrips.fold(0.0, (acc, t) => acc + t.evDistanceKm);
   }
 
   double get _homeAcSpend {
-    return _customExpenses.where((e) => e.type == 'home_ac').fold(0.0, (acc, e) => acc + e.amountRm);
+    return _monthExpenses.where((e) => e.type == 'home_ac').fold(0.0, (acc, e) => acc + e.amountRm);
   }
 
   double get _petrolSpend {
-    return _customExpenses.where((e) => e.type == 'petrol').fold(0.0, (acc, e) => acc + e.amountRm);
+    return _monthExpenses.where((e) => e.type == 'petrol').fold(0.0, (acc, e) => acc + e.amountRm);
   }
 
   double get _publicEvSpend {
-    return _customExpenses.where((e) => e.type == 'public_ev').fold(0.0, (acc, e) => acc + e.amountRm);
+    return _monthExpenses.where((e) => e.type == 'public_ev').fold(0.0, (acc, e) => acc + e.amountRm);
   }
 
   double get _totalSpend => _homeAcSpend + _petrolSpend + _publicEvSpend;
@@ -679,8 +702,8 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
         petrolSpend: _petrolSpend,
         publicEvSpend: _publicEvSpend,
         monthlySavings: _monthlySavings,
-        trips: _trips,
-        expenses: _customExpenses,
+        trips: _monthTrips,
+        expenses: _monthExpenses,
       ),
     );
   }
@@ -745,6 +768,26 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
     final limeAccent = context.tokens.accent;
     const orangeAccent = Color(0xFFFF6E40);
 
+    final totalKm = _totalDistanceKm;
+    final distanceText = totalKm.toStringAsFixed(0).replaceAllMapped(RegExp(r'\B(?=(\d{3})+$)'), (_) => ',');
+    final spendText = _totalSpend.toStringAsFixed(_totalSpend < 10 ? 2 : 0);
+    final evShareText = totalKm > 0 ? '${(_totalEvDistanceKm / totalKm * 100).round()}%' : '--';
+
+    final daysInMonth = DateTime(_viewMonth.year, _viewMonth.month + 1, 0).day;
+    final dailyEvKm = List<double>.filled(daysInMonth, 0.0);
+    final dailyFuelKm = List<double>.filled(daysInMonth, 0.0);
+    for (final t in _monthTrips) {
+      final dayIndex = _recordTime(t.id).day - 1;
+      dailyEvKm[dayIndex] += t.evDistanceKm;
+      dailyFuelKm[dayIndex] += t.hevDistanceKm;
+    }
+
+    final visibleEntries = _monthEntries.where((e) {
+      if (_cyberEntryFilter == 1) return e.isEv;
+      if (_cyberEntryFilter == 2) return !e.isEv;
+      return true;
+    }).toList();
+
     return Scaffold(
       backgroundColor: bgCol,
       body: SafeArea(
@@ -755,36 +798,47 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'LOG',
-                      style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.4,
-                        color: textMuted,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'LOG',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.4,
+                          color: textMuted,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _selectedMonth,
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.5,
-                        color: textPrimary,
+                      const SizedBox(height: 2),
+                      Text(
+                        _selectedMonth,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.5,
+                          color: textPrimary,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 Row(
                   children: [
                     IconButton(
                       icon: Icon(Icons.chevron_left, color: textMuted, size: 22),
-                      onPressed: () {},
+                      tooltip: 'Previous month',
+                      onPressed: () => _shiftViewMonth(-1),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.chevron_right, color: textMuted, size: 22),
+                      tooltip: 'Next month',
+                      onPressed: _isViewingCurrentMonth ? null : () => _shiftViewMonth(1),
                       visualDensity: VisualDensity.compact,
                     ),
                     IconButton(
@@ -818,9 +872,9 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                         RichText(
                           text: TextSpan(
                             style: TextStyle(fontFamily: 'monospace', fontSize: 18, fontWeight: FontWeight.w800, color: textPrimary),
-                            children: const [
-                              TextSpan(text: '1,284'),
-                              TextSpan(text: ' km', style: TextStyle(fontSize: 11, fontWeight: FontWeight.normal)),
+                            children: [
+                              TextSpan(text: distanceText),
+                              const TextSpan(text: ' km', style: TextStyle(fontSize: 11, fontWeight: FontWeight.normal)),
                             ],
                           ),
                         ),
@@ -845,9 +899,9 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                         RichText(
                           text: TextSpan(
                             style: TextStyle(fontFamily: 'monospace', fontSize: 18, fontWeight: FontWeight.w800, color: textPrimary),
-                            children: const [
-                              TextSpan(text: 'RM '),
-                              TextSpan(text: '186'),
+                            children: [
+                              const TextSpan(text: 'RM '),
+                              TextSpan(text: spendText),
                             ],
                           ),
                         ),
@@ -869,7 +923,7 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                       children: [
                         Text('EV SHARE', style: TextStyle(fontFamily: 'monospace', fontSize: 9.5, fontWeight: FontWeight.w600, color: textMuted)),
                         const SizedBox(height: 4),
-                        Text('61%', style: TextStyle(fontFamily: 'monospace', fontSize: 18, fontWeight: FontWeight.w800, color: limeAccent)),
+                        Text(evShareText, style: TextStyle(fontFamily: 'monospace', fontSize: 18, fontWeight: FontWeight.w800, color: limeAccent)),
                       ],
                     ),
                   ),
@@ -912,6 +966,8 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
               height: 110,
               child: CustomPaint(
                 painter: DailyKmBarPainter(
+                  dailyEvKm: dailyEvKm,
+                  dailyFuelKm: dailyFuelKm,
                   limeAccent: limeAccent,
                   orangeAccent: orangeAccent,
                   gridLineColor: borderCol,
@@ -994,84 +1050,28 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
             const SizedBox(height: 12),
 
             // 6. LOG ENTRIES LIST
-            _buildCyberEntryItem(
-              date: '29 Oct',
-              title: 'Home → Bangsar South',
-              detail: '26 km · 100% EV · 5.1 kWh',
-              value: '26 km',
-              isEv: true,
-              limeAccent: limeAccent,
-              orangeAccent: orangeAccent,
-              textPrimary: textPrimary,
-              textMuted: textMuted,
-              cardCol: cardCol,
-              borderCol: borderCol,
-            ),
-            _buildCyberEntryItem(
-              date: '28 Oct',
-              title: 'Home wallbox · off-peak',
-              detail: '10.3 kWh · 22:00–01:06',
-              value: 'RM 2.87',
-              isEv: true,
-              limeAccent: limeAccent,
-              orangeAccent: orangeAccent,
-              textPrimary: textPrimary,
-              textMuted: textMuted,
-              cardCol: cardCol,
-              borderCol: borderCol,
-            ),
-            _buildCyberEntryItem(
-              date: '27 Oct',
-              title: 'Shah Alam loop',
-              detail: '33 km · 88% EV',
-              value: '33 km',
-              isEv: true,
-              limeAccent: limeAccent,
-              orangeAccent: orangeAccent,
-              textPrimary: textPrimary,
-              textMuted: textMuted,
-              cardCol: cardCol,
-              borderCol: borderCol,
-            ),
-            _buildCyberEntryItem(
-              date: '20 Oct',
-              title: 'KL → Ipoh (NSE)',
-              detail: '212 km · 30% EV · 9.8 L',
-              value: '212 km',
-              isEv: false,
-              limeAccent: limeAccent,
-              orangeAccent: orangeAccent,
-              textPrimary: textPrimary,
-              textMuted: textMuted,
-              cardCol: cardCol,
-              borderCol: borderCol,
-            ),
-            _buildCyberEntryItem(
-              date: '20 Oct',
-              title: 'Petronas Tapah · RON95',
-              detail: '28.4 L @ RM 2.05',
-              value: 'RM 58.22',
-              isEv: false,
-              limeAccent: limeAccent,
-              orangeAccent: orangeAccent,
-              textPrimary: textPrimary,
-              textMuted: textMuted,
-              cardCol: cardCol,
-              borderCol: borderCol,
-            ),
-            _buildCyberEntryItem(
-              date: '13 Oct',
-              title: 'Genting Highlands',
-              detail: '104 km · 8% EV',
-              value: '104 km',
-              isEv: false,
-              limeAccent: limeAccent,
-              orangeAccent: orangeAccent,
-              textPrimary: textPrimary,
-              textMuted: textMuted,
-              cardCol: cardCol,
-              borderCol: borderCol,
-            ),
+            if (visibleEntries.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  'No entries this month',
+                  style: TextStyle(fontFamily: 'monospace', fontSize: 11.5, color: textMuted),
+                ),
+              ),
+            for (final entry in visibleEntries)
+              _buildCyberEntryItem(
+                date: _formatEntryDate(entry.when),
+                title: entry.title,
+                detail: entry.detail,
+                value: entry.value,
+                isEv: entry.isEv,
+                limeAccent: limeAccent,
+                orangeAccent: orangeAccent,
+                textPrimary: textPrimary,
+                textMuted: textMuted,
+                cardCol: cardCol,
+                borderCol: borderCol,
+              ),
             const SizedBox(height: 16),
           ],
         ),
@@ -3004,14 +3004,16 @@ class _ExportLogbookModalState extends State<_ExportLogbookModal> with SingleTic
     return buffer.toString();
   }
 
+  String _csvDate(String id) => recordTimeFromId(id).toIso8601String().substring(0, 10);
+
   String get _csvReport {
     final buffer = StringBuffer();
     buffer.writeln('Date,Entry,Type,Distance_km,EV_km,HEV_km,Electric_kWh,Petrol_L,Cost_MYR');
     for (final t in widget.trips) {
-      buffer.writeln('"${t.timestamp}","${t.title.replaceAll('"', '""')}","Drive",${t.distanceKm},${t.evDistanceKm},${t.hevDistanceKm},${t.electricKwh},${t.petrolLitres},${t.costRm}');
+      buffer.writeln('"${_csvDate(t.id)}","${t.title.replaceAll('"', '""')}","Drive",${t.distanceKm},${t.evDistanceKm},${t.hevDistanceKm},${t.electricKwh},${t.petrolLitres},${t.costRm}');
     }
     for (final e in widget.expenses) {
-      buffer.writeln('"${e.date}","${e.title.replaceAll('"', '""')}","Expense",0,0,0,${e.type.contains("ac") || e.type.contains("ev") ? e.units : 0},${e.type == "petrol" ? e.units : 0},${e.amountRm}');
+      buffer.writeln('"${_csvDate(e.id)}","${e.title.replaceAll('"', '""')}","Expense",0,0,0,${e.type.contains("ac") || e.type.contains("ev") ? e.units : 0},${e.type == "petrol" ? e.units : 0},${e.amountRm}');
     }
     return buffer.toString();
   }

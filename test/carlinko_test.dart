@@ -63,8 +63,34 @@ void main() {
 
       expect(telemetry.isSimulated, isFalse);
       expect(telemetry.dataSourceLabel, contains('LIVE CARLINKO'));
-      expect(telemetry.fuelRangeKm, equals(838));
-      expect(telemetry.totalRangeKm, greaterThanOrEqualTo(838));
+      // The sample blob has no fuel range or tyre readings, so neither is invented
+      expect(telemetry.fuelRangeKm, equals(0));
+      expect(telemetry.totalRangeKm, equals(telemetry.electricRangeKm));
+      expect(telemetry.tyreFlPressureKpa, equals(0.0));
+    });
+
+    test('VehicleTelemetry.fromBlobMap reports missing fields as unknown, not plausible values', () {
+      final telemetry = VehicleTelemetry.fromBlobMap({}, isSimulated: false);
+
+      expect(telemetry.hasLocation, isFalse);
+      expect(telemetry.locationName, 'Location unavailable');
+      expect(telemetry.headingDegrees, equals(0.0));
+      expect(telemetry.parkedDurationText, 'Parked');
+      expect(telemetry.volt12, equals(0.0));
+      expect(telemetry.doorsOpen, isFalse);
+      expect(telemetry.engineOn, isFalse);
+    });
+
+    test('VehicleTelemetry.fromBlobMap keeps reported coordinates and derives moving state from speed', () {
+      final telemetry = VehicleTelemetry.fromBlobMap(
+        {'lat': 3.2, 'lon': 101.7, 'speed': 40.0},
+        isSimulated: false,
+      );
+
+      expect(telemetry.hasLocation, isTrue);
+      expect(telemetry.locationName, 'Last reported position');
+      expect(telemetry.isParked, isFalse);
+      expect(telemetry.parkedDurationText, 'Moving');
     });
   });
 

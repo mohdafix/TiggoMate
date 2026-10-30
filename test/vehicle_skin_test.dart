@@ -117,6 +117,12 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
 
+      // The skin render lives on the carousel's Paint Studio page
+      await tester.drag(find.byType(PageView), const Offset(-500, 0));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.text('VEHICLE PAINT STUDIO'), findsOneWidget);
+
       // Verify initial car image is khaki white
       final initialImageFinder = find.byWidgetPredicate(
         (widget) => widget is Image && widget.image is AssetImage && (widget.image as AssetImage).assetName == 'assets/images/car_hero_khaki_white.png',

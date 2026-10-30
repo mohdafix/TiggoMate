@@ -1,10 +1,47 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../carlinko/vehicle_telemetry.dart';
 import '../theme/app_theme.dart';
 import 'app_notification.dart';
+
+/// A charging location saved in the app. Live availability and prices are not known.
+class _SavedCharger {
+  final String name;
+  final String plugs;
+  final double lat;
+  final double lon;
+
+  const _SavedCharger({
+    required this.name,
+    required this.plugs,
+    required this.lat,
+    required this.lon,
+  });
+}
+
+const List<_SavedCharger> _savedChargers = [
+  _SavedCharger(
+    name: 'Gentari - KL Gateway Mall',
+    plugs: '2x Type 2 AC (22 kW) • 1x 60 kW DC',
+    lat: 3.1182,
+    lon: 101.6644,
+  ),
+  _SavedCharger(
+    name: 'ChargEV - Nexus Bangsar South',
+    plugs: '4x Type 2 AC (11 kW)',
+    lat: 3.1197,
+    lon: 101.6669,
+  ),
+  _SavedCharger(
+    name: 'Shell Recharge - Pantai Sentral',
+    plugs: '2x Type 2 AC (7.4 kW) • 1x 120 kW DC',
+    lat: 3.1091,
+    lon: 101.6612,
+  ),
+];
 
 /// Interactive Circular Radar HUD & Vehicle Locator Sheet (Phase 1)
 /// Inspired by tactical automotive radar and official Chery CarLinko Find My Car.
@@ -63,6 +100,10 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
   }
 
   Future<void> _launchWaze(double lat, double lon) async {
+    if (lat == 0.0 && lon == 0.0) {
+      _showToast('Car location unavailable');
+      return;
+    }
     final nativeUri = Uri.parse('waze://?ll=$lat,$lon&navigate=yes');
     final webUri = Uri.parse('https://waze.com/ul?ll=$lat,$lon&navigate=yes');
     if (await canLaunchUrl(nativeUri)) {
@@ -75,6 +116,10 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
   }
 
   Future<void> _launchGoogleMaps(double lat, double lon) async {
+    if (lat == 0.0 && lon == 0.0) {
+      _showToast('Car location unavailable');
+      return;
+    }
     final uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lon');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -83,7 +128,49 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
     }
   }
 
+  Future<void> _launchChargerSearch(double lat, double lon) async {
+    final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=EV+charging+station+near+$lat%2C$lon');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      _showToast('Could not open Google Maps');
+    }
+  }
+
+  double _distanceToCarMetres(_SavedCharger charger) {
+    return Geolocator.distanceBetween(
+      widget.telemetry.latitude,
+      widget.telemetry.longitude,
+      charger.lat,
+      charger.lon,
+    );
+  }
+
+  String _formatDistance(double metres) {
+    if (metres < 1000) return '${metres.round()} m';
+    final km = metres / 1000;
+    return '${km.toStringAsFixed(km < 100 ? 1 : 0)} km';
+  }
+
+  /// Saved chargers, nearest to the car first when its position is known.
+  List<_SavedCharger> get _chargersByDistance {
+    final chargers = List<_SavedCharger>.of(_savedChargers);
+    if (widget.telemetry.hasLocation) {
+      chargers.sort((a, b) => _distanceToCarMetres(a).compareTo(_distanceToCarMetres(b)));
+    }
+    return chargers;
+  }
+
+  String _compassPoint(double degrees) {
+    const points = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+    return points[((degrees % 360) / 45).round() % 8];
+  }
+
   void _copyGps() {
+    if (!widget.telemetry.hasLocation) {
+      _showToast('Car location unavailable');
+      return;
+    }
     final coords = '${widget.telemetry.latitude.toStringAsFixed(5)}, ${widget.telemetry.longitude.toStringAsFixed(5)}';
     Clipboard.setData(ClipboardData(text: coords));
     _showToast('GPS coordinates copied to clipboard: $coords');
@@ -447,27 +534,13 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                               ],
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: colors.evTeal.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              '120 m away (2m)',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: colors.evTeal,
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Coordinates: ${lat.toStringAsFixed(4)}° N, ${lon.toStringAsFixed(4)}° E • Bearing: ${widget.telemetry.headingDegrees.toStringAsFixed(0)}° NE',
+                        widget.telemetry.hasLocation
+                            ? 'Coordinates: ${lat.toStringAsFixed(4)}° N, ${lon.toStringAsFixed(4)}° E • Bearing: ${widget.telemetry.headingDegrees.toStringAsFixed(0)}° ${_compassPoint(widget.telemetry.headingDegrees)}'
+                            : 'Coordinates unavailable',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(fontSize: 11, color: colors.textMuted),
@@ -482,10 +555,10 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                             style: TextStyle(fontSize: 11, color: colors.textSecondary),
                           ),
                           const SizedBox(width: 10),
-                          Icon(Icons.lock, size: 12, color: colors.evTeal),
+                          Icon(widget.telemetry.doorsOpen ? Icons.lock_open : Icons.lock, size: 12, color: colors.evTeal),
                           const SizedBox(width: 4),
                           Text(
-                            'Secured & Stationary',
+                            widget.telemetry.doorsOpen ? 'Doors open' : 'Doors closed',
                             style: TextStyle(fontSize: 11, color: colors.evTeal, fontWeight: FontWeight.bold),
                           ),
                         ],
@@ -573,50 +646,42 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                   ],
                 ),
               ] else ...[
-                // ---------------- 4. NEARBY MALAYSIAN EV CHARGING HUBS ----------------
+                // ---------------- 4. EV CHARGING NEAR THE CAR ----------------
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: widget.telemetry.hasLocation ? () => _launchChargerSearch(lat, lon) : null,
+                    icon: const Icon(Icons.ev_station, size: 16),
+                    label: Text(
+                      widget.telemetry.hasLocation ? 'Find Chargers Near Car' : 'Car location unavailable',
+                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
                 Text(
-                  'Nearby AC/DC Chargers (Bangsar South)',
+                  'Saved Chargers (Bangsar South)',
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: colors.textPrimary),
                 ),
-                const SizedBox(height: 10),
-                _buildChargerTile(
-                  name: 'Gentari - KL Gateway Mall',
-                  operator: 'Gentari',
-                  distance: '450 m',
-                  plugs: '2x Type 2 AC (22 kW) • 1x 60 kW DC',
-                  price: 'RM 0.90 / kWh',
-                  status: '2 of 3 Available',
-                  statusColor: const Color(0xFFD2F835),
-                  lat: 3.1182,
-                  lon: 101.6644,
-                  colors: colors,
+                const SizedBox(height: 2),
+                Text(
+                  widget.telemetry.hasLocation
+                      ? 'Distance from your car. Check availability and prices in Maps.'
+                      : 'Check availability and prices in Maps.',
+                  style: TextStyle(fontSize: 11, color: colors.textMuted),
                 ),
                 const SizedBox(height: 10),
-                _buildChargerTile(
-                  name: 'ChargEV - Nexus Bangsar South',
-                  operator: 'ChargEV',
-                  distance: '320 m',
-                  plugs: '4x Type 2 AC (11 kW)',
-                  price: 'RM 0.80 / kWh',
-                  status: '3 of 4 Available',
-                  statusColor: const Color(0xFFD2F835),
-                  lat: 3.1197,
-                  lon: 101.6669,
-                  colors: colors,
-                ),
-                const SizedBox(height: 10),
-                _buildChargerTile(
-                  name: 'Shell Recharge - Pantai Sentral',
-                  operator: 'Shell Recharge',
-                  distance: '1.2 km',
-                  plugs: '2x Type 2 AC (7.4 kW) • 1x 120 kW DC',
-                  price: 'RM 1.20 / kWh',
-                  status: 'Busy (1 Available)',
-                  statusColor: Colors.amber,
-                  lat: 3.1091,
-                  lon: 101.6612,
-                  colors: colors,
-                ),
+                for (final charger in _chargersByDistance) ...[
+                  _buildChargerTile(
+                    name: charger.name,
+                    distance: widget.telemetry.hasLocation ? _formatDistance(_distanceToCarMetres(charger)) : '--',
+                    plugs: charger.plugs,
+                    lat: charger.lat,
+                    lon: charger.lon,
+                    colors: colors,
+                  ),
+                  const SizedBox(height: 10),
+                ],
               ],
             ],
           ),
@@ -627,12 +692,8 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
 
   Widget _buildChargerTile({
     required String name,
-    required String operator,
     required String distance,
     required String plugs,
-    required String price,
-    required String status,
-    required Color statusColor,
     required double lat,
     required double lon,
     required AppColors colors,
@@ -673,27 +734,22 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
           Text(plugs, style: TextStyle(fontSize: 11, color: colors.textSecondary)),
           const SizedBox(height: 2),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Text('$price • $status', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: statusColor)),
-              Row(
-                children: [
-                  InkWell(
-                    onTap: () => _launchWaze(lat, lon),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                      child: Text('Waze', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF33CCFF))),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  InkWell(
-                    onTap: () => _launchGoogleMaps(lat, lon),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                      child: Text('Maps', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF34A853))),
-                    ),
-                  ),
-                ],
+              InkWell(
+                onTap: () => _launchWaze(lat, lon),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  child: Text('Waze', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF33CCFF))),
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () => _launchGoogleMaps(lat, lon),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  child: Text('Maps', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF34A853))),
+                ),
               ),
             ],
           ),

@@ -35,10 +35,14 @@ class _EnergyScreenState extends State<EnergyScreen> {
   // Tiggo 7 PHEV Battery Size in Malaysia
   static const double batteryCapacityKwh = 19.27;
 
-  int get currentSoc => widget.telemetry.batteryPct > 0 ? widget.telemetry.batteryPct : 24;
+  /// Null when the car has not reported a battery level.
+  int? get currentSoc =>
+      widget.telemetry.isBound || widget.telemetry.batteryPct > 0 ? widget.telemetry.batteryPct : null;
 
   double get addsKwh {
-    final deficit = math.max(0, _targetSoc - currentSoc);
+    final soc = currentSoc;
+    if (soc == null) return 0.0;
+    final deficit = math.max(0, _targetSoc - soc);
     return (deficit / 100.0) * batteryCapacityKwh;
   }
 
@@ -148,7 +152,7 @@ class _EnergyScreenState extends State<EnergyScreen> {
                         color: textPrimary,
                       ),
                       children: [
-                        TextSpan(text: '$currentSoc'),
+                        TextSpan(text: '${currentSoc ?? '--'}'),
                         TextSpan(
                           text: '%',
                           style: TextStyle(
@@ -177,7 +181,7 @@ class _EnergyScreenState extends State<EnergyScreen> {
               CustomPaint(
                 size: const Size(double.infinity, 32),
                 painter: _HatchedChargeBarPainter(
-                  currentPct: currentSoc / 100.0,
+                  currentPct: (currentSoc ?? 0) / 100.0,
                   targetPct: _targetSoc / 100.0,
                   accentColor: limeAccent,
                   trackColor: isDark ? const Color(0xFF161922) : const Color(0xFFE2E8F0),
@@ -330,7 +334,7 @@ class _EnergyScreenState extends State<EnergyScreen> {
                           children: [
                             Text('DONE', style: TextStyle(fontFamily: 'monospace', fontSize: 9.5, color: textMuted)),
                             const SizedBox(height: 3),
-                            Text(doneTimeStr, style: TextStyle(fontFamily: 'monospace', fontSize: 18, fontWeight: FontWeight.w700, color: textPrimary)),
+                            Text(currentSoc == null ? '--:--' : doneTimeStr, style: TextStyle(fontFamily: 'monospace', fontSize: 18, fontWeight: FontWeight.w700, color: textPrimary)),
                           ],
                         ),
                       ),
@@ -344,7 +348,7 @@ class _EnergyScreenState extends State<EnergyScreen> {
                           children: [
                             Text('ADDS', style: TextStyle(fontFamily: 'monospace', fontSize: 9.5, color: textMuted)),
                             const SizedBox(height: 3),
-                            Text('${addsKwh.toStringAsFixed(1)} kWh', style: TextStyle(fontFamily: 'monospace', fontSize: 18, fontWeight: FontWeight.w700, color: textPrimary)),
+                            Text(currentSoc == null ? '-- kWh' : '${addsKwh.toStringAsFixed(1)} kWh', style: TextStyle(fontFamily: 'monospace', fontSize: 18, fontWeight: FontWeight.w700, color: textPrimary)),
                           ],
                         ),
                       ),
@@ -370,7 +374,7 @@ class _EnergyScreenState extends State<EnergyScreen> {
               // Off-peak row
               _CostBarRow(
                 label: 'Off-peak',
-                amount: 'RM ${offPeakCost.toStringAsFixed(2)}',
+                amount: currentSoc == null ? 'RM --' : 'RM ${offPeakCost.toStringAsFixed(2)}',
                 barFactor: 0.45,
                 barColor: limeAccent,
                 textPrimary: textPrimary,
@@ -382,7 +386,7 @@ class _EnergyScreenState extends State<EnergyScreen> {
               // Peak row
               _CostBarRow(
                 label: 'Peak',
-                amount: 'RM ${peakCost.toStringAsFixed(2)}',
+                amount: currentSoc == null ? 'RM --' : 'RM ${peakCost.toStringAsFixed(2)}',
                 barFactor: 0.85,
                 barColor: isDark ? const Color(0xFF333B4A) : const Color(0xFF94A3B8),
                 textPrimary: textPrimary,
@@ -394,7 +398,7 @@ class _EnergyScreenState extends State<EnergyScreen> {
               // RON95 equiv row
               _CostBarRow(
                 label: 'RON95 equiv.',
-                amount: 'RM ${ron95Cost.toStringAsFixed(2)}',
+                amount: currentSoc == null ? 'RM --' : 'RM ${ron95Cost.toStringAsFixed(2)}',
                 barFactor: 0.90,
                 barColor: orangeAccent,
                 textPrimary: textPrimary,
