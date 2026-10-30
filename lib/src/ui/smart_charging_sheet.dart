@@ -68,7 +68,7 @@ class _SmartChargingSheetState extends State<SmartChargingSheet> {
   int _activeTab = 0; // 0: Optimizer & Schedule, 1: Power Curve & SOH, 2: Tariff Breakdown
 
   // Constants for Tiggo 7 PHEV
-  static const double batteryCapacityKwh = 18.3; // Chery Tiggo 7 PHEV battery size
+  static const double batteryCapacityKwh = 19.27; // Chery Tiggo 7 PHEV battery size
   static const double pureEvRangeKm = 95.0;       // Rated pure EV range
   static const double petrolLitersPer100Km = 5.5; // Equivalent hybrid petrol consumption
   static const double ron95PricePerLiter = 2.05;  // Malaysian standard subsidized RON95

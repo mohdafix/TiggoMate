@@ -3,6 +3,7 @@ import 'src/service/service_appointment_manager.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
@@ -290,6 +291,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       MaintenanceTab(settings: _settings),
     ];
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       body: SafeArea(
         child: IndexedStack(
@@ -298,62 +301,62 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         ),
       ),
       bottomNavigationBar: Container(
+        height: 60,
         decoration: BoxDecoration(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? const Color(0xFF0D1219)
-              : Colors.white,
+          color: isDark ? const Color(0xFF0A0B0E) : Colors.white,
           border: Border(
             top: BorderSide(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? const Color(0xFF1E2636)
-                  : const Color(0xFFE2E8F0),
-              width: AppDesignTokens.borderWidth,
+              color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0),
+              width: 1.0,
             ),
           ),
         ),
-        child: NavigationBar(
-          height: 64,
-          elevation: 0,
-          backgroundColor: Colors.transparent,
-          selectedIndex: _currentIndex,
-          onDestinationSelected: (idx) => setState(() => _currentIndex = idx),
-          destinations: [
-            NavigationDestination(
-              icon: const Icon(Icons.directions_car_outlined, size: 22),
-              selectedIcon: Icon(
-                Icons.directions_car,
-                size: 22,
-                color: context.tokens.accent,
-              ),
-              label: 'Vehicle',
+        child: Row(
+          children: [
+            _buildCyberBottomNavItem(0, 'CAR', Icons.directions_car_outlined, Icons.directions_car),
+            _buildCyberBottomNavItem(1, 'ASSISTANT', Icons.chat_bubble_outline, Icons.chat_bubble),
+            _buildCyberBottomNavItem(2, 'LOG', Icons.route_outlined, Icons.route),
+            _buildCyberBottomNavItem(3, 'SERVICE', Icons.build_outlined, Icons.build),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCyberBottomNavItem(int index, String label, IconData unselectedIcon, IconData selectedIcon) {
+    final isSelected = _currentIndex == index;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = context.tokens.accent;
+    final textMuted = isDark ? const Color(0xFF717684) : const Color(0xFF64748B);
+
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _currentIndex = index),
+        child: Column(
+          children: [
+            // Top active indicator line
+            Container(
+              height: 2,
+              color: isSelected ? accent : Colors.transparent,
             ),
-            NavigationDestination(
-              icon: const Icon(Icons.chat_bubble_outline, size: 22),
-              selectedIcon: Icon(
-                Icons.chat_bubble,
-                size: 22,
-                color: context.tokens.accent,
-              ),
-              label: 'Assistant',
+            const SizedBox(height: 6),
+            Icon(
+              isSelected ? selectedIcon : unselectedIcon,
+              size: 20,
+              color: isSelected ? accent : textMuted,
             ),
-            NavigationDestination(
-              icon: const Icon(Icons.route_outlined, size: 22),
-              selectedIcon: Icon(
-                Icons.route,
-                size: 22,
-                color: context.tokens.accent,
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                letterSpacing: 0.8,
+                color: isSelected ? accent : textMuted,
               ),
-              label: 'Trips & Log',
             ),
-            NavigationDestination(
-              icon: const Icon(Icons.build_outlined, size: 22),
-              selectedIcon: Icon(
-                Icons.build,
-                size: 22,
-                color: context.tokens.accent,
-              ),
-              label: 'Service',
-            ),
+            const SizedBox(height: 4),
           ],
         ),
       ),
@@ -728,6 +731,32 @@ class _AssistantTabState extends State<AssistantTab> {
     }
   ];
   bool _loading = false;
+  bool _isListening = false;
+
+  Future<void> _listenVoice() async {
+    HapticFeedback.mediumImpact();
+    setState(() => _isListening = true);
+
+    try {
+      final recognized = await VoiceRecognitionService.startListening();
+      if (!mounted) return;
+      setState(() => _isListening = false);
+
+      if (recognized != null && recognized.trim().isNotEmpty) {
+        _controller.text = recognized;
+        _sendMessage(recognized);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isListening = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Voice Command: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
 
   final List<String> _suggestions = [
     "Why hasn't my petrol engine started in AUTO mode?",
@@ -765,7 +794,7 @@ class _AssistantTabState extends State<AssistantTab> {
             "Owner: ${widget.settings.ownerName}, Vehicle Plate: ${widget.settings.carPlateNumber}, Nickname: ${widget.settings.vehicleNickname}.\n"
             "Vehicle Specs: 1.5L Turbo + 3-speed Dedicated Hybrid Transmission (3DHT) + Dual Electric Motors, 240 kW (326 PS) / 545 Nm system torque.\n"
             "Tyres & Wheels: 225/55 R19 99V tyres, 19-inch Aero Alloy Wheels (5x108 PCD). Cold Tyre Pressure: 230 kPa (2.3 bar / 33.4 psi) on all 4 tyres. Spare tyre: tyre repair sealant kit + 12V air compressor under boot luggage floor.\n"
-            "18.3 kWh LFP battery pack (80-100 km EV range), 60L petrol tank (~1,000-1,200 km combined range). Type 2 AC charging (6.6 kW, ~2.8 hours 0-100%). AUTO mode prioritizes EV until battery drops below ~20-25% SOC or hard acceleration.\n"
+            "19.27 kWh LFP battery pack (80-100 km EV range), 51L petrol tank (~1,000-1,200 km combined range). Type 2 AC charging (6.6 kW, ~2.8 hours 0-100%). AUTO mode prioritizes EV until battery drops below ~20-25% SOC or hard acceleration.\n"
             "Engine Oil: Fully Synthetic C5 0W-20 (4.7L, RM 270.00). Spark plugs: replaced every 30,000 km (RM 308.40). Major powertrain fluids: 40,000 km (3DHT transmission oil RM 399.20, coolant RM 141.80, brake fluid RM 100.00).\n"
             "Official Service Milestones (27 Aug 2026): 1k km (FOC), 10k km (RM 407.50), 20k km (RM 444.60, FOC labour), 30k km (RM 715.90), "
             "40k km (RM 1,085.60, FOC labour), 60k km (RM 753.00, FOC labour), 120k km (RM 1,644.00 major overhaul). Free labour at 1k, 20k, 40k, 60k, 80k, 100k km. TNB: RM ${widget.settings.tnbTariff}/kWh, RON95: RM ${widget.settings.fuelPrice}/L.\n"
@@ -873,9 +902,9 @@ class _AssistantTabState extends State<AssistantTab> {
       citations = [{"document": "Chery Tiggo 7 PHEV Malaysian Market Guide", "section": "Wheels & Tyres", "page": 184}];
     } else if (q.contains("battery") || q.contains("kwh") || q.contains("capacity") || q.contains("range") || (q.contains("charge") && !q.contains("cost"))) {
       answer = "### Chery Tiggo 7 PHEV CSH — Battery & Electric Driving Range\n\n"
-          "- **Traction Battery:** **18.3 kWh LFP (Lithium Iron Phosphate)** High-Safety Blade Cells\n"
+          "- **Traction Battery:** **19.27 kWh LFP (Lithium Iron Phosphate)** High-Safety Blade Cells\n"
           "- **Pure Electric Driving Range:** **80 – 100 km (NEDC)** / **~90 km (WLTP)**\n"
-          "- **Total Combined Hybrid Range:** **~1,200 km** (60L fuel tank + 18.3 kWh battery)\n"
+          "- **Total Combined Hybrid Range:** **~1,200 km** (51L fuel tank + 19.27 kWh battery)\n"
           "- **AC Charging Port:** **Type 2 Mennekes** (supports 6.6 kW AC and 40 kW DC fast charging)\n"
           "- **Recommended Charging Habit:** Daily AC charging at home (TNB off-peak 10:00 PM – 08:00 AM @ RM 0.28/kWh = ~RM 4.20 full top-up)\n"
           "- **Battery Warranty:** **8 Years / 160,000 km** with 1-to-1 replacement if State of Health (SOH) drops below 70%\n\n"
@@ -1177,7 +1206,25 @@ class _AssistantTabState extends State<AssistantTab> {
                   onSubmitted: _sendMessage,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
+              InkWell(
+                onTap: _listenVoice,
+                borderRadius: BorderRadius.circular(AppDesignTokens.radiusPill),
+                child: Container(
+                  width: AppDesignTokens.minTouchTarget,
+                  height: AppDesignTokens.minTouchTarget,
+                  decoration: BoxDecoration(
+                    color: _isListening ? const Color(0xFFFF5252) : (isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0)),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    _isListening ? Icons.mic : Icons.mic_none_rounded,
+                    size: 18,
+                    color: _isListening ? Colors.white : accent,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
               SizedBox(
                 width: AppDesignTokens.minTouchTarget,
                 height: AppDesignTokens.minTouchTarget,
@@ -1226,7 +1273,7 @@ class EnergyTab extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text('Up to 6.6 kW', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: accent)),
                 const SizedBox(height: 4),
-                const Text('0–100% full charge in ~2.8 hours on AC Wallbox (18.3 kWh pack)', style: TextStyle(fontSize: 12, color: Colors.white60)),
+                const Text('0–100% full charge in ~2.8 hours on AC Wallbox (19.27 kWh pack)', style: TextStyle(fontSize: 12, color: Colors.white60)),
               ],
             ),
           ),
@@ -1254,7 +1301,7 @@ class EnergyTab extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text('⛽ Petrol (RON95 RM ${settings.fuelPrice.toStringAsFixed(2)}/L)', style: const TextStyle(fontSize: 13)),
-                    Text('RM ${petrolCost.toStringAsFixed(2)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF2F81F7))),
+                    Text('RM ${petrolCost.toStringAsFixed(2)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFFF6E40))),
                   ],
                 ),
                 const Divider(height: 20, color: Color(0xFF232D3D)),
@@ -1656,34 +1703,38 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
   ];
 
   Widget _buildSubTabSwitcher(bool isDark) {
-    final accent = context.tokens.accent;
-    final onAccent = context.tokens.onAccent;
+    final cardCol = isDark ? const Color(0xFF12141A) : Colors.white;
+    final borderCol = isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0);
+    final textMuted = isDark ? const Color(0xFF717684) : const Color(0xFF64748B);
+    const cyberLime = Color(0xFFD2F835);
 
     return Container(
       height: 38,
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF131922) : const Color(0xFFF3F4F6),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
+        color: cardCol,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: borderCol, width: 1.0),
       ),
       child: Row(
         children: [
           Expanded(
             child: InkWell(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(5),
               onTap: () => setState(() => _activeSubTab = 0),
               child: Container(
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: _activeSubTab == 0 ? accent : Colors.transparent,
-                  borderRadius: BorderRadius.circular(20),
+                  color: _activeSubTab == 0 ? cyberLime : Colors.transparent,
+                  borderRadius: BorderRadius.circular(5),
                 ),
                 child: Text(
-                  'Schedule & Pricing',
+                  'SCHEDULE & PRICING',
                   style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: _activeSubTab == 0 ? onAccent : (isDark ? Colors.white70 : const Color(0xFF6B7280)),
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                    color: _activeSubTab == 0 ? Colors.black : textMuted,
                   ),
                 ),
               ),
@@ -1691,13 +1742,13 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
           ),
           Expanded(
             child: InkWell(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(5),
               onTap: () => setState(() => _activeSubTab = 1),
               child: Container(
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: _activeSubTab == 1 ? accent : Colors.transparent,
-                  borderRadius: BorderRadius.circular(20),
+                  color: _activeSubTab == 1 ? cyberLime : Colors.transparent,
+                  borderRadius: BorderRadius.circular(5),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -1705,15 +1756,17 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                     Icon(
                       Icons.location_on,
                       size: 13,
-                      color: _activeSubTab == 1 ? onAccent : accent,
+                      color: _activeSubTab == 1 ? Colors.black : cyberLime,
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      'Service Centres (${CheryServiceDirectory.centres.length})',
+                      'SERVICE CENTRES (${CheryServiceDirectory.centres.length})',
                       style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: _activeSubTab == 1 ? onAccent : (isDark ? Colors.white70 : const Color(0xFF6B7280)),
+                        fontFamily: 'monospace',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                        color: _activeSubTab == 1 ? Colors.black : textMuted,
                       ),
                     ),
                   ],
@@ -1729,20 +1782,587 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgCol = isDark ? const Color(0xFF0A0B0E) : const Color(0xFFF6F8FA);
 
-    if (_activeSubTab == 1) {
-      return Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: _buildSubTabSwitcher(isDark),
+    return Scaffold(
+      backgroundColor: bgCol,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+              child: _buildSubTabSwitcher(isDark),
+            ),
+            Expanded(
+              child: _activeSubTab == 1
+                  ? const CheryServiceCentresScreen(isEmbedded: true)
+                  : _buildScheduleAndPricingView(context, isDark),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScheduleAndPricingView(BuildContext context, bool isDark) {
+    final bgCol = isDark ? const Color(0xFF0A0B0E) : const Color(0xFFF6F8FA);
+    final cardCol = isDark ? const Color(0xFF12141A) : Colors.white;
+    final borderCol = isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0);
+    final textMuted = isDark ? const Color(0xFF717684) : const Color(0xFF64748B);
+    final textPrimary = isDark ? Colors.white : const Color(0xFF0A0B0E);
+    final limeAccent = context.tokens.accent;
+
+    final currentKm = AppVehicleRepository.instance.isVehicleBound && AppVehicleRepository.instance.currentTelemetry.odometerKm > 0
+        ? AppVehicleRepository.instance.currentTelemetry.odometerKm
+        : 842;
+    final kmLeft = (1000 - currentKm).clamp(0, 1000);
+
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+      children: [
+        // 1. TOP HEADER: SERVICE · ODOMETER
+        Text(
+          'SERVICE · ODOMETER',
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.4,
+            color: textMuted,
           ),
-          const Expanded(
-            child: CheryServiceCentresScreen(isEmbedded: true),
+        ),
+        const SizedBox(height: 4),
+
+        // Big Odometer + Distance to service
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            RichText(
+              text: TextSpan(
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 32,
+                  fontWeight: FontWeight.w800,
+                  color: textPrimary,
+                ),
+                children: [
+                  TextSpan(text: '$currentKm'),
+                  TextSpan(
+                    text: ' km',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Text(
+              '$kmLeft km to first service',
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: limeAccent,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // 2. MILESTONE SLIDER (0 ── 500 ── 1,000)
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: SizedBox(
+            height: 10,
+            child: Stack(
+              children: [
+                Container(color: isDark ? const Color(0xFF161922) : const Color(0xFFE2E8F0)),
+                FractionallySizedBox(
+                  widthFactor: (currentKm / 1000.0).clamp(0.05, 1.0),
+                  child: Container(color: limeAccent),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('0', style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: textMuted)),
+            Text('500', style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: textMuted)),
+            Text('1,000', style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: textMuted)),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        // Service Appointment Banner (if already booked)
+        ListenableBuilder(
+          listenable: ServiceAppointmentManager.instance,
+          builder: (context, _) {
+            final upcoming = ServiceAppointmentManager.instance.upcomingAppointment;
+            if (upcoming == null) return const SizedBox.shrink();
+            return Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: cardCol,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: limeAccent.withValues(alpha: 0.6)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.event_available_rounded, size: 16, color: limeAccent),
+                          const SizedBox(width: 8),
+                          Text(
+                            'CONFIRMED APPOINTMENT',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: limeAccent,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: limeAccent,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          upcoming.daysUntil == 0
+                              ? 'TODAY'
+                              : (upcoming.daysUntil == 1 ? 'TOMORROW' : 'In ${upcoming.daysUntil} days'),
+                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF0A0B0E)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    upcoming.serviceType,
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: textPrimary),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${upcoming.formattedDate} • ${upcoming.timeSlot} • ${upcoming.centreName}',
+                    style: TextStyle(fontSize: 11.5, color: textMuted),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => _confirmCancelAppointment(context, upcoming),
+                        child: const Text('Cancel Booking', style: TextStyle(color: Colors.redAccent, fontSize: 11)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+
+        // 3. NEXT · MONTH 1: 1,000 KM INSPECTION CARD
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: cardCol,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: borderCol),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'NEXT · MONTH 1',
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                  color: textMuted,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '1,000 km inspection',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: textPrimary,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'FOC',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              // Checklist Items
+              _buildServiceCheckRow('CarLinko telematics pairing', '0.00', textPrimary, textMuted),
+              const SizedBox(height: 8),
+              _buildServiceCheckRow('3DHT & BMS diagnostic scan', '0.00', textPrimary, textMuted),
+              const SizedBox(height: 8),
+              _buildServiceCheckRow('HV harness torque check', '0.00', textPrimary, textMuted),
+              const SizedBox(height: 8),
+              _buildServiceCheckRow('Tyre pressure & torque', '0.00', textPrimary, textMuted),
+              const SizedBox(height: 18),
+
+              // Action Buttons Row: [ Find 3S/4S ] & [ Book slot ]
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        setState(() => _activeSubTab = 1);
+                      },
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: borderCol),
+                        backgroundColor: bgCol,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: Text(
+                        'Find 3S/4S',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: textPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => BookServiceAppointmentSheet.show(
+                        context,
+                        initialServiceType: '1,000 km 1st Inspection & Activation (FOC)',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: limeAccent,
+                        foregroundColor: const Color(0xFF0A0B0E),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Book slot',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0A0B0E),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 22),
+
+        // 4. SCHEDULE · TO 150,000 KM (16 STOPS)
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'SCHEDULE · TO 150,000 KM',
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.2,
+                color: textMuted,
+              ),
+            ),
+            Text(
+              '16 STOPS',
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1.0,
+                color: textMuted,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // 10k item
+        _buildScheduleMilestoneRow(
+          km: '10k',
+          month: 'Month 6',
+          desc: 'oil · filters · inspection',
+          price: 'RM 407.50',
+          badge: null,
+          textPrimary: textPrimary,
+          textMuted: textMuted,
+          cardCol: cardCol,
+          borderCol: borderCol,
+        ),
+        const SizedBox(height: 8),
+
+        // 20k item
+        _buildScheduleMilestoneRow(
+          km: '20k',
+          month: 'Month 12',
+          desc: 'parts only',
+          price: 'RM 444.60',
+          badge: 'FOC LABOUR',
+          textPrimary: textPrimary,
+          textMuted: textMuted,
+          cardCol: cardCol,
+          borderCol: borderCol,
+        ),
+        const SizedBox(height: 8),
+
+        // 30k item
+        _buildScheduleMilestoneRow(
+          km: '30k',
+          month: 'Month 18',
+          desc: 'spark plugs · fluids · inspection',
+          price: 'RM 715.90',
+          badge: null,
+          textPrimary: textPrimary,
+          textMuted: textMuted,
+          cardCol: cardCol,
+          borderCol: borderCol,
+        ),
+        const SizedBox(height: 12),
+
+        Center(
+          child: TextButton.icon(
+            onPressed: () => setState(() => _showFullTable = !_showFullTable),
+            icon: Icon(_showFullTable ? Icons.expand_less : Icons.table_chart_outlined, size: 16, color: limeAccent),
+            label: Text(
+              _showFullTable ? 'Hide 150,000 km Schedule Table' : 'View full 150,000 km schedule table (16 stops) →',
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: limeAccent,
+              ),
+            ),
+          ),
+        ),
+        if (_showFullTable) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: cardCol,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: borderCol),
+            ),
+            child: Column(
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0A0B0E) : const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          'MILESTONE',
+                          style: TextStyle(fontFamily: 'monospace', fontSize: 10, fontWeight: FontWeight.w700, color: textMuted),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          'LABOUR',
+                          style: TextStyle(fontFamily: 'monospace', fontSize: 10, fontWeight: FontWeight.w700, color: textMuted),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          'PARTS',
+                          style: TextStyle(fontFamily: 'monospace', fontSize: 10, fontWeight: FontWeight.w700, color: limeAccent),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Divider(height: 1, color: borderCol),
+                ..._milestones.map((m) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                    decoration: BoxDecoration(
+                      border: Border(bottom: BorderSide(color: borderCol.withValues(alpha: 0.5), width: 0.5)),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            '${m.km ~/ 1000}k km (M${m.month})',
+                            style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.w600, color: textPrimary),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            m.isLabourFoc ? 'FOC' : 'RM ${m.labourFee.toInt()}',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 10.5,
+                              color: m.isLabourFoc ? limeAccent : textMuted,
+                              fontWeight: m.isLabourFoc ? FontWeight.w700 : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            m.compulsoryFee == 0 ? 'FOC' : 'RM ${m.compulsoryFee.toStringAsFixed(2)}',
+                            style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.w700, color: limeAccent),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
           ),
         ],
-      );
-    }
+        const SizedBox(height: 12),
+      ],
+    );
+  }
+
+  Widget _buildServiceCheckRow(String label, String amount, Color textPrimary, Color textMuted) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: TextStyle(fontSize: 12.5, color: textPrimary)),
+        Text(amount, style: TextStyle(fontFamily: 'monospace', fontSize: 12.5, color: textMuted)),
+      ],
+    );
+  }
+
+  Widget _buildScheduleMilestoneRow({
+    required String km,
+    required String month,
+    required String desc,
+    required String price,
+    String? badge,
+    required Color textPrimary,
+    required Color textMuted,
+    required Color cardCol,
+    required Color borderCol,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: cardCol,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: borderCol),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              SizedBox(
+                width: 38,
+                child: Text(
+                  km,
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(month, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textPrimary)),
+                      if (badge != null) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: borderCol,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: Text(
+                            badge,
+                            style: TextStyle(fontFamily: 'monospace', fontSize: 8.5, color: textMuted),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(desc, style: TextStyle(fontSize: 10.5, color: textMuted)),
+                ],
+              ),
+            ],
+          ),
+          Text(
+            price,
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ignore: unused_element
+  Widget _buildOldMaintenanceTab(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final filteredMilestones = _milestones.where((m) {
       if (_filterIndex == 1) return m.isLabourFoc;
@@ -1762,312 +2382,6 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
       children: [
         _buildSubTabSwitcher(isDark),
         const SizedBox(height: 14),
-
-        // Title Header
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Service Schedule & Pricing',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Chery Tiggo 7 PHEV CSH • ${widget.settings.carPlateNumber} • ${widget.settings.ownerName}',
-                    style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF6B7280)),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text('27 Aug 2026 Gazette', style: TextStyle(color: accent, fontSize: 9.5, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-
-        // Service Appointment / Milestone Reminder Area
-        ListenableBuilder(
-          listenable: ServiceAppointmentManager.instance,
-          builder: (context, _) {
-            final upcoming = ServiceAppointmentManager.instance.upcomingAppointment;
-            if (upcoming != null) {
-              return Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0F1E1B) : const Color(0xFFE6FFFA),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: 0.6)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF00D2AA).withValues(alpha: 0.2),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.event_available_rounded, size: 16, color: Color(0xFF00D2AA)),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'CONFIRMED SERVICE APPOINTMENT',
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.6,
-                                color: isDark ? const Color(0xFF00D2AA) : const Color(0xFF0D9488),
-                              ),
-                            ),
-                          ],
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF00D2AA),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            upcoming.daysUntil == 0
-                                ? 'TODAY'
-                                : (upcoming.daysUntil == 1 ? 'TOMORROW' : 'In ${upcoming.daysUntil} days'),
-                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      upcoming.serviceType,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : const Color(0xFF111827),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(Icons.calendar_today_rounded, size: 12, color: isDark ? Colors.white70 : const Color(0xFF4B5563)),
-                        const SizedBox(width: 5),
-                        Text(
-                          '${upcoming.formattedDate} • ${upcoming.timeSlot}',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : const Color(0xFF374151)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        Icon(Icons.storefront_rounded, size: 12, color: isDark ? Colors.white70 : const Color(0xFF4B5563)),
-                        const SizedBox(width: 5),
-                        Expanded(
-                          child: Text(
-                            '${upcoming.centreName} (${upcoming.centreAddress})',
-                            style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : const Color(0xFF6B7280)),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        const Icon(Icons.notifications_active_outlined, size: 12, color: Color(0xFF00D2AA)),
-                        const SizedBox(width: 5),
-                        Text(
-                          'Reminder: ${upcoming.formattedReminder}',
-                          style: const TextStyle(fontSize: 11, color: Color(0xFF00D2AA), fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                    if (upcoming.notes.isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        'Notes: "${upcoming.notes}"',
-                        style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: isDark ? Colors.white54 : const Color(0xFF6B7280)),
-                      ),
-                    ],
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: () => ServiceAppointmentManager.instance.launchDeviceCalendar(upcoming),
-                          icon: const Icon(Icons.calendar_month_rounded, size: 12, color: Color(0xFF00D2AA)),
-                          label: const Text('Add to Calendar', style: TextStyle(fontSize: 11, color: Color(0xFF00D2AA), fontWeight: FontWeight.bold)),
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Color(0xFF00D2AA)),
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            minimumSize: Size.zero,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        OutlinedButton(
-                          onPressed: () => BookServiceAppointmentSheet.show(context, existingAppointment: upcoming),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            minimumSize: Size.zero,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                          child: const Text('Reschedule', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                        ),
-                        const Spacer(),
-                        TextButton(
-                          onPressed: () => _confirmCancelAppointment(context, upcoming),
-                          child: const Text('Cancel', style: TextStyle(color: Colors.redAccent, fontSize: 11)),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            // Default Milestone reminder banner with direct "Book Service" button
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFFF1B343).withValues(alpha: 0.08) : const Color(0xFFFEF3C7),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isDark ? const Color(0xFFF1B343).withValues(alpha: 0.3) : const Color(0xFFF59E0B).withValues(alpha: 0.4),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: (isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706)).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(Icons.build_circle_outlined, size: 18, color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309)),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                'NEXT DUE: 1,000 KM INSPECTION',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.6,
-                                  color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309),
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                AppVehicleRepository.instance.isVehicleBound && AppVehicleRepository.instance.currentTelemetry.odometerKm > 0
-                                    ? '${(1000 - AppVehicleRepository.instance.currentTelemetry.odometerKm).clamp(0, 1000)} km Left'
-                                    : '1,000 km Due',
-                                style: TextStyle(
-                                  color: isDark ? Colors.black87 : Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 9.5,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'CarLinko Telematics Activation & 3DHT Diagnostic Scan (FOC)',
-                    style: TextStyle(color: isDark ? Colors.white70 : const Color(0xFF4B5563), fontSize: 11.5),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: () => BookServiceAppointmentSheet.show(
-                          context,
-                          initialServiceType: '1,000 km 1st Inspection & Activation (FOC)',
-                        ),
-                        icon: const Icon(Icons.event_available_rounded, size: 12),
-                        label: const Text('Book', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF00D2AA),
-                          foregroundColor: Colors.black87,
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          minimumSize: Size.zero,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      InkWell(
-                        onTap: () => setState(() => _activeSubTab = 1),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: (isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706)).withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: (isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706)).withValues(alpha: 0.35),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Find 3S/4S',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309),
-                                ),
-                              ),
-                              const SizedBox(width: 2),
-                              Icon(Icons.chevron_right, size: 13, color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-        const SizedBox(height: 16),
 
         // Filter Chips
         SingleChildScrollView(
@@ -2209,11 +2523,11 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2F81F7).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF2F81F7)),
+                          color: const Color(0xFFFF6E40).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0xFFFF6E40)),
                         ),
-                        child: const Text('MAJOR SERVICE', style: TextStyle(color: Color(0xFF2F81F7), fontSize: 10, fontWeight: FontWeight.bold)),
+                        child: const Text('MAJOR SERVICE', style: TextStyle(fontFamily: 'monospace', color: Color(0xFFFF6E40), fontSize: 9.5, fontWeight: FontWeight.bold)),
                       ),
                   ],
                 ),
@@ -2504,9 +2818,9 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                 _buildSpecRow('Powertrain', '1.5L Turbo + Dual Motors (CSH)', isDark),
                 _buildSpecRow('System Output', '240 kW (326 PS) / 545 Nm', isDark),
                 _buildSpecRow('Transmission', '3-speed Dedicated Hybrid (3DHT)', isDark),
-                _buildSpecRow('Battery Capacity', '18.3 kWh LFP Traction Battery', isDark),
+                _buildSpecRow('Battery Capacity', '19.27 kWh LFP Traction Battery', isDark),
                 _buildSpecRow('Electric Range', '80–100 km (NEDC rated 100 km)', isDark),
-                _buildSpecRow('Fuel Tank', '60 Litres (RON95 compatible)', isDark),
+                _buildSpecRow('Fuel Tank', '51 Litres (RON95 compatible)', isDark),
                 _buildSpecRow('Target Cold Tyre Pressure', '230 kPa (2.3 bar / 33.4 psi)', isDark),
                 _buildSpecRow('Vehicle Warranty', '7 Years / 150,000 km', isDark),
                 _buildSpecRow('Battery Warranty', '8 Years / 160,000 km', isDark),

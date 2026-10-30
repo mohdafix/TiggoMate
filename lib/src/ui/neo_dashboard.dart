@@ -7,6 +7,7 @@ import '../carlinko/vehicle_telemetry.dart';
 import '../carlinko/vehicle_skin.dart';
 import '../auth/auth_service.dart';
 import '../theme/app_theme.dart';
+import '../theme/app_tokens.dart';
 import 'auth_sheet.dart';
 import 'carlinko_connect_dialog.dart';
 import 'chery_service_centres_screen.dart';
@@ -21,6 +22,11 @@ import '../widgets/home_widget_service.dart';
 import 'climate_control_sheet.dart';
 import 'window_sunroof_sheet.dart';
 import 'remote_engine_sheet.dart';
+import 'blueprint_car_canvas.dart';
+import 'ask_assistant_sheet.dart';
+import 'energy_screen.dart';
+import '../mytnb/mytnb_api.dart';
+import 'mytnb_connect_dialog.dart';
 
 class NeoDashboard extends StatefulWidget {
   final VehicleRepository repository;
@@ -423,7 +429,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text('Battery Pack Size', style: TextStyle(fontSize: 12, color: colors.textSecondary)),
-                        Text('18.3 kWh LFP (${_telemetry.batteryPct}% SoC)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colors.evTeal)),
+                        Text('19.27 kWh LFP (${_telemetry.batteryPct}% SoC)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colors.evTeal)),
                       ],
                     ),
                     Divider(height: 20, color: colors.border),
@@ -680,26 +686,67 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       _openCarlinkoConnect();
       return;
     }
-    if (action == 'lock') {
-      final willLock = !_isDoorsLocked;
+    if (action == 'lock' || action == 'door_lock') {
+      final willLock = action == 'door_lock' ? true : !_isDoorsLocked;
       setState(() => _isDoorsLocked = willLock);
       widget.repository.sendRemoteCommand(willLock ? 'door_lock' : 'door_unlock');
       _showNotification(willLock ? '🔒 CarLinko: Doors Locked' : '🔓 CarLinko: Doors Unlocked');
       _syncWidgetTelemetry();
-    } else if (action == 'climate') {
-      final willTurnOn = !_isAcActive;
+    } else if (action == 'door_unlock') {
+      setState(() => _isDoorsLocked = false);
+      widget.repository.sendRemoteCommand('door_unlock');
+      _showNotification('🔓 CarLinko: Doors Unlocked');
+      _syncWidgetTelemetry();
+    } else if (action == 'climate' || action == 'climate_on') {
+      final willTurnOn = action == 'climate_on' ? true : !_isAcActive;
       setState(() => _isAcActive = willTurnOn);
       widget.repository.sendRemoteCommand(willTurnOn ? 'ac_on' : 'ac_off');
-      _showNotification(willTurnOn ? '❄️ Cabin Pre-cooling started (${_telemetry.acTemp}°C)' : '❄️ Climate Pre-conditioning OFF');
+      _showNotification(willTurnOn ? '❄️ Cabin Pre-cooling started (22°C)' : '❄️ Climate Pre-conditioning OFF');
       _syncWidgetTelemetry();
-    } else if (action == 'windows') {
+    } else if (action == 'climate_off') {
+      setState(() => _isAcActive = false);
+      widget.repository.sendRemoteCommand('ac_off');
+      _showNotification('❄️ Climate Pre-conditioning OFF');
+      _syncWidgetTelemetry();
+    } else if (action == 'windows_open') {
+      setState(() => _isWindowsVented = true);
+      widget.repository.sendRemoteCommand('window_open_all');
+      _showNotification('🪟 CarLinko: All 4 Windows opened');
+    } else if (action == 'windows_close') {
+      setState(() => _isWindowsVented = false);
+      widget.repository.sendRemoteCommand('window_close_all');
+      _showNotification('🪟 CarLinko: All Windows closed and secured');
+    } else if (action == 'windows' || action == 'windows_vent') {
       setState(() => _isWindowsVented = !_isWindowsVented);
       widget.repository.sendRemoteCommand(_isWindowsVented ? 'window_vent' : 'window_close');
       _showNotification(_isWindowsVented ? '🪟 Windows vented (20mm)' : '🪟 All Windows closed');
-    } else if (action == 'trunk') {
+    } else if (action == 'sunroof_open') {
+      widget.repository.sendRemoteCommand('sunroof_open');
+      _showNotification('☀️ Panoramic Sunroof opened');
+    } else if (action == 'sunroof_close') {
+      widget.repository.sendRemoteCommand('sunroof_close');
+      _showNotification('☀️ Panoramic Sunroof closed');
+    } else if (action == 'trunk' || action == 'trunk_open') {
       setState(() => _isTrunkOpen = !_isTrunkOpen);
       widget.repository.sendRemoteCommand(_isTrunkOpen ? 'trunk_open' : 'trunk_close');
       _showNotification(_isTrunkOpen ? '🚗 Power Tailgate opened' : '🚗 Tailgate closed');
+    } else if (action == 'engine_start') {
+      widget.repository.sendRemoteCommand('engine_start');
+      _showNotification('⚡ 1.5T Dedicated Hybrid Engine Remote Started');
+    } else if (action == 'engine_stop') {
+      widget.repository.sendRemoteCommand('engine_stop');
+      _showNotification('⚡ Engine Shut Down');
+    } else if (action == 'schedule_charging') {
+      _openSmartChargingSheet();
+    } else if (action == 'check_tnb') {
+      showDialog(
+        context: context,
+        builder: (ctx) => MyTnbConnectDialog(
+          repository: MyTnbRepository(),
+          currentTariff: widget.tnbTariff,
+          onTariffUpdated: (r, a) {},
+        ),
+      );
     } else if (action == 'locate') {
       widget.repository.sendRemoteCommand('locate');
       VehicleRadarSheet.show(
@@ -799,6 +846,688 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
+    return _buildCyberDashboard(context);
+  }
+
+  Widget _buildCyberDashboard(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgCol = isDark ? const Color(0xFF0A0B0E) : const Color(0xFFF6F8FA);
+    final cardCol = isDark ? const Color(0xFF12141A) : Colors.white;
+    final borderCol = isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0);
+    final textMuted = isDark ? const Color(0xFF717684) : const Color(0xFF64748B);
+    final textPrimary = isDark ? Colors.white : const Color(0xFF0A0B0E);
+    final limeAccent = context.tokens.accent;
+    const orangeAccent = Color(0xFFFF6E40);
+
+    final isBound = widget.repository.isVehicleBound;
+    final totalRange = isBound && _telemetry.totalRangeKm > 0 ? _telemetry.totalRangeKm : 686;
+    final evRange = isBound && _telemetry.electricRangeKm > 0 ? _telemetry.electricRangeKm : 22;
+    final fuelRange = isBound && _telemetry.fuelRangeKm > 0 ? _telemetry.fuelRangeKm : 664;
+    final evPct = isBound && _telemetry.batteryPct > 0 ? _telemetry.batteryPct : 24;
+    final fuelPct = (fuelRange / 838.0 * 100).round().clamp(10, 100);
+
+    final totalRangeSum = (evRange + fuelRange) > 0 ? (evRange + fuelRange) : 1;
+    final evFraction = (evRange / totalRangeSum).clamp(0.05, 0.95);
+
+    return Scaffold(
+      backgroundColor: bgCol,
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          children: [
+            // 1. TOP HEADER: Model subtitle + Big Plate + Bell + Menu
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.vehicleNickname.isNotEmpty ? widget.vehicleNickname.toUpperCase() : 'CHERY TIGGO 7 PHEV · CSH',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.4,
+                        color: textMuted,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      widget.carPlateNumber.isNotEmpty ? widget.carPlateNumber : 'VRT 3342',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 30,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                        color: textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    // Bell icon
+                    ListenableBuilder(
+                      listenable: VehicleAlertsManager.instance,
+                      builder: (context, _) {
+                        final unread = VehicleAlertsManager.instance.unreadCount;
+                        return Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            IconButton(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.all(6),
+                              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                              icon: Icon(Icons.notifications_outlined, size: 22, color: textPrimary),
+                              onPressed: () => VehicleAlertsSheet.show(context),
+                            ),
+                            if (unread > 0)
+                              Positioned(
+                                top: 6,
+                                right: 6,
+                                child: Container(
+                                  width: 7,
+                                  height: 7,
+                                  decoration: BoxDecoration(
+                                    color: limeAccent,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: bgCol, width: 1.5),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 4),
+
+                    // Menu icon (Burger)
+                    PopupMenuButton<String>(
+                      tooltip: 'Vehicle Tools & Settings',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      icon: Icon(Icons.menu_rounded, size: 24, color: textPrimary),
+                      color: cardCol,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        side: BorderSide(color: borderCol),
+                      ),
+                      onSelected: (val) {
+                        switch (val) {
+                          case 'skin_studio':
+                            _showVehicleSkinStudioModal();
+                            break;
+                          case 'orbit_3d':
+                            _show3DOrbitDialog();
+                            break;
+                          case 'hud':
+                            SmartDriveHudSheet.show(context);
+                            break;
+                          case 'centres':
+                            Navigator.of(context).push(
+                              MaterialPageRoute(builder: (context) => const CheryServiceCentresScreen()),
+                            );
+                            break;
+                          case 'theme':
+                            AppThemeController.instance.toggleTheme(context);
+                            break;
+                          case 'settings':
+                            widget.onOpenSettings();
+                            break;
+                        }
+                      },
+                      itemBuilder: (ctx) => [
+                        PopupMenuItem(
+                          value: 'skin_studio',
+                          child: Row(
+                            children: [
+                              Icon(Icons.palette_outlined, size: 18, color: limeAccent),
+                              const SizedBox(width: 10),
+                              const Text('Vehicle Paint Studio', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'orbit_3d',
+                          child: Row(
+                            children: [
+                              Icon(Icons.view_in_ar_outlined, size: 18, color: textMuted),
+                              const SizedBox(width: 10),
+                              const Text('3D Orbit Viewer', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'hud',
+                          child: Row(
+                            children: [
+                              Icon(Icons.speed_outlined, size: 18, color: textMuted),
+                              const SizedBox(width: 10),
+                              const Text('Smart Drive Mode HUD', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'centres',
+                          child: Row(
+                            children: [
+                              Icon(Icons.storefront_outlined, size: 18, color: textMuted),
+                              const SizedBox(width: 10),
+                              const Text('Chery Service Centres', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuDivider(),
+                        PopupMenuItem(
+                          value: 'theme',
+                          child: Row(
+                            children: [
+                              Icon(isDark ? Icons.wb_sunny_outlined : Icons.nightlight_round_outlined, size: 18, color: textMuted),
+                              const SizedBox(width: 10),
+                              Text(isDark ? 'Light Theme' : 'Dark Theme', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'settings',
+                          child: Row(
+                            children: [
+                              Icon(Icons.settings_outlined, size: 18, color: textMuted),
+                              const SizedBox(width: 10),
+                              const Text('Settings & Profile', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // 2. STATUS CAPSULE
+            GestureDetector(
+              onTap: _openCarlinkoConnect,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: cardCol,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: borderCol),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isBound ? limeAccent : const Color(0xFFFFB74D),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              isBound
+                                  ? 'LIVE CarLinko · synced 12s ago'
+                                  : 'Pending Car Bind · Awaiting VIN pairing',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: isBound ? textPrimary : const Color(0xFFFFB74D),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'P · Parked',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // 3. BLUEPRINT TOP-VIEW CAR WITH 4-WHEEL TPMS CALLOUTS
+            BlueprintCarCanvas(
+              telemetry: _telemetry,
+              isBound: isBound,
+              accentColor: limeAccent,
+            ),
+            const SizedBox(height: 18),
+
+            // 4. TOTAL RANGE & DUAL ENERGY BAR (Tappable to open Energy Plan)
+            GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => EnergyScreen(
+                      telemetry: _telemetry,
+                      isCharging: _telemetry.isCharging,
+                      tnbTariff: widget.tnbTariff,
+                      fuelPrice: widget.fuelPrice,
+                    ),
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                color: Colors.transparent,
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'TOTAL RANGE',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.2,
+                                color: textMuted,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(Icons.chevron_right, size: 13, color: limeAccent),
+                          ],
+                        ),
+                        RichText(
+                          text: TextSpan(
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
+                              color: textPrimary,
+                            ),
+                            children: [
+                              TextSpan(text: '$totalRange'),
+                              TextSpan(
+                                text: ' km',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Dual Split Range Bar
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: SizedBox(
+                        height: 10,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: (evFraction * 100).round(),
+                              child: Container(color: limeAccent),
+                            ),
+                            const SizedBox(width: 2),
+                            Expanded(
+                              flex: ((1.0 - evFraction) * 100).round(),
+                              child: Container(color: orangeAccent),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Sub-row: ■ EV 24% · 22 km    ■ Fuel 71% · 664 km
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(width: 8, height: 8, color: limeAccent),
+                            const SizedBox(width: 6),
+                            Text(
+                              'EV $evPct% · $evRange km',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            Container(width: 8, height: 8, color: orangeAccent),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Fuel $fuelPct% · $fuelRange km',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            // 5. 6-GRID REMOTE CONTROL CARDS
+            Row(
+              children: [
+                Expanded(
+                  child: _buildCyberRemoteCard(
+                    title: 'DOORS',
+                    value: _isDoorsLocked ? 'Locked' : 'Unlocked',
+                    icon: _isDoorsLocked ? '🔒' : '🔓',
+                    isActive: _isDoorsLocked,
+                    limeAccent: limeAccent,
+                    cardCol: cardCol,
+                    borderCol: borderCol,
+                    textMuted: textMuted,
+                    textPrimary: textPrimary,
+                    onTap: () => _handleRemoteCommand('lock'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildCyberRemoteCard(
+                    title: 'CLIMATE',
+                    value: _isAcActive ? '${_telemetry.acTemp}°C' : 'Off → 22°',
+                    icon: null,
+                    isActive: _isAcActive,
+                    limeAccent: limeAccent,
+                    cardCol: cardCol,
+                    borderCol: borderCol,
+                    textMuted: textMuted,
+                    textPrimary: textPrimary,
+                    onTap: _openClimateControlSheet,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildCyberRemoteCard(
+                    title: 'WINDOWS',
+                    value: _isWindowsVented ? 'Vented' : 'Closed',
+                    icon: null,
+                    isActive: _isWindowsVented,
+                    limeAccent: limeAccent,
+                    cardCol: cardCol,
+                    borderCol: borderCol,
+                    textMuted: textMuted,
+                    textPrimary: textPrimary,
+                    onTap: _openWindowSunroofSheet,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            Row(
+              children: [
+                Expanded(
+                  child: _buildCyberRemoteCard(
+                    title: 'TRUNK',
+                    value: _isTrunkOpen ? 'Open' : 'Closed',
+                    icon: null,
+                    isActive: _isTrunkOpen,
+                    limeAccent: limeAccent,
+                    cardCol: cardCol,
+                    borderCol: borderCol,
+                    textMuted: textMuted,
+                    textPrimary: textPrimary,
+                    onTap: () => _handleRemoteCommand('trunk'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildCyberRemoteCard(
+                    title: 'LOCATE',
+                    value: '120 m NE',
+                    icon: null,
+                    isActive: false,
+                    limeAccent: limeAccent,
+                    cardCol: cardCol,
+                    borderCol: borderCol,
+                    textMuted: textMuted,
+                    textPrimary: textPrimary,
+                    onTap: () => _handleRemoteCommand('locate'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildCyberRemoteCard(
+                    title: 'ENGINE',
+                    value: _telemetry.engineOn ? 'Running' : 'Pre-cool',
+                    icon: null,
+                    isActive: _telemetry.engineOn,
+                    limeAccent: limeAccent,
+                    cardCol: cardCol,
+                    borderCol: borderCol,
+                    textMuted: textMuted,
+                    textPrimary: textPrimary,
+                    onTap: _openRemoteEngineSheet,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+
+            // 6. BOTTOM AI COMMAND PROMPT BAR
+            GestureDetector(
+              onTap: () => AskAssistantSheet.show(
+                context,
+                carPlate: widget.carPlateNumber,
+                vehicleModel: 'CHERY TIGGO 7 PHEV · CSH',
+                batteryPct: _telemetry.batteryPct,
+                onExecuteCommand: (cmd) => _handleRemoteCommand(cmd),
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: cardCol,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: borderCol),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: Row(
+                        children: [
+                          Text('›  ', style: TextStyle(color: limeAccent, fontSize: 16, fontWeight: FontWeight.bold)),
+                          Flexible(
+                            child: Text(
+                              'Ask or command — "cool cabin to 22°"',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 11.5,
+                                color: textMuted,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'ASK',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCyberRemoteCard({
+    required String title,
+    required String value,
+    String? icon,
+    required bool isActive,
+    required Color limeAccent,
+    required Color cardCol,
+    required Color borderCol,
+    required Color textMuted,
+    required Color textPrimary,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        height: 68,
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+        decoration: BoxDecoration(
+          color: cardCol,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isActive ? limeAccent : borderCol,
+            width: isActive ? 1.5 : 1.0,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 9.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.0,
+                color: textMuted,
+              ),
+            ),
+            Row(
+              children: [
+                if (icon != null) ...[
+                  Text(icon, style: const TextStyle(fontSize: 11)),
+                  const SizedBox(width: 4),
+                ],
+                Flexible(
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: textPrimary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _show3DOrbitDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Container(
+          height: 380,
+          decoration: BoxDecoration(
+            color: const Color(0xFF12141A),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFF1E222B)),
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('3D Orbit Perspective', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white70),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+                  child: ModelViewer(
+                    src: 'assets/models/tiggo7.glb',
+                    alt: 'Chery Tiggo 7 PHEV CSH 3D Model',
+                    ar: false,
+                    autoRotate: true,
+                    autoRotateDelay: 2000,
+                    rotationPerSecond: '20deg',
+                    cameraControls: true,
+                    backgroundColor: const Color(0xFF0A0B0E),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ignore: unused_element
+  Widget _buildOldDashboard(BuildContext context) {
     final colors = AppColors(context);
     final double homeAcCost = _homeAcCost;
     final double petrolCost = _petrolCost;
@@ -829,32 +1558,34 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                           : const Color(0xFF2F81F7).withValues(alpha: 0.5),
                     ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: _telemetry.isCharging
-                              ? colors.evTeal
-                              : (AuthService().currentUser.isAuthenticated ? colors.evTeal : const Color(0xFF2F81F7)),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: _telemetry.isCharging
+                                ? colors.evTeal
+                                : (AuthService().currentUser.isAuthenticated ? colors.evTeal : const Color(0xFF2F81F7)),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 5),
-                      Icon(
-                        AuthService().currentUser.isAuthenticated
-                            ? Icons.account_circle_outlined
-                            : Icons.login_rounded,
-                        size: 14,
-                        color: AuthService().currentUser.isAuthenticated
-                            ? colors.evTeal
-                            : const Color(0xFF2F81F7),
-                      ),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
+                        const SizedBox(width: 5),
+                        Icon(
+                          AuthService().currentUser.isAuthenticated
+                              ? Icons.account_circle_outlined
+                              : Icons.login_rounded,
+                          size: 14,
+                          color: AuthService().currentUser.isAuthenticated
+                              ? colors.evTeal
+                              : const Color(0xFF2F81F7),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
                           AuthService().currentUser.isAuthenticated
                               ? AuthService().currentUser.displayName
                               : 'Log In',
@@ -868,51 +1599,51 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                                 : const Color(0xFF2F81F7),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      Builder(
-                        builder: (context) {
-                          final isBound = widget.repository.isVehicleBound;
-                          final isCharging = isBound && _telemetry.isCharging;
-                          final Color badgeColor = isBound
-                              ? colors.evTeal
-                              : (colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFD97706));
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: isCharging
-                                  ? colors.evTeal.withValues(alpha: 0.2)
-                                  : badgeColor.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 5,
-                                  height: 5,
-                                  decoration: BoxDecoration(
-                                    color: badgeColor,
-                                    shape: BoxShape.circle,
+                        const SizedBox(width: 6),
+                        Builder(
+                          builder: (context) {
+                            final isBound = widget.repository.isVehicleBound;
+                            final isCharging = isBound && _telemetry.isCharging;
+                            final Color badgeColor = isBound
+                                ? colors.evTeal
+                                : (colors.isDark ? const Color(0xFFFFB74D) : const Color(0xFFD97706));
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isCharging
+                                    ? colors.evTeal.withValues(alpha: 0.2)
+                                    : badgeColor.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 5,
+                                    height: 5,
+                                    decoration: BoxDecoration(
+                                      color: badgeColor,
+                                      shape: BoxShape.circle,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  isCharging
-                                      ? '⚡ 3.3kW'
-                                      : (isBound ? 'Live CAN-Bus' : 'Pending Bind'),
-                                  style: TextStyle(
-                                    fontSize: 9.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: badgeColor,
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    isCharging
+                                        ? '⚡ 3.3kW'
+                                        : (isBound ? 'Live CAN' : 'Pending Bind'),
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: badgeColor,
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ],
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -2502,7 +3233,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        isBound && _telemetry.isCharging ? '⚡ 3.3 kW AC' : '18.3 kWh LFP',
+                        isBound && _telemetry.isCharging ? '⚡ 3.3 kW AC' : '19.27 kWh LFP',
                         style: TextStyle(
                           fontSize: 8.5,
                           fontWeight: FontWeight.w600,
@@ -2663,7 +3394,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        '⛽ 60L Tank (RON95)',
+                        '⛽ 51L Tank (RON95)',
                         style: TextStyle(
                           fontSize: 8.5,
                           fontWeight: FontWeight.w600,
@@ -3197,7 +3928,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('18.3 kWh LFP Traction Battery', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          const Text('19.27 kWh LFP Traction Battery', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                           const SizedBox(height: 2),
                           Text('${_telemetry.batteryPct}% SoC • ${_telemetry.electricRangeKm} km EV Range • AC Type 2', style: TextStyle(fontSize: 11, color: colors.textSecondary)),
                         ],
@@ -3498,7 +4229,10 @@ class _VehicleSkinStudioSheetState extends State<_VehicleSkinStudioSheet> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 6,
+                              runSpacing: 2,
                               children: [
                                 Text(
                                   skin.name,
@@ -3508,7 +4242,6 @@ class _VehicleSkinStudioSheetState extends State<_VehicleSkinStudioSheet> {
                                     color: colors.isDark ? Colors.white : const Color(0xFF111827),
                                   ),
                                 ),
-                                const SizedBox(width: 6),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(

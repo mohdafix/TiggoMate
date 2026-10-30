@@ -62,10 +62,10 @@ class _RemoteEngineSheetState extends State<RemoteEngineSheet> {
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0C111A) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        color: isDark ? const Color(0xFF12141A) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         border: Border.all(
-          color: isDark ? const Color(0xFF233044) : Colors.black12,
+          color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0),
           width: 1,
         ),
       ),
@@ -96,10 +96,10 @@ class _RemoteEngineSheetState extends State<RemoteEngineSheet> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFF9F1C).withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
+                      color: const Color(0xFFFF6E40).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
                     ),
-                    child: const Icon(Icons.power_settings_new, size: 20, color: Color(0xFFFF9F1C)),
+                    child: const Icon(Icons.power_settings_new, size: 20, color: Color(0xFFFF6E40)),
                   ),
                   const SizedBox(width: 10),
                   Column(
@@ -134,7 +134,7 @@ class _RemoteEngineSheetState extends State<RemoteEngineSheet> {
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: colors.tileBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(color: colors.border),
             ),
             child: Column(
@@ -143,21 +143,22 @@ class _RemoteEngineSheetState extends State<RemoteEngineSheet> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('ENGINE STATE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colors.textMuted)),
+                    Text('ENGINE STATE', style: TextStyle(fontFamily: 'monospace', fontSize: 10, fontWeight: FontWeight.bold, color: colors.textMuted)),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: _engineOn
-                            ? const Color(0xFFFF9F1C).withValues(alpha: 0.15)
+                            ? const Color(0xFFFF6E40).withValues(alpha: 0.15)
                             : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
                         _engineOn ? 'RUNNING (IDLE HYBRID)' : 'STANDBY (OFF)',
                         style: TextStyle(
+                          fontFamily: 'monospace',
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: _engineOn ? const Color(0xFFFF9F1C) : colors.textMuted,
+                          color: _engineOn ? const Color(0xFFFF6E40) : colors.textMuted,
                         ),
                       ),
                     ),
@@ -176,14 +177,14 @@ class _RemoteEngineSheetState extends State<RemoteEngineSheet> {
           // Precondition Checks
           Text(
             'CAN-BUS SAFETY INTERLOCKS',
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: colors.textMuted),
+            style: TextStyle(fontFamily: 'monospace', fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: colors.textMuted),
           ),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: colors.tileBg,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(color: colors.border),
             ),
             child: Column(
@@ -206,15 +207,21 @@ class _RemoteEngineSheetState extends State<RemoteEngineSheet> {
             child: ElevatedButton.icon(
               onPressed: _confirmAction,
               style: ElevatedButton.styleFrom(
-                backgroundColor: _engineOn ? Colors.redAccent : const Color(0xFFFF9F1C),
+                backgroundColor: _engineOn ? const Color(0xFFFF453A) : const Color(0xFFFF6E40),
                 foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 elevation: 0,
               ),
-              icon: Icon(_engineOn ? Icons.stop_circle_outlined : Icons.play_circle_filled, size: 20),
+              icon: Icon(_engineOn ? Icons.stop_circle_outlined : Icons.play_circle_filled, size: 18, color: Colors.black),
               label: Text(
-                _engineOn ? 'Stop Engine Immediately' : 'Start 1.5T Engine (10 Min Runtime)',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                _engineOn ? 'STOP ENGINE IMMEDIATELY' : 'START 1.5T ENGINE (10 MIN RUNTIME)',
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12.5,
+                  color: Colors.black,
+                  letterSpacing: 0.5,
+                ),
               ),
             ),
           ),
@@ -224,14 +231,23 @@ class _RemoteEngineSheetState extends State<RemoteEngineSheet> {
   }
 
   Widget _buildInterlockRow(String title, bool ok, AppColors colors) {
+    const cyberLime = Color(0xFFD2F835);
     return Row(
       children: [
-        Icon(ok ? Icons.check_circle : Icons.cancel, size: 14, color: ok ? colors.evTeal : Colors.red),
+        Icon(ok ? Icons.check_circle : Icons.cancel, size: 14, color: ok ? cyberLime : const Color(0xFFFF453A)),
         const SizedBox(width: 8),
         Expanded(
           child: Text(title, style: TextStyle(fontSize: 11, color: colors.textSecondary)),
         ),
-        Text(ok ? 'PASS' : 'FAIL', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: ok ? colors.evTeal : Colors.red)),
+        Text(
+          ok ? 'PASS' : 'FAIL',
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 9.5,
+            fontWeight: FontWeight.bold,
+            color: ok ? cyberLime : const Color(0xFFFF453A),
+          ),
+        ),
       ],
     );
   }

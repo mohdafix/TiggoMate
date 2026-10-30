@@ -146,10 +146,10 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00D2AA).withValues(alpha: 0.15),
+                      color: const Color(0xFFD2F835).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.widgets_outlined, color: Color(0xFF00D2AA), size: 24),
+                    child: const Icon(Icons.widgets_outlined, color: Color(0xFFD2F835), size: 24),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -203,7 +203,7 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
                           Icon(
                             Icons.sync,
                             size: 14,
-                            color: const Color(0xFF00D2AA),
+                            color: const Color(0xFFD2F835),
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -211,7 +211,7 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF00D2AA),
+                              color: Color(0xFFD2F835),
                             ),
                           ),
                         ],
@@ -254,7 +254,7 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
               _buildShortcutTile(
                 context: context,
                 icon: Icons.lock_outline,
-                iconColor: const Color(0xFF00D2AA),
+                iconColor: const Color(0xFFD2F835),
                 title: widget.isLocked ? 'Unlock Vehicle' : 'Lock Vehicle',
                 subtitle: '🔒 Lock / Unlock Chery Tiggo 7 PHEV doors',
                 actionUri: 'tiggomate://action/lock',
@@ -287,7 +287,7 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
               _buildShortcutTile(
                 context: context,
                 icon: Icons.radar,
-                iconColor: const Color(0xFF00D2AA),
+                iconColor: const Color(0xFFD2F835),
                 title: 'Find My Car (Radar HUD)',
                 subtitle: '📍 360° Circular Radar locator & parking distance',
                 actionUri: 'tiggomate://action/radar',
@@ -347,10 +347,10 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
       decoration: BoxDecoration(
         color: const Color(0xFF0B132B),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: 0.5), width: 1.5),
+        border: Border.all(color: const Color(0xFFD2F835).withValues(alpha: 0.5), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF00D2AA).withValues(alpha: 0.12),
+            color: const Color(0xFFD2F835).withValues(alpha: 0.12),
             blurRadius: 16,
             spreadRadius: 2,
           ),
@@ -393,7 +393,7 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
                       decoration: BoxDecoration(
                         color: widget.isCharging
                             ? const Color(0xFFF59E0B)
-                            : const Color(0xFF00D2AA),
+                            : const Color(0xFFD2F835),
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -407,7 +407,7 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
                         fontWeight: FontWeight.bold,
                         color: widget.isCharging
                             ? const Color(0xFFF59E0B)
-                            : const Color(0xFF00D2AA),
+                            : const Color(0xFFD2F835),
                       ),
                     ),
                   ],
@@ -429,7 +429,7 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
                       style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w900,
-                        color: Color(0xFF00D2AA),
+                        color: Color(0xFFD2F835),
                       ),
                     ),
                     Text(

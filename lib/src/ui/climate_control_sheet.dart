@@ -134,6 +134,48 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
     Navigator.of(context).pop();
   }
 
+  Widget _buildMiniToggle({
+    required bool value,
+    required Color activeColor,
+    required ValueChanged<bool> onChanged,
+    required bool isDark,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onChanged(!value);
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: 36,
+        height: 20,
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          color: value
+              ? activeColor
+              : (isDark ? const Color(0xFF262C36) : const Color(0xFFCBD5E1)),
+        ),
+        alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: value ? Colors.black : Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 2,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = AppColors(context);
@@ -144,10 +186,10 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
         maxHeight: MediaQuery.of(context).size.height * 0.90,
       ),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0C111A) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        color: isDark ? const Color(0xFF12141A) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         border: Border.all(
-          color: isDark ? const Color(0xFF233044) : Colors.black12,
+          color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0),
           width: 1,
         ),
       ),
@@ -180,14 +222,14 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: _acOn
-                            ? const Color(0xFF2F81F7).withValues(alpha: 0.15)
+                            ? const Color(0xFFD2F835).withValues(alpha: 0.15)
                             : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
-                        shape: BoxShape.circle,
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Icon(
                         Icons.ac_unit,
                         size: 20,
-                        color: _acOn ? const Color(0xFF2F81F7) : colors.textMuted,
+                        color: _acOn ? const Color(0xFFD2F835) : colors.textMuted,
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -197,7 +239,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                         Text(
                           'Climate & Seat Comfort',
                           style: TextStyle(
-                            fontSize: 17,
+                            fontSize: 16.5,
                             fontWeight: FontWeight.bold,
                             color: colors.textPrimary,
                           ),
@@ -216,16 +258,16 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                     HapticFeedback.mediumImpact();
                     setState(() => _acOn = !_acOn);
                   },
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(6),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: _acOn
-                          ? const Color(0xFF2F81F7).withValues(alpha: 0.2)
+                          ? const Color(0xFFD2F835).withValues(alpha: 0.2)
                           : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06)),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(6),
                       border: Border.all(
-                        color: _acOn ? const Color(0xFF2F81F7) : colors.border,
+                        color: _acOn ? const Color(0xFFD2F835) : colors.border,
                       ),
                     ),
                     child: Row(
@@ -234,15 +276,16 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                         Icon(
                           Icons.power_settings_new,
                           size: 14,
-                          color: _acOn ? const Color(0xFF2F81F7) : colors.textMuted,
+                          color: _acOn ? const Color(0xFFD2F835) : colors.textMuted,
                         ),
                         const SizedBox(width: 6),
                         Text(
                           _acOn ? 'A/C ON' : 'A/C OFF',
                           style: TextStyle(
-                            fontSize: 11.5,
+                            fontFamily: 'monospace',
+                            fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: _acOn ? const Color(0xFF2F81F7) : colors.textMuted,
+                            color: _acOn ? const Color(0xFFD2F835) : colors.textMuted,
                           ),
                         ),
                       ],
@@ -301,12 +344,13 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                                   Text(
                                     _targetTemp.toStringAsFixed(1),
                                     style: TextStyle(
+                                      fontFamily: 'monospace',
                                       fontSize: 44,
                                       fontWeight: FontWeight.w900,
                                       color: _acOn
                                           ? (_targetTemp < 22.0
-                                              ? const Color(0xFF00D2AA)
-                                              : (_targetTemp > 25.0 ? const Color(0xFFFF9F1C) : const Color(0xFF2F81F7)))
+                                              ? const Color(0xFFD2F835)
+                                              : (_targetTemp > 25.0 ? const Color(0xFFFF6E40) : const Color(0xFFD2F835)))
                                           : colors.textPrimary,
                                       letterSpacing: -1.0,
                                     ),
@@ -365,24 +409,25 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                                   _quickWarm = false;
                                 });
                               },
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(6),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
                                   color: isSelected
-                                      ? const Color(0xFF2F81F7).withValues(alpha: 0.2)
+                                      ? const Color(0xFFD2F835)
                                       : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.04)),
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
-                                    color: isSelected ? const Color(0xFF2F81F7) : Colors.transparent,
+                                    color: isSelected ? const Color(0xFFD2F835) : Colors.transparent,
                                   ),
                                 ),
                                 child: Text(
                                   t == 18.0 ? 'LO' : '${t.toInt()}°C',
                                   style: TextStyle(
+                                    fontFamily: 'monospace',
                                     fontSize: 11,
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                    color: isSelected ? const Color(0xFF2F81F7) : colors.textSecondary,
+                                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                    color: isSelected ? Colors.black : colors.textSecondary,
                                   ),
                                 ),
                               ),
@@ -407,7 +452,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                       icon: Icons.ac_unit,
                       label: 'Rapid Cool',
                       active: _rapidCool,
-                      activeColor: const Color(0xFF00D2AA),
+                      activeColor: const Color(0xFFD2F835),
                       colors: colors,
                       onTap: () {
                         setState(() {
@@ -426,7 +471,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                       icon: Icons.whatshot,
                       label: 'Quick Warm',
                       active: _quickWarm,
-                      activeColor: const Color(0xFFFF9F1C),
+                      activeColor: const Color(0xFFFF6E40),
                       colors: colors,
                       onTap: () {
                         setState(() {
@@ -445,7 +490,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                       icon: Icons.lens_blur,
                       label: 'Front Defrost',
                       active: _frontDefrost,
-                      activeColor: Colors.cyanAccent,
+                      activeColor: const Color(0xFFD2F835),
                       colors: colors,
                       onTap: () => setState(() => _frontDefrost = !_frontDefrost),
                     ),
@@ -454,7 +499,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                       icon: Icons.window,
                       label: 'Rear Heat',
                       active: _rearDefrost,
-                      activeColor: Colors.amberAccent,
+                      activeColor: const Color(0xFFFF6E40),
                       colors: colors,
                       onTap: () => setState(() => _rearDefrost = !_rearDefrost),
                     ),
@@ -462,61 +507,77 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                 ),
                 const SizedBox(height: 14),
 
-                // 3. Pre-run Duration Selector (/user/device/manage/airDuration)
+                // 3. Pre-run Duration Selector (/user/device/manage/airDuration) - Bulletproof Responsive Row
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   decoration: BoxDecoration(
                     color: colors.tileBg,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: colors.border),
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Icon(Icons.timer_outlined, size: 17, color: colors.evTeal),
-                          const SizedBox(width: 8),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Auto Shutoff Timer', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: colors.textPrimary)),
-                              Text('airDuration CAN-bus setting', style: TextStyle(fontSize: 10, color: colors.textMuted)),
-                            ],
-                          ),
-                        ],
+                      Icon(Icons.timer_outlined, size: 16, color: const Color(0xFFD2F835)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Auto Shutoff Timer',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colors.textPrimary),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                            Text(
+                              'CAN-bus setting',
+                              style: TextStyle(fontFamily: 'monospace', fontSize: 9.5, color: colors.textMuted),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ],
+                        ),
                       ),
-                      Row(
-                        children: [5, 10, 15, 20].map((m) {
-                          final isSel = _durationMin == m;
-                          return Padding(
-                            padding: const EdgeInsets.only(left: 4),
-                            child: InkWell(
-                              onTap: () {
-                                HapticFeedback.selectionClick();
-                                setState(() => _durationMin = m);
-                              },
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: isSel ? colors.evTeal : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  '${m}m',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: isSel ? Colors.black : colors.textSecondary,
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [5, 10, 15, 20].map((m) {
+                            final isSel = _durationMin == m;
+                            return Padding(
+                              padding: const EdgeInsets.only(left: 3),
+                              child: InkWell(
+                                onTap: () {
+                                  HapticFeedback.selectionClick();
+                                  setState(() => _durationMin = m);
+                                },
+                                borderRadius: BorderRadius.circular(6),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3.5),
+                                  decoration: BoxDecoration(
+                                    color: isSel ? const Color(0xFFD2F835) : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    '${m}m',
+                                    style: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 10,
+                                      fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                                      color: isSel ? Colors.black : colors.textSecondary,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          );
-                        }).toList(),
+                            );
+                          }).toList(),
+                        ),
                       ),
-                    ],
+                    ),
+                  ],
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -526,7 +587,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
                     color: colors.tileBg,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: colors.border),
                   ),
                   child: Column(
@@ -537,14 +598,14 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.air, size: 17, color: const Color(0xFF2F81F7)),
+                              Icon(Icons.air, size: 17, color: const Color(0xFFD2F835)),
                               const SizedBox(width: 8),
                               Text('Blower Fan Speed', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: colors.textPrimary)),
                             ],
                           ),
                           Text(
-                            _fanGear == 0 ? 'AUTO GEAR' : 'GEAR $_fanGear / 7',
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2F81F7)),
+                            _fanGear == 0 ? 'AUTO' : 'GEAR $_fanGear / 7',
+                            style: const TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFD2F835)),
                           ),
                         ],
                       ),
@@ -561,20 +622,21 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                                   HapticFeedback.selectionClick();
                                   setState(() => _fanGear = i);
                                 },
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(6),
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(vertical: 6),
                                   decoration: BoxDecoration(
-                                    color: isSel ? const Color(0xFF2F81F7) : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
-                                    borderRadius: BorderRadius.circular(8),
+                                    color: isSel ? const Color(0xFFD2F835) : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
+                                    borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Center(
                                     child: Text(
                                       label,
                                       style: TextStyle(
+                                        fontFamily: 'monospace',
                                         fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: isSel ? Colors.white : colors.textSecondary,
+                                        fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                                        color: isSel ? Colors.black : colors.textSecondary,
                                       ),
                                     ),
                                   ),
@@ -629,54 +691,74 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                   children: [
                     Expanded(
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                         decoration: BoxDecoration(
                           color: colors.tileBg,
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: colors.border),
                         ),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Row(
-                              children: [
-                                Icon(Icons.filter_vintage_outlined, size: 16, color: colors.evTeal),
-                                const SizedBox(width: 8),
-                                Text('PM2.5 Purifier', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: colors.textPrimary)),
-                              ],
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.filter_vintage_outlined, size: 15, color: Color(0xFFD2F835)),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      'PM2.5 Purifier',
+                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: colors.textPrimary),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            Switch(
+                            const SizedBox(width: 4),
+                            _buildMiniToggle(
                               value: _airPurifier,
-                              activeThumbColor: colors.evTeal,
+                              activeColor: const Color(0xFFD2F835),
                               onChanged: (v) => setState(() => _airPurifier = v),
+                              isDark: isDark,
                             ),
                           ],
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                         decoration: BoxDecoration(
                           color: colors.tileBg,
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: colors.border),
                         ),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Row(
-                              children: [
-                                Icon(Icons.radio_button_checked, size: 16, color: const Color(0xFFFF9F1C)),
-                                const SizedBox(width: 8),
-                                Text('Heated Wheel', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: colors.textPrimary)),
-                              ],
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.radio_button_checked, size: 15, color: Color(0xFFFF6E40)),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      'Heated Wheel',
+                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: colors.textPrimary),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            Switch(
+                            const SizedBox(width: 4),
+                            _buildMiniToggle(
                               value: _steeringHeat,
-                              activeThumbColor: const Color(0xFFFF9F1C),
+                              activeColor: const Color(0xFFFF6E40),
                               onChanged: (v) => setState(() => _steeringHeat = v),
+                              isDark: isDark,
                             ),
                           ],
                         ),
@@ -715,8 +797,8 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
           Container(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0C111A) : Colors.white,
-              border: Border(top: BorderSide(color: colors.borderSubtle)),
+              color: isDark ? const Color(0xFF12141A) : Colors.white,
+              border: Border(top: BorderSide(color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0))),
             ),
             child: SizedBox(
               width: double.infinity,
@@ -724,17 +806,23 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
               child: ElevatedButton.icon(
                 onPressed: _applyChanges,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2F81F7),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  backgroundColor: const Color(0xFFD2F835),
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   elevation: 0,
                 ),
-                icon: const Icon(Icons.send_rounded, size: 17),
+                icon: const Icon(Icons.send_rounded, size: 16, color: Colors.black),
                 label: Text(
                   _acOn
-                      ? 'Transmit Climate Command (${_targetTemp.toStringAsFixed(1)}°C • ${_durationMin}m)'
-                      : 'Transmit Climate Shutdown',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ? 'TRANSMIT CLIMATE (${_targetTemp.toStringAsFixed(1)}°C · ${_durationMin}M)'
+                      : 'TRANSMIT CLIMATE SHUTDOWN',
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12.5,
+                    color: Colors.black,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
             ),
@@ -872,15 +960,16 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
                         decoration: BoxDecoration(
                           color: isSel
-                              ? const Color(0xFF00D2AA)
+                              ? const Color(0xFFD2F835)
                               : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          lvl == 0 ? 'Off' : '$lvl',
+                          lvl == 0 ? 'OFF' : '$lvl',
                           style: TextStyle(
+                            fontFamily: 'monospace',
                             fontSize: 9.5,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
                             color: isSel ? Colors.black : colors.textMuted,
                           ),
                         ),
@@ -913,15 +1002,16 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
                         decoration: BoxDecoration(
                           color: isSel
-                              ? const Color(0xFFFF9F1C)
+                              ? const Color(0xFFFF6E40)
                               : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          lvl == 0 ? 'Off' : '$lvl',
+                          lvl == 0 ? 'OFF' : '$lvl',
                           style: TextStyle(
+                            fontFamily: 'monospace',
                             fontSize: 9.5,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
                             color: isSel ? Colors.black : colors.textMuted,
                           ),
                         ),

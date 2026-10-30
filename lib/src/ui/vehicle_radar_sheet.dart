@@ -586,7 +586,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                   plugs: '2x Type 2 AC (22 kW) • 1x 60 kW DC',
                   price: 'RM 0.90 / kWh',
                   status: '2 of 3 Available',
-                  statusColor: const Color(0xFF00D2AA),
+                  statusColor: const Color(0xFFD2F835),
                   lat: 3.1182,
                   lon: 101.6644,
                   colors: colors,
@@ -599,7 +599,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                   plugs: '4x Type 2 AC (11 kW)',
                   price: 'RM 0.80 / kWh',
                   status: '3 of 4 Available',
-                  statusColor: const Color(0xFF00D2AA),
+                  statusColor: const Color(0xFFD2F835),
                   lat: 3.1197,
                   lon: 101.6669,
                   colors: colors,
@@ -841,7 +841,7 @@ class _CircularRadarMapPainter extends CustomPainter {
 
     // 6. Subtle Concentric Radar Grid Rings (50m, 100m, 180m)
     final ringPaint = Paint()
-      ..color = (isDark ? const Color(0xFF00D2AA) : const Color(0xFF00A389)).withValues(alpha: 0.16)
+      ..color = (isDark ? const Color(0xFFD2F835) : const Color(0xFF65A30D)).withValues(alpha: 0.16)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
     canvas.drawCircle(center, radius * 0.35, ringPaint);
@@ -855,7 +855,7 @@ class _CircularRadarMapPainter extends CustomPainter {
         startAngle: 0.0,
         endAngle: math.pi / 2,
         colors: [
-          (isDark ? const Color(0xFF00D2AA) : const Color(0xFF00A389)).withValues(alpha: 0.28),
+          (isDark ? const Color(0xFFD2F835) : const Color(0xFF65A30D)).withValues(alpha: 0.28),
           Colors.transparent,
         ],
         transform: GradientRotation(radarAngle),

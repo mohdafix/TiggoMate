@@ -68,10 +68,10 @@ class _WindowSunroofSheetState extends State<WindowSunroofSheet> {
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0C111A) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        color: isDark ? const Color(0xFF12141A) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         border: Border.all(
-          color: isDark ? const Color(0xFF233044) : Colors.black12,
+          color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0),
           width: 1,
         ),
       ),
@@ -102,10 +102,10 @@ class _WindowSunroofSheetState extends State<WindowSunroofSheet> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: colors.evTeal.withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
+                      color: const Color(0xFFD2F835).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
                     ),
-                    child: Icon(Icons.sensor_window_outlined, size: 20, color: colors.evTeal),
+                    child: const Icon(Icons.sensor_window_outlined, size: 20, color: Color(0xFFD2F835)),
                   ),
                   const SizedBox(width: 10),
                   Column(
@@ -138,7 +138,7 @@ class _WindowSunroofSheetState extends State<WindowSunroofSheet> {
           // 1. Windows Controls
           Text(
             '4-DOOR POWER WINDOWS',
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: colors.textMuted),
+            style: TextStyle(fontFamily: 'monospace', fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: colors.textMuted),
           ),
           const SizedBox(height: 8),
           Row(
@@ -148,7 +148,7 @@ class _WindowSunroofSheetState extends State<WindowSunroofSheet> {
                 desc: 'Sealed & Secured',
                 icon: Icons.compress,
                 isSelected: _windowMode == 'closed',
-                activeColor: colors.evTeal,
+                activeColor: const Color(0xFFD2F835),
                 colors: colors,
                 onTap: () => setState(() => _windowMode = 'closed'),
               ),
@@ -158,7 +158,7 @@ class _WindowSunroofSheetState extends State<WindowSunroofSheet> {
                 desc: 'Heat Escape',
                 icon: Icons.air,
                 isSelected: _windowMode == 'vent',
-                activeColor: const Color(0xFF2F81F7),
+                activeColor: const Color(0xFFD2F835),
                 colors: colors,
                 onTap: () => setState(() => _windowMode = 'vent'),
               ),
@@ -168,7 +168,7 @@ class _WindowSunroofSheetState extends State<WindowSunroofSheet> {
                 desc: 'Fully Lowered',
                 icon: Icons.vertical_align_bottom,
                 isSelected: _windowMode == 'open',
-                activeColor: Colors.amber,
+                activeColor: const Color(0xFFFF6E40),
                 colors: colors,
                 onTap: () => setState(() => _windowMode = 'open'),
               ),
@@ -179,7 +179,7 @@ class _WindowSunroofSheetState extends State<WindowSunroofSheet> {
           // 2. Panoramic Sunroof Controls
           Text(
             'PANORAMIC SUNROOF & SHADE',
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: colors.textMuted),
+            style: TextStyle(fontFamily: 'monospace', fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: colors.textMuted),
           ),
           const SizedBox(height: 8),
           Row(
@@ -189,7 +189,7 @@ class _WindowSunroofSheetState extends State<WindowSunroofSheet> {
                 desc: 'Flush Sealed',
                 icon: Icons.wb_twilight,
                 isSelected: _sunroofMode == 'closed',
-                activeColor: colors.evTeal,
+                activeColor: const Color(0xFFD2F835),
                 colors: colors,
                 onTap: () => setState(() => _sunroofMode = 'closed'),
               ),
@@ -199,7 +199,7 @@ class _WindowSunroofSheetState extends State<WindowSunroofSheet> {
                 desc: 'Highway Aero',
                 icon: Icons.open_in_full,
                 isSelected: _sunroofMode == 'tilt',
-                activeColor: const Color(0xFF2F81F7),
+                activeColor: const Color(0xFFD2F835),
                 colors: colors,
                 onTap: () => setState(() => _sunroofMode = 'tilt'),
               ),
@@ -209,7 +209,7 @@ class _WindowSunroofSheetState extends State<WindowSunroofSheet> {
                 desc: 'Full Sky View',
                 icon: Icons.open_in_browser,
                 isSelected: _sunroofMode == 'open',
-                activeColor: Colors.amber,
+                activeColor: const Color(0xFFFF6E40),
                 colors: colors,
                 onTap: () => setState(() => _sunroofMode = 'open'),
               ),
@@ -222,7 +222,7 @@ class _WindowSunroofSheetState extends State<WindowSunroofSheet> {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: colors.tileBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(color: colors.border),
             ),
             child: Row(
@@ -236,14 +236,15 @@ class _WindowSunroofSheetState extends State<WindowSunroofSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Motorized Sunshade Curtain', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: colors.textPrimary)),
-                        Text('High UV solar rejection fabric', style: TextStyle(fontSize: 10, color: colors.textMuted)),
+                        Text('High UV solar rejection fabric', style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: colors.textMuted)),
                       ],
                     ),
                   ],
                 ),
                 Switch(
                   value: _sunshadeClosed,
-                  activeThumbColor: colors.evTeal,
+                  activeThumbColor: const Color(0xFFD2F835),
+                  activeTrackColor: const Color(0xFFD2F835).withValues(alpha: 0.3),
                   onChanged: (v) => setState(() => _sunshadeClosed = v),
                 ),
               ],
@@ -257,15 +258,21 @@ class _WindowSunroofSheetState extends State<WindowSunroofSheet> {
             child: ElevatedButton.icon(
               onPressed: _applyChanges,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00D2AA),
+                backgroundColor: const Color(0xFFD2F835),
                 foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 elevation: 0,
               ),
-              icon: const Icon(Icons.send_rounded, size: 17),
+              icon: const Icon(Icons.send_rounded, size: 16, color: Colors.black),
               label: const Text(
-                'Transmit Glazing Commands to T-Box',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                'TRANSMIT GLAZING COMMANDS',
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12.5,
+                  color: Colors.black,
+                  letterSpacing: 0.5,
+                ),
               ),
             ),
           ),
@@ -289,14 +296,14 @@ class _WindowSunroofSheetState extends State<WindowSunroofSheet> {
           HapticFeedback.selectionClick();
           onTap();
         },
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(8),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
           decoration: BoxDecoration(
             color: isSelected
-                ? activeColor.withValues(alpha: colors.isDark ? 0.2 : 0.15)
+                ? activeColor.withValues(alpha: colors.isDark ? 0.18 : 0.12)
                 : colors.tileBg,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: isSelected ? activeColor : colors.border,
               width: isSelected ? 1.5 : 1,
@@ -313,8 +320,9 @@ class _WindowSunroofSheetState extends State<WindowSunroofSheet> {
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                  fontFamily: 'monospace',
+                  fontSize: 10.5,
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                   color: isSelected ? activeColor : colors.textPrimary,
                 ),
                 textAlign: TextAlign.center,
@@ -322,7 +330,8 @@ class _WindowSunroofSheetState extends State<WindowSunroofSheet> {
               Text(
                 desc,
                 style: TextStyle(
-                  fontSize: 9,
+                  fontFamily: 'monospace',
+                  fontSize: 8.5,
                   color: colors.textMuted,
                 ),
                 textAlign: TextAlign.center,

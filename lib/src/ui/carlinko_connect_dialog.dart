@@ -178,9 +178,12 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
     final isConnected = widget.repository.isCloudConnected;
 
     return Dialog(
-      backgroundColor: isDark ? const Color(0xFF131922) : Colors.white,
+      backgroundColor: isDark ? const Color(0xFF12141A) : Colors.white,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0)),
+      ),
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: isConnected && !_showLoginForm
@@ -256,9 +259,9 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF181F2C) : const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: isDark ? t.border : const Color(0xFFE2E8F0)),
+            color: isDark ? const Color(0xFF181B22) : const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -267,10 +270,10 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
                 icon: Icons.account_circle_outlined,
                 label: 'Cloud Account',
                 value: accountName,
-                accentColor: t.accent,
+                accentColor: const Color(0xFFD2F835),
                 isDark: isDark,
               ),
-              Divider(height: 18, color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+              Divider(height: 18, color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0)),
               _buildDetailRow(
                 icon: Icons.public,
                 label: 'Region Gateway',
@@ -278,7 +281,7 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
                 accentColor: isDark ? t.ink2 : const Color(0xFF475569),
                 isDark: isDark,
               ),
-              Divider(height: 18, color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+              Divider(height: 18, color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0)),
               _buildDetailRow(
                 icon: Icons.cell_tower,
                 label: 'Telematics Pipeline',
@@ -286,11 +289,11 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
                     ? 'Pending Car Bind (Pairing Required)'
                     : 'Live CAN-Bus Sync',
                 accentColor: isPreActivation
-                    ? (isDark ? const Color(0xFFF1B343) : const Color(0xFFD97706))
-                    : t.ok,
+                    ? const Color(0xFFFF6E40)
+                    : const Color(0xFFD2F835),
                 isDark: isDark,
               ),
-              Divider(height: 18, color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+              Divider(height: 18, color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0)),
               _buildDetailRow(
                 icon: Icons.access_time_rounded,
                 label: 'Last Sync',
@@ -310,27 +313,27 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFFF1B343).withValues(alpha: 0.08) : const Color(0xFFFEF3C7),
-              borderRadius: BorderRadius.circular(12),
+              color: const Color(0xFFFF6E40).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: isDark ? const Color(0xFFF1B343).withValues(alpha: 0.25) : const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                color: const Color(0xFFFF6E40).withValues(alpha: 0.4),
               ),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
+                const Icon(
                   Icons.info_outline_rounded,
-                  color: isDark ? const Color(0xFFF1B343) : const Color(0xFFB45309),
+                  color: Color(0xFFFF6E40),
                   size: 20,
                 ),
                 const SizedBox(width: 10),
-                Expanded(
+                const Expanded(
                   child: Text(
                     'Pending Car Bind: Your CarLinko account is verified. Live CAN-bus telematics and vehicle remote controls will automatically stream once your Chery centre completes vehicle VIN pairing.',
                     style: TextStyle(
                       fontSize: 11,
-                      color: isDark ? const Color(0xFFE5B56A) : const Color(0xFF92400E),
+                      color: Color(0xFFFF6E40),
                       height: 1.35,
                     ),
                   ),
@@ -345,13 +348,13 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
             width: double.infinity,
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: _isError ? Colors.red.withValues(alpha: 0.12) : t.accent.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _isError ? Colors.red.withValues(alpha: 0.3) : t.accent.withValues(alpha: 0.3)),
+              color: _isError ? Colors.red.withValues(alpha: 0.12) : const Color(0xFFD2F835).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: _isError ? Colors.red.withValues(alpha: 0.3) : const Color(0xFFD2F835).withValues(alpha: 0.3)),
             ),
             child: Text(
               _statusMessage!,
-              style: TextStyle(fontSize: 11.5, color: _isError ? Colors.redAccent : t.accent),
+              style: TextStyle(fontSize: 11.5, color: _isError ? Colors.redAccent : const Color(0xFFD2F835)),
             ),
           ),
           const SizedBox(height: 14),
@@ -360,23 +363,32 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
         // Action Buttons for Connected State
         SizedBox(
           width: double.infinity,
+          height: 46,
           child: ElevatedButton.icon(
             onPressed: _syncing ? null : _handleRefreshSync,
             style: ElevatedButton.styleFrom(
-              backgroundColor: t.accent,
-              foregroundColor: t.onAccent,
-              padding: const EdgeInsets.symmetric(vertical: 13),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              backgroundColor: const Color(0xFFD2F835),
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               elevation: 0,
             ),
             icon: _syncing
-                ? SizedBox(
+                ? const SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: t.onAccent),
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
                   )
-                : const Icon(Icons.sync_rounded, size: 18),
-            label: Text(_syncing ? 'Syncing with Chery Cloud...' : 'Refresh Cloud Sync'),
+                : const Icon(Icons.sync_rounded, size: 18, color: Colors.black),
+            label: Text(
+              _syncing ? 'SYNCING CHERY CLOUD...' : 'REFRESH CLOUD SYNC',
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.w800,
+                fontSize: 12.5,
+                color: Colors.black,
+                letterSpacing: 0.5,
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 10),
@@ -387,9 +399,9 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
                 onPressed: () => setState(() => _showLoginForm = true),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: isDark ? t.ink2 : const Color(0xFF334155),
-                  side: BorderSide(color: isDark ? t.border : const Color(0xFFCBD5E1)),
+                  side: BorderSide(color: isDark ? const Color(0xFF1E222B) : const Color(0xFFCBD5E1)),
                   padding: const EdgeInsets.symmetric(vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 icon: const Icon(Icons.manage_accounts_outlined, size: 16),
                 label: const Text('Switch Account', style: TextStyle(fontSize: 12)),
@@ -400,10 +412,10 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
               child: OutlinedButton.icon(
                 onPressed: _loading ? null : _handleDisconnect,
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: t.danger,
-                  side: BorderSide(color: t.danger.withValues(alpha: 0.5)),
+                  foregroundColor: const Color(0xFFFF453A),
+                  side: BorderSide(color: const Color(0xFFFF453A).withValues(alpha: 0.5)),
                   padding: const EdgeInsets.symmetric(vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 icon: const Icon(Icons.logout_rounded, size: 16),
                 label: const Text('Disconnect', style: TextStyle(fontSize: 12)),
@@ -652,25 +664,31 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
         // Action Buttons
         SizedBox(
           width: double.infinity,
+          height: 46,
           child: ElevatedButton.icon(
             onPressed: _loading ? null : _handleConnect,
             style: ElevatedButton.styleFrom(
-              backgroundColor: t.accent,
-              foregroundColor: t.onAccent,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              backgroundColor: const Color(0xFFD2F835),
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               elevation: 0,
             ),
             icon: _loading
-                ? SizedBox(
+                ? const SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: t.onAccent),
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
                   )
-                : const Icon(Icons.cloud_sync_rounded, size: 18),
+                : const Icon(Icons.cloud_sync_rounded, size: 18, color: Colors.black),
             label: Text(
-              _loading ? 'Connecting...' : 'Connect Cloud',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              _loading ? 'CONNECTING...' : 'BIND CARLINKO CLOUD',
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.w800,
+                fontSize: 12.5,
+                color: Colors.black,
+                letterSpacing: 0.5,
+              ),
             ),
           ),
         ),

@@ -436,13 +436,13 @@ class AppNotification {
   static Color _accentColorFor(NotificationType type, bool isDark) {
     switch (type) {
       case NotificationType.success:
-        return isDark ? AppTheme.evTealDark : AppTheme.evTealLight;
+        return const Color(0xFFD2F835);
       case NotificationType.warning:
-        return isDark ? const Color(0xFFFF9F1C) : const Color(0xFFD97706);
+        return const Color(0xFFFF6E40);
       case NotificationType.error:
-        return isDark ? const Color(0xFFFF5C5C) : const Color(0xFFDC2626);
+        return const Color(0xFFFF453A);
       case NotificationType.info:
-        return isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7);
+        return const Color(0xFFD2F835);
     }
   }
 }
@@ -525,11 +525,9 @@ class _HudAlertBannerWidgetState extends State<_HudAlertBannerWidget> with Singl
     final topPadding = mediaQuery.padding.top + 8;
     final isDark = widget.isDark;
 
-    // Bulletproof High-Contrast Theme Colors:
-    // Obsidian Dark: Deep high-contrast slate #161E2E with crisp pure white text #FFFFFF
-    // Tesla Light: Pure bright white #FFFFFF with deep obsidian charcoal text #0F172A
-    final bg = isDark ? const Color(0xFF161E2E) : Colors.white;
-    final border = isDark ? const Color(0xFF2D3A4F) : const Color(0xFFCBD5E1);
+    // Cyber Minimalist Alert Banner Styling
+    final bg = isDark ? const Color(0xFF12141A) : Colors.white;
+    final border = isDark ? const Color(0xFF1E222B) : const Color(0xFFCBD5E1);
     final textTitle = isDark ? Colors.white : const Color(0xFF0F172A);
     final textBody = isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155);
     final textMeta = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
@@ -556,13 +554,13 @@ class _HudAlertBannerWidgetState extends State<_HudAlertBannerWidget> with Singl
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
                   color: bg,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: border, width: 1.3),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: border, width: 1.2),
                   boxShadow: [
                     BoxShadow(
                       color: isDark ? Colors.black.withValues(alpha: 0.55) : Colors.black.withValues(alpha: 0.12),
-                      blurRadius: 18,
-                      offset: const Offset(0, 8),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
                     ),
                   ],
                 ),
@@ -571,11 +569,11 @@ class _HudAlertBannerWidgetState extends State<_HudAlertBannerWidget> with Singl
                   children: [
                     // Automotive Status Icon Badge
                     Container(
-                      width: 38,
-                      height: 38,
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
-                        color: accent.withValues(alpha: isDark ? 0.22 : 0.15),
-                        shape: BoxShape.circle,
+                        color: accent.withValues(alpha: isDark ? 0.18 : 0.12),
+                        borderRadius: BorderRadius.circular(6),
                         border: Border.all(
                           color: accent.withValues(alpha: 0.4),
                           width: 1.2,
@@ -584,7 +582,7 @@ class _HudAlertBannerWidgetState extends State<_HudAlertBannerWidget> with Singl
                       child: Icon(
                         widget.icon,
                         color: accent,
-                        size: 20,
+                        size: 18,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -600,7 +598,7 @@ class _HudAlertBannerWidgetState extends State<_HudAlertBannerWidget> with Singl
                               Text(
                                 widget.title,
                                 style: TextStyle(
-                                  fontSize: 13.5,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.bold,
                                   color: textTitle,
                                   letterSpacing: 0.1,
@@ -608,16 +606,18 @@ class _HudAlertBannerWidgetState extends State<_HudAlertBannerWidget> with Singl
                               ),
                               const SizedBox(width: 6),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                                 decoration: BoxDecoration(
-                                  color: accent.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(6),
+                                  color: accent.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(3),
+                                  border: Border.all(color: accent.withValues(alpha: 0.3)),
                                 ),
                                 child: Text(
-                                  'CarLinko',
+                                  'CARLINKO',
                                   style: TextStyle(
-                                    fontSize: 9.5,
-                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'monospace',
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w700,
                                     color: accent,
                                   ),
                                 ),

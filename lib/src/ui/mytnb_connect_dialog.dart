@@ -136,13 +136,114 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
     }
   }
 
+  void _showEditAccountModal(MyTnbAccount current) {
+    final caController = TextEditingController(text: current.accountNumber);
+    final descController = TextEditingController(text: current.accountDesc);
+    final kwhController = TextEditingController(text: current.currentUsageKwh.toStringAsFixed(1));
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF12141A) : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0)),
+        ),
+        title: Text(
+          'Customize TNB Account',
+          style: TextStyle(fontFamily: 'monospace', fontSize: 15, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Set your real TNB contract account (CA) number and current monthly consumption to compute true domestic tariff rates.', style: TextStyle(fontSize: 11.5, color: isDark ? Colors.white60 : Colors.black54)),
+            const SizedBox(height: 14),
+            TextField(
+              controller: caController,
+              keyboardType: TextInputType.number,
+              style: TextStyle(fontFamily: 'monospace', fontSize: 13, color: isDark ? Colors.white : Colors.black),
+              decoration: const InputDecoration(
+                labelText: 'Contract Account (CA) No',
+                hintText: 'e.g. 220194827101',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: descController,
+              style: TextStyle(fontSize: 13, color: isDark ? Colors.white : Colors.black),
+              decoration: const InputDecoration(
+                labelText: 'Account Label / Premises',
+                hintText: 'e.g. Home Bangi (Smart Meter)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: kwhController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: TextStyle(fontFamily: 'monospace', fontSize: 13, color: isDark ? Colors.white : Colors.black),
+              decoration: const InputDecoration(
+                labelText: 'Current Month Usage (kWh)',
+                hintText: 'e.g. 450.0',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('CANCEL'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFD2F835),
+              foregroundColor: Colors.black,
+            ),
+            onPressed: () {
+              final newKwh = double.tryParse(kwhController.text.trim()) ?? current.currentUsageKwh;
+              final newBill = TnbTariffCalculator.calculateDomesticBill(newKwh);
+              final newTariff = TnbTariffCalculator.calculateEffectiveTariff(newKwh);
+
+              final updated = MyTnbAccount(
+                accountNumber: caController.text.trim().isNotEmpty ? caController.text.trim() : current.accountNumber,
+                accountDesc: descController.text.trim().isNotEmpty ? descController.text.trim() : current.accountDesc,
+                address: current.address,
+                ownerName: current.ownerName,
+                isSmartMeter: current.isSmartMeter,
+                currentCharges: double.parse(newBill.toStringAsFixed(2)),
+                currentUsageKwh: newKwh,
+                projectedCostRm: double.parse((newBill * 1.15).toStringAsFixed(2)),
+                lastReadingTime: 'Manual Verified Reading',
+                effectiveTariff: newTariff,
+                isDemo: false,
+              );
+
+              widget.repository.selectAccount(updated);
+              widget.onTariffUpdated(newTariff, updated);
+              Navigator.pop(ctx);
+              setState(() {});
+            },
+            child: const Text('SAVE & APPLY', style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Dialog(
-      backgroundColor: isDark ? const Color(0xFF131922) : Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      backgroundColor: isDark ? const Color(0xFF12141A) : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0)),
+      ),
       child: ValueListenableBuilder<MyTnbAccount?>(
         valueListenable: widget.repository.selectedAccountNotifier,
         builder: (context, account, _) {
@@ -185,7 +286,7 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
                             style: TextStyle(
                               fontSize: 12,
                               color: isLoggedIn
-                                  ? const Color(0xFF00D2AA)
+                                  ? const Color(0xFFD2F835)
                                   : (isDark ? Colors.white60 : const Color(0xFF64748B)),
                             ),
                           ),
@@ -216,18 +317,18 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00D2AA).withValues(alpha: 0.12),
+                      color: const Color(0xFFD2F835).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: 0.4)),
+                      border: Border.all(color: const Color(0xFFD2F835).withValues(alpha: 0.4)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.check_circle_outline, color: Color(0xFF00D2AA), size: 18),
+                        const Icon(Icons.check_circle_outline, color: Color(0xFFD2F835), size: 18),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             _statusMessage!,
-                            style: const TextStyle(fontSize: 12, color: Color(0xFF00D2AA)),
+                            style: const TextStyle(fontSize: 12, color: Color(0xFFD2F835)),
                           ),
                         ),
                       ],
@@ -269,9 +370,75 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
   }
 
   Widget _buildConnectedView(MyTnbAccount account, MyTnbSession session, bool isDark) {
+    final allAccounts = widget.repository.allAccountsNotifier.value;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (allAccounts.length > 1) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              children: [
+                const Icon(Icons.swap_horiz, size: 14, color: Color(0xFFD2F835)),
+                const SizedBox(width: 4),
+                Text(
+                  'Switch Account (${allAccounts.length} Discovered)',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white70 : const Color(0xFF475569),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0D1219) : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0)),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: allAccounts.any((a) => a.accountNumber == account.accountNumber)
+                    ? account.accountNumber
+                    : allAccounts.first.accountNumber,
+                isExpanded: true,
+                dropdownColor: isDark ? const Color(0xFF12141A) : Colors.white,
+                items: allAccounts.map((acc) {
+                  return DropdownMenuItem<String>(
+                    value: acc.accountNumber,
+                    child: Text(
+                      '${acc.accountDesc} (${acc.accountNumber})',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                }).toList(),
+                onChanged: (selectedCa) {
+                  if (selectedCa != null) {
+                    final target = allAccounts.firstWhere(
+                      (a) => a.accountNumber == selectedCa,
+                      orElse: () => account,
+                    );
+                    widget.repository.selectAccount(target);
+                    widget.onTariffUpdated(target.effectiveTariff, target);
+                    setState(() {});
+                  }
+                },
+              ),
+            ),
+          ),
+        ],
+
         // Linked Account Card
         Container(
           width: double.infinity,
@@ -281,7 +448,7 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: account.isSmartMeter
-                  ? const Color(0xFF00D2AA).withValues(alpha: 0.3)
+                  ? const Color(0xFFD2F835).withValues(alpha: 0.3)
                   : (isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0)),
             ),
           ),
@@ -305,12 +472,12 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: account.isSmartMeter
-                          ? const Color(0xFF00D2AA).withValues(alpha: 0.2)
+                          ? const Color(0xFFD2F835).withValues(alpha: 0.2)
                           : (isDark ? Colors.white12 : const Color(0xFFF1F5F9)),
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
                         color: account.isSmartMeter
-                            ? const Color(0xFF00D2AA)
+                            ? const Color(0xFFD2F835)
                             : (isDark ? Colors.white24 : const Color(0xFFCBD5E1)),
                       ),
                     ),
@@ -321,7 +488,7 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
                           account.isSmartMeter ? Icons.sensors : Icons.speed,
                           size: 11,
                           color: account.isSmartMeter
-                              ? const Color(0xFF00D2AA)
+                              ? const Color(0xFFD2F835)
                               : (isDark ? Colors.white60 : const Color(0xFF64748B)),
                         ),
                         const SizedBox(width: 4),
@@ -331,7 +498,7 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
                             fontSize: 9.5,
                             fontWeight: FontWeight.bold,
                             color: account.isSmartMeter
-                                ? const Color(0xFF00D2AA)
+                                ? const Color(0xFFD2F835)
                                 : (isDark ? Colors.white60 : const Color(0xFF64748B)),
                           ),
                         ),
@@ -341,12 +508,35 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
                 ],
               ),
               const SizedBox(height: 4),
-              Text(
-                'CA No: ${account.accountNumber} • ${account.ownerName}',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  color: isDark ? Colors.white54 : const Color(0xFF64748B),
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'CA No: ${account.accountNumber} • ${account.ownerName}',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 11,
+                        color: isDark ? Colors.white70 : const Color(0xFF64748B),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => _showEditAccountModal(account),
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 6),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.edit_outlined, size: 12, color: Color(0xFFD2F835)),
+                          SizedBox(width: 3),
+                          Text('EDIT', style: TextStyle(fontFamily: 'monospace', fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFD2F835))),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
               if (account.address.isNotEmpty) ...[
                 const SizedBox(height: 2),
@@ -373,7 +563,7 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
                 'MONTH CONSUMPTION',
                 '${account.currentUsageKwh.toStringAsFixed(1)} kWh',
                 Icons.electric_bolt,
-                const Color(0xFF00D2AA),
+                const Color(0xFFD2F835),
                 isDark,
               ),
             ),
@@ -454,7 +644,7 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
             style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 13),
           ),
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF00D2AA),
+            backgroundColor: const Color(0xFFD2F835),
             minimumSize: const Size(double.infinity, 44),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -509,12 +699,12 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
 
   Widget _buildTelemetryStat(String label, String value, IconData icon, Color color, bool isDark) {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0D1219) : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(10),
+        color: isDark ? const Color(0xFF181B22) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0),
+          color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0),
         ),
       ),
       child: Column(
@@ -524,18 +714,38 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
             children: [
               Icon(icon, size: 12, color: color),
               const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 8.5,
-                  color: isDark ? Colors.white38 : const Color(0xFF64748B),
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 8,
+                      color: isDark ? Colors.white54 : const Color(0xFF64748B),
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 4),
-          Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color)),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12.5,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -581,7 +791,7 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
             ),
             focusedBorder: const OutlineInputBorder(
               borderRadius: BorderRadius.all(Radius.circular(12)),
-              borderSide: BorderSide(color: Color(0xFF00D2AA)),
+              borderSide: BorderSide(color: Color(0xFFD2F835)),
             ),
           ),
         ),
@@ -621,7 +831,7 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
             ),
             focusedBorder: const OutlineInputBorder(
               borderRadius: BorderRadius.all(Radius.circular(12)),
-              borderSide: BorderSide(color: Color(0xFF00D2AA)),
+              borderSide: BorderSide(color: Color(0xFFD2F835)),
             ),
           ),
         ),
@@ -631,7 +841,7 @@ class _MyTnbConnectDialogState extends State<MyTnbConnectDialog> {
         ElevatedButton(
           onPressed: _isLoading ? null : () => _handleLogin(isDemo: false),
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF00D2AA),
+            backgroundColor: const Color(0xFFD2F835),
             minimumSize: const Size(double.infinity, 44),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),

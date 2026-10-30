@@ -342,7 +342,7 @@ class CheryServiceDirectory {
       type: '4S',
       region: 'Southern',
       state: 'Johor',
-      address: '125-3, Batu 4 ½, Jalan Skudai Kiri, Kampung Skudai Kiri, 81200 Johor Bahru, Johor',
+      address: '125-3, Batu 4 Â½, Jalan Skudai Kiri, Kampung Skudai Kiri, 81200 Johor Bahru, Johor',
       phone: '010-2067299',
       operatingHours: 'Mon - Sat: 8:30 AM - 5:30 PM',
       hasBodyPaint: true,
@@ -827,6 +827,13 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgCol = isDark ? const Color(0xFF0A0B0E) : const Color(0xFFF8FAFC);
+    final cardCol = isDark ? const Color(0xFF12141A) : Colors.white;
+    final borderCol = isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0);
+    final textMuted = isDark ? const Color(0xFF717684) : const Color(0xFF64748B);
+    final textPrimary = isDark ? Colors.white : const Color(0xFF0A0B0E);
+    const cyberLime = Color(0xFFD2F835);
+    const cyberOrange = Color(0xFFFF6E40);
 
     // Determine nearest centre if GPS is available
     CheryServiceCentre? closestCentre;
@@ -844,54 +851,49 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
           child: Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: isDark
-                    ? const [Color(0xFF1B2A32), Color(0xFF131922)]
-                    : const [Color(0xFFE6FFFA), Color(0xFFF0FDF4)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: isDark ? 0.3 : 0.5)),
+              color: cardCol,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: cyberOrange.withValues(alpha: 0.5)),
             ),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF00D2AA).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
+                    color: cyberOrange.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const Icon(Icons.support_agent, color: Color(0xFF00D2AA), size: 26),
+                  child: const Icon(Icons.support_agent, color: cyberOrange, size: 22),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Chery 24/7 Roadside Careline',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: isDark ? Colors.white : const Color(0xFF111827)),
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: textPrimary),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Toll-Free Nationwide • High Voltage PHEV Rescue',
-                        style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF4B5563)),
+                        'Toll-Free 1800-88-2868 · HV PHEV Rescue',
+                        style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: textMuted),
                       ),
                     ],
                   ),
                 ),
                 ElevatedButton.icon(
                   onPressed: () => _makePhoneCall(CheryServiceDirectory.tollFreeCareline),
-                  icon: const Icon(Icons.call, size: 14, color: Colors.black87),
-                  label: const Text('Call', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87, fontSize: 12)),
+                  icon: const Icon(Icons.call, size: 12, color: Colors.black),
+                  label: const Text('CALL', style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w800, color: Colors.black, fontSize: 11)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00D2AA),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    backgroundColor: cyberLime,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     minimumSize: Size.zero,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                    elevation: 0,
                   ),
                 ),
               ],
@@ -904,11 +906,11 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF121A20) : const Color(0xFFF0FDF4),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: 0.45)),
+                color: cardCol,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: cyberLime.withValues(alpha: 0.6)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -918,35 +920,36 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                     children: [
                       Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.near_me_rounded, color: Color(0xFF00D2AA), size: 14),
-                          const SizedBox(width: 5),
+                        children: const [
+                          Icon(Icons.near_me_rounded, color: cyberLime, size: 12),
+                          SizedBox(width: 5),
                           Text(
                             'NEAREST SERVICE CENTRE',
                             style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.6,
-                              color: isDark ? const Color(0xFF00D2AA) : const Color(0xFF0D9488),
+                              fontFamily: 'monospace',
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.8,
+                              color: cyberLime,
                             ),
                           ),
                         ],
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF00D2AA).withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: 0.4)),
+                          color: cyberLime.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(3),
+                          border: Border.all(color: cyberLime.withValues(alpha: 0.4)),
                         ),
                         child: Text(
                           '${closestCentre.distanceTo(_userPosition!.latitude, _userPosition!.longitude).toStringAsFixed(1)} km away',
-                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF00D2AA)),
+                          style: const TextStyle(fontFamily: 'monospace', fontSize: 10, fontWeight: FontWeight.w700, color: cyberLime),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
                       Expanded(
@@ -956,16 +959,16 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                             Text(
                               closestCentre.name,
                               style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: isDark ? Colors.white : const Color(0xFF111827),
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: textPrimary,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${closestCentre.dealerName} • ${closestCentre.type} Hub',
-                              style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : const Color(0xFF6B7280)),
+                              '${closestCentre.dealerName} • ${closestCentre.type}',
+                              style: TextStyle(fontSize: 10.5, color: textMuted),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ],
@@ -975,24 +978,25 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                       OutlinedButton(
                         onPressed: () => BookServiceAppointmentSheet.show(context, preselectedCentre: closestCentre),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF00D2AA),
-                          side: const BorderSide(color: Color(0xFF00D2AA)),
+                          foregroundColor: textPrimary,
+                          side: BorderSide(color: borderCol),
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           minimumSize: Size.zero,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                         ),
-                        child: const Text('Book', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        child: const Text('BOOK', style: TextStyle(fontFamily: 'monospace', fontSize: 10.5, fontWeight: FontWeight.w700)),
                       ),
                       const SizedBox(width: 6),
                       ElevatedButton.icon(
                         onPressed: () => _openMaps(closestCentre!),
-                        icon: const Icon(Icons.directions, size: 12, color: Colors.black87),
-                        label: const Text('Go', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87)),
+                        icon: const Icon(Icons.directions, size: 11, color: Colors.black),
+                        label: const Text('GO', style: TextStyle(fontFamily: 'monospace', fontSize: 10.5, fontWeight: FontWeight.w800, color: Colors.black)),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF00D2AA),
+                          backgroundColor: cyberLime,
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           minimumSize: Size.zero,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                          elevation: 0,
                         ),
                       ),
                     ],
@@ -1011,14 +1015,14 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                 child: TextField(
                   controller: _searchController,
                   onChanged: (val) => setState(() {}),
-                  style: TextStyle(color: isDark ? Colors.white : const Color(0xFF111827), fontSize: 13),
+                  style: TextStyle(color: textPrimary, fontSize: 12.5),
                   decoration: InputDecoration(
                     hintText: 'Search city, dealer, or state (e.g. Puchong, Ipoh)...',
-                    hintStyle: TextStyle(fontSize: 12.5, color: isDark ? Colors.white38 : const Color(0xFF9CA3AF)),
-                    prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF00D2AA)),
+                    hintStyle: TextStyle(fontSize: 11.5, color: textMuted),
+                    prefixIcon: const Icon(Icons.search, size: 18, color: cyberLime),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
-                            icon: Icon(Icons.clear, size: 18, color: isDark ? Colors.white60 : const Color(0xFF6B7280)),
+                            icon: Icon(Icons.clear, size: 16, color: textMuted),
                             onPressed: () {
                               _searchController.clear();
                               setState(() {});
@@ -1026,19 +1030,19 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                           )
                         : null,
                     filled: true,
-                    fillColor: isDark ? const Color(0xFF131922) : Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    fillColor: cardCol,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0)),
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: borderCol),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0)),
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: borderCol),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(color: Color(0xFF00D2AA)),
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: const BorderSide(color: cyberLime),
                     ),
                   ),
                 ),
@@ -1055,42 +1059,39 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                     });
                   }
                 },
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(6),
                 child: Container(
-                  height: 44,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  height: 40,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
                   decoration: BoxDecoration(
-                    color: _sortByNearest
-                        ? const Color(0xFF00D2AA)
-                        : (isDark ? const Color(0xFF131922) : const Color(0xFFF1F5F9)),
-                    borderRadius: BorderRadius.circular(12),
+                    color: _sortByNearest ? cyberLime : cardCol,
+                    borderRadius: BorderRadius.circular(6),
                     border: Border.all(
-                      color: _sortByNearest
-                          ? const Color(0xFF00D2AA)
-                          : (isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0)),
+                      color: _sortByNearest ? cyberLime : borderCol,
                     ),
                   ),
                   child: Row(
                     children: [
                       if (_isLocatingGps)
-                        const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF00D2AA)),
+                        SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: _sortByNearest ? Colors.black : cyberLime),
                         )
                       else
                         Icon(
                           Icons.near_me_rounded,
-                          size: 16,
-                          color: _sortByNearest ? Colors.black87 : const Color(0xFF00D2AA),
+                          size: 14,
+                          color: _sortByNearest ? Colors.black : cyberLime,
                         ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 5),
                       Text(
-                        _sortByNearest ? 'GPS: On' : 'Nearby',
+                        _sortByNearest ? 'GPS: ON' : 'NEARBY',
                         style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: _sortByNearest ? Colors.black87 : (isDark ? Colors.white70 : const Color(0xFF374151)),
+                          fontFamily: 'monospace',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: _sortByNearest ? Colors.black : textPrimary,
                         ),
                       ),
                     ],
@@ -1113,19 +1114,21 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                   padding: const EdgeInsets.only(right: 6),
                   child: FilterChip(
                     label: Text(
-                      reg,
+                      reg.toUpperCase(),
                       style: TextStyle(
-                        fontSize: 11.5,
-                        color: isSelected ? Colors.black : (isDark ? Colors.white70 : const Color(0xFF4B5563)),
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontFamily: 'monospace',
+                        fontSize: 10.5,
+                        color: isSelected ? Colors.black : textMuted,
+                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                       ),
                     ),
                     selected: isSelected,
                     onSelected: (val) => setState(() => _selectedRegion = reg),
-                    backgroundColor: isDark ? const Color(0xFF131922) : const Color(0xFFF1F5F9),
-                    selectedColor: const Color(0xFF00D2AA),
-                    side: BorderSide(color: isSelected ? const Color(0xFF00D2AA) : (isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0))),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    backgroundColor: cardCol,
+                    selectedColor: cyberLime,
+                    side: BorderSide(color: isSelected ? cyberLime : borderCol),
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                   ),
                 );
               }),
@@ -1137,19 +1140,21 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                   padding: const EdgeInsets.only(right: 6),
                   child: FilterChip(
                     label: Text(
-                      tp == 'All' ? 'All Types' : '$tp Only',
+                      tp == 'All' ? 'ALL TYPES' : '$tp ONLY',
                       style: TextStyle(
-                        fontSize: 11,
-                        color: isSelected ? Colors.white : (isDark ? Colors.white60 : const Color(0xFF4B5563)),
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                        color: isSelected ? Colors.black : textMuted,
+                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                       ),
                     ),
                     selected: isSelected,
                     onSelected: (val) => setState(() => _selectedType = tp),
-                    backgroundColor: isDark ? const Color(0xFF131922) : const Color(0xFFF1F5F9),
-                    selectedColor: const Color(0xFF2F81F7),
-                    side: BorderSide(color: isSelected ? const Color(0xFF2F81F7) : (isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0))),
+                    backgroundColor: cardCol,
+                    selectedColor: cyberLime,
+                    side: BorderSide(color: isSelected ? cyberLime : borderCol),
                     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                   ),
                 );
               }),
@@ -1165,14 +1170,14 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
             children: [
               Text(
                 _sortByNearest && _userPosition != null
-                    ? 'Showing ${filtered.length} centres • Sorted by nearest GPS'
-                    : 'Showing ${filtered.length} authorised centres',
+                    ? 'SHOWING ${filtered.length} CENTRES · ORDERED BY GPS'
+                    : 'SHOWING ${filtered.length} AUTHORISED CENTRES',
                 style: TextStyle(
-                  fontSize: 11.5,
-                  color: (_sortByNearest && _userPosition != null)
-                      ? const Color(0xFF00D2AA)
-                      : (isDark ? Colors.white54 : const Color(0xFF6B7280)),
-                  fontWeight: FontWeight.w600,
+                  fontFamily: 'monospace',
+                  fontSize: 10,
+                  color: (_sortByNearest && _userPosition != null) ? cyberLime : textMuted,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
                 ),
               ),
               InkWell(
@@ -1184,9 +1189,9 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                 },
                 child: Row(
                   children: const [
-                    Text('Official Portal', style: TextStyle(fontSize: 11, color: Color(0xFF00D2AA), fontWeight: FontWeight.bold)),
-                    SizedBox(width: 2),
-                    Icon(Icons.open_in_new, size: 12, color: Color(0xFF00D2AA)),
+                    Text('OFFICIAL PORTAL', style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: cyberLime, fontWeight: FontWeight.w700)),
+                    SizedBox(width: 3),
+                    Icon(Icons.open_in_new, size: 11, color: cyberLime),
                   ],
                 ),
               ),
@@ -1201,9 +1206,9 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.location_off_outlined, size: 48, color: Colors.white24),
+                      Icon(Icons.location_off_outlined, size: 48, color: textMuted),
                       const SizedBox(height: 12),
-                      Text('No service centres found matching "$query"', style: const TextStyle(color: Colors.white54)),
+                      Text('No service centres found matching "$query"', style: TextStyle(color: textMuted)),
                       const SizedBox(height: 6),
                       TextButton(
                         onPressed: () {
@@ -1213,7 +1218,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                             _selectedType = 'All';
                           });
                         },
-                        child: const Text('Reset Filters', style: TextStyle(color: Color(0xFF00D2AA))),
+                        child: const Text('RESET FILTERS', style: TextStyle(fontFamily: 'monospace', color: cyberLime, fontWeight: FontWeight.w700)),
                       ),
                     ],
                   ),
@@ -1235,11 +1240,19 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
     }
 
     return Scaffold(
+      backgroundColor: bgCol,
       appBar: AppBar(
-        title: const Text('Chery Service Network', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        backgroundColor: isDark ? const Color(0xFF0D1117) : Colors.white,
-        foregroundColor: isDark ? Colors.white : const Color(0xFF0F172A),
+        title: Text(
+          'CHERY SERVICE NETWORK',
+          style: TextStyle(fontFamily: 'monospace', fontSize: 15, fontWeight: FontWeight.w800, color: textPrimary, letterSpacing: 0.5),
+        ),
+        backgroundColor: bgCol,
+        foregroundColor: textPrimary,
         elevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: borderCol, height: 1),
+        ),
       ),
       body: content,
     );
@@ -1248,206 +1261,234 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
   Widget _buildCentreCard(CheryServiceCentre centre) {
     final is4S = centre.type == '4S';
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardCol = isDark ? const Color(0xFF12141A) : Colors.white;
+    final borderCol = isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0);
+    final textPrimary = isDark ? Colors.white : const Color(0xFF0A0B0E);
+    final textMuted = isDark ? const Color(0xFF717684) : const Color(0xFF64748B);
+    const cyberLime = Color(0xFFD2F835);
 
     final distanceKm = (_userPosition != null)
         ? centre.distanceTo(_userPosition!.latitude, _userPosition!.longitude)
         : null;
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Top Row: Name, Proximity & Badges
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        centre.name,
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF111827)),
+      decoration: BoxDecoration(
+        color: cardCol,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: borderCol, width: 1.0),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top Row: Name, Proximity & Badges
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      centre.name,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: textPrimary,
+                        letterSpacing: -0.2,
                       ),
-                      const SizedBox(height: 2),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      centre.dealerName,
+                      style: TextStyle(fontSize: 11.5, color: textMuted),
+                    ),
+                  ],
+                ),
+              ),
+              if (distanceKm != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                  decoration: BoxDecoration(
+                    color: cyberLime.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(3),
+                    border: Border.all(color: cyberLime.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.near_me, size: 9.5, color: cyberLime),
+                      const SizedBox(width: 3),
                       Text(
-                        centre.dealerName,
-                        style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : const Color(0xFF6B7280)),
+                        '${distanceKm.toStringAsFixed(1)} km',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: cyberLime,
+                        ),
                       ),
                     ],
                   ),
                 ),
-                // Distance Pill (when GPS is active)
-                if (distanceKm != null) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00D2AA).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: 0.45)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.near_me, size: 10, color: Color(0xFF00D2AA)),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${distanceKm.toStringAsFixed(1)} km',
-                          style: const TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF00D2AA),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                ],
-                // 4S / 3S Badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
+                const SizedBox(width: 6),
+              ],
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                decoration: BoxDecoration(
+                  color: is4S
+                      ? const Color(0xFF58A6FF).withValues(alpha: 0.15)
+                      : cyberLime.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(3),
+                  border: Border.all(
                     color: is4S
-                        ? const Color(0xFF2F81F7).withValues(alpha: 0.2)
-                        : const Color(0xFF00D2AA).withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: is4S
-                          ? const Color(0xFF2F81F7).withValues(alpha: 0.6)
-                          : const Color(0xFF00D2AA).withValues(alpha: 0.6),
-                    ),
-                  ),
-                  child: Text(
-                    centre.type,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: is4S ? const Color(0xFF58A6FF) : const Color(0xFF00D2AA),
-                    ),
+                        ? const Color(0xFF58A6FF).withValues(alpha: 0.5)
+                        : cyberLime.withValues(alpha: 0.5),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 10),
+                child: Text(
+                  centre.type,
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    color: is4S ? const Color(0xFF58A6FF) : cyberLime,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
 
-            // Capabilities Pill Row
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: [
-                _buildCapabilityBadge(Icons.bolt, 'PHEV / HV Diagnostic Ready', const Color(0xFF00D2AA)),
-                if (centre.hasBodyPaint)
-                  _buildCapabilityBadge(Icons.format_paint, 'Body & Paint (B&P)', const Color(0xFF2F81F7)),
-                _buildCapabilityBadge(Icons.location_on_outlined, centre.state, isDark ? Colors.white54 : const Color(0xFF6B7280)),
-              ],
-            ),
-            const SizedBox(height: 10),
+          // Capabilities Pill Row
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              _buildCapabilityBadge(Icons.bolt, 'PHEV / HV DIAGNOSTIC READY', cyberLime),
+              if (centre.hasBodyPaint)
+                _buildCapabilityBadge(Icons.format_paint, 'BODY & PAINT (B&P)', const Color(0xFF58A6FF)),
+              _buildCapabilityBadge(Icons.location_on_outlined, centre.state.toUpperCase(), textMuted),
+            ],
+          ),
+          const SizedBox(height: 10),
 
-            // Address Row
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.place, size: 15, color: isDark ? Colors.white38 : const Color(0xFF9CA3AF)),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    centre.address,
-                    style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : const Color(0xFF4B5563), height: 1.35),
-                  ),
+          // Address
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.place_outlined, size: 14, color: textMuted),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  centre.address,
+                  style: TextStyle(fontSize: 11.5, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155), height: 1.35),
                 ),
-              ],
-            ),
-            const SizedBox(height: 6),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
 
-            // Phone & Hours Row
-            Row(
-              children: [
-                const Icon(Icons.phone_outlined, size: 14, color: Color(0xFF00D2AA)),
-                const SizedBox(width: 6),
-                Text(
-                  centre.phone,
-                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF111827)),
+          // Phone & Hours Row
+          Row(
+            children: [
+              const Icon(Icons.phone_outlined, size: 13, color: cyberLime),
+              const SizedBox(width: 6),
+              Text(
+                centre.phone,
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: textPrimary,
                 ),
-                const Spacer(),
-                Icon(Icons.schedule, size: 13, color: isDark ? Colors.white38 : const Color(0xFF9CA3AF)),
-                const SizedBox(width: 4),
-                Text(
-                  centre.operatingHours.split('•').first.trim(),
-                  style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : const Color(0xFF9CA3AF)),
-                ),
-              ],
-            ),
-            Divider(height: 18, color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE2E8F0)),
+              ),
+              const Spacer(),
+              Icon(Icons.schedule, size: 12, color: textMuted),
+              const SizedBox(width: 4),
+              Text(
+                centre.operatingHours.split('•').first.trim(),
+                style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: textMuted),
+              ),
+            ],
+          ),
+          Divider(height: 18, color: borderCol),
 
-            // Action Buttons Row (3 equal width buttons)
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _makePhoneCall(centre.phone),
-                    icon: const Icon(Icons.call, size: 13, color: Color(0xFF00D2AA)),
-                    label: const Text('Call', style: TextStyle(fontSize: 11.5, color: Color(0xFF00D2AA), fontWeight: FontWeight.bold)),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFF00D2AA)),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      minimumSize: Size.zero,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
+          // Action Buttons Row (3 equal width cyber buttons)
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _makePhoneCall(centre.phone),
+                  icon: const Icon(Icons.call, size: 12, color: cyberLime),
+                  label: const Text('CALL', style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: cyberLime, fontWeight: FontWeight.w700)),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: cyberLime.withValues(alpha: 0.8)),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    minimumSize: Size.zero,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => BookServiceAppointmentSheet.show(context, preselectedCentre: centre),
-                    icon: const Icon(Icons.event_available_rounded, size: 13, color: Color(0xFF2F81F7)),
-                    label: const Text('Book', style: TextStyle(fontSize: 11.5, color: Color(0xFF2F81F7), fontWeight: FontWeight.bold)),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFF2F81F7)),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      minimumSize: Size.zero,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => BookServiceAppointmentSheet.show(context, preselectedCentre: centre),
+                  icon: Icon(Icons.event_available_rounded, size: 12, color: textPrimary),
+                  label: Text('BOOK', style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: textPrimary, fontWeight: FontWeight.w700)),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: borderCol),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    minimumSize: Size.zero,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _openMaps(centre),
-                    icon: const Icon(Icons.directions, size: 13, color: Colors.black87),
-                    label: const Text('Map', style: TextStyle(fontSize: 11.5, color: Colors.black87, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00D2AA),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      minimumSize: Size.zero,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => _openMaps(centre),
+                  icon: const Icon(Icons.directions, size: 12, color: Colors.black),
+                  label: const Text('MAP', style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: Colors.black, fontWeight: FontWeight.w800)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: cyberLime,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    minimumSize: Size.zero,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                    elevation: 0,
                   ),
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildCapabilityBadge(IconData icon, String label, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(3),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 11, color: color),
+          Icon(icon, size: 10, color: color),
           const SizedBox(width: 4),
-          Text(label, style: TextStyle(fontSize: 10.5, color: color, fontWeight: FontWeight.w600)),
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 9.5,
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );

@@ -3,11 +3,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../auth/auth_service.dart';
 import '../carlinko/vehicle_skin.dart';
 import '../theme/accent.dart';
-import '../theme/app_theme.dart';
 import '../theme/app_tokens.dart';
-import 'auth_sheet.dart';
 
-/// Interactive Setup & Onboarding Intro Screen for TiggoMate (DashMate Style)
+/// Screen 1: Register Your Car (Cyber Minimalist Automotive Onboarding)
 class SetupIntroScreen extends StatefulWidget {
   final VoidCallback onCompleted;
   final bool isRevisit;
@@ -25,14 +23,14 @@ class SetupIntroScreen extends StatefulWidget {
 class _SetupIntroScreenState extends State<SetupIntroScreen> {
   late TextEditingController _nameController;
   late TextEditingController _plateController;
-  String _selectedModel = 'Chery Tiggo 7 PHEV CSH';
+  String _selectedModel = 'Tiggo 7 PHEV CSH';
   String _skinKey = 'khaki_white';
 
   final List<String> _models = [
-    'Chery Tiggo 7 PHEV CSH',
-    'Chery Tiggo 8 Pro',
-    'Chery Tiggo 7 Pro',
-    'Chery Omoda 5',
+    'Tiggo 7 PHEV CSH',
+    'Tiggo 8 Pro e+',
+    'Tiggo 7 Pro',
+    'Omoda E5',
   ];
 
   AppTokens get t => context.tokens;
@@ -56,7 +54,13 @@ class _SetupIntroScreenState extends State<SetupIntroScreen> {
       setState(() {
         if (savedName != null && savedName.isNotEmpty) _nameController.text = savedName;
         if (savedPlate != null && savedPlate.isNotEmpty) _plateController.text = savedPlate;
-        if (savedModel != null && savedModel.isNotEmpty) _selectedModel = savedModel;
+        if (savedModel != null && savedModel.isNotEmpty) {
+          if (_models.contains(savedModel)) {
+            _selectedModel = savedModel;
+          } else if (savedModel.contains('Tiggo 7')) {
+            _selectedModel = 'Tiggo 7 PHEV CSH';
+          }
+        }
         if (savedSkin != null && savedSkin.isNotEmpty) _skinKey = savedSkin;
       });
     } catch (_) {}
@@ -82,7 +86,6 @@ class _SetupIntroScreenState extends State<SetupIntroScreen> {
       await prefs.setString('tm_vehicle_color_skin', _skinKey);
       await VehicleSkinManager.instance.setSkin(_skinKey);
 
-      // Initialize guest session in AuthService with configured driver details
       final auth = AuthService();
       if (!auth.currentUser.isAuthenticated) {
         await auth.continueAsGuest(name: name, plate: plate);
@@ -97,482 +100,420 @@ class _SetupIntroScreenState extends State<SetupIntroScreen> {
   @override
   Widget build(BuildContext context) {
     final skin = getVehicleSkinByKey(_skinKey);
-    final themeCtrl = AppThemeController.instance;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final bgCol = isDark ? const Color(0xFF0A0B0E) : const Color(0xFFF6F8FA);
+    final cardCol = isDark ? const Color(0xFF12141A) : Colors.white;
+    final borderCol = isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0);
+    final textMuted = isDark ? const Color(0xFF717684) : const Color(0xFF64748B);
+    final textPrimary = isDark ? Colors.white : const Color(0xFF0A0B0E);
+    final limeAccent = context.tokens.accent;
 
     return Scaffold(
-      backgroundColor: t.bg,
+      backgroundColor: bgCol,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Top Brand Tag
+              // Top Step Indicator
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: t.accent.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: t.accent.withValues(alpha: 0.3)),
-                        ),
-                        child: Text(
-                          'T I G G O M A T E',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 2.0,
-                            color: t.accent,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'SETUP',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.5,
-                          color: t.ink3,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (widget.isRevisit)
-                    IconButton(
-                      icon: Icon(Icons.close, color: t.ink2),
-                      onPressed: () => Navigator.pop(context),
-                    )
-                  else
-                    TextButton(
-                      onPressed: _finishSetup,
-                      child: Text('Skip', style: TextStyle(color: t.ink3, fontSize: 13)),
+                  Text(
+                    'TIGGOMATE',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 2.2,
+                      color: textMuted,
                     ),
+                  ),
+                  Text(
+                    'STEP 1 / 2',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.5,
+                      color: textMuted,
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
 
-              // Headline
+              // Step Progress Line
+              Stack(
+                children: [
+                  Container(
+                    height: 2,
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1A1D24) : const Color(0xFFE2E8F0),
+                      borderRadius: BorderRadius.circular(1),
+                    ),
+                  ),
+                  FractionallySizedBox(
+                    widthFactor: 0.5,
+                    child: Container(
+                      height: 2,
+                      decoration: BoxDecoration(
+                        color: limeAccent,
+                        borderRadius: BorderRadius.circular(1),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 22),
+
+              // Headline & Subtitle
               Text(
-                'Personalize Your Cockpit',
+                'Register your car.',
                 style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                  color: t.ink,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.6,
+                  color: textPrimary,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
-                'Set up your driver profile and vehicle look before entering the road.',
-                style: TextStyle(fontSize: 13, color: t.ink2, height: 1.3),
+                'Three fields. You can bind CarLinko telemetry later.',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  color: textMuted,
+                  height: 1.35,
+                ),
               ),
               const SizedBox(height: 20),
 
-              // Hero Vehicle Preview Card (changes in real-time with color choice)
+              // Car Preview Card
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: t.surface,
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: t.border),
-                  boxShadow: t.cardShadow,
+                  color: cardCol,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: borderCol, width: 1),
                 ),
                 child: Column(
                   children: [
-                    Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        // Soft radial background glow
-                        Container(
-                          height: 170,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: [
-                                t.accent.withValues(alpha: 0.18),
-                                Colors.transparent,
-                              ],
-                            ),
-                          ),
-                        ),
-                        // Real Car Hero Image Render
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 300),
+                    // Vehicle Image
+                    SizedBox(
+                      height: 145,
+                      child: Center(
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 250),
                           child: Image.asset(
                             skin.assetPath,
                             key: ValueKey(skin.assetPath),
-                            height: 160,
                             fit: BoxFit.contain,
                             errorBuilder: (context, error, stackTrace) => Image.asset(
                               'assets/images/car_hero.png',
-                              height: 160,
                               fit: BoxFit.contain,
                             ),
                           ),
                         ),
-                      ],
+                      ),
                     ),
                     const SizedBox(height: 12),
-                    Text(
-                      skin.name + (skin.isDualTone ? ' · Dual-Tone Edition' : ''),
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: t.ink),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      skin.tag,
-                      style: TextStyle(fontSize: 12, color: t.ink2),
-                    ),
-                    const SizedBox(height: 14),
 
-                    // Color Selector Swatches
+                    // Paint Name & Swatches Row
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: kOfficialVehicleSkins.map((s) {
-                        final isSel = s.key == _skinKey;
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'PAINT',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 1.4,
+                                color: textMuted,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              skin.name,
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                                color: textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: kOfficialVehicleSkins.map((s) {
+                            final isSel = s.key == _skinKey;
+                            return GestureDetector(
+                              onTap: () => setState(() => _skinKey = s.key),
+                              child: Container(
+                                margin: const EdgeInsets.only(left: 8),
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: isSel ? limeAccent : Colors.transparent,
+                                    width: 1.8,
+                                  ),
+                                ),
+                                child: Container(
+                                  width: 28,
+                                  height: 20,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(4),
+                                    color: s.primaryColor,
+                                    border: Border.all(color: borderCol),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Framed Input Rows
+              Container(
+                decoration: BoxDecoration(
+                  color: cardCol,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: borderCol, width: 1),
+                ),
+                child: Column(
+                  children: [
+                    // 01 · DRIVER
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '01 · DRIVER',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1.4,
+                              color: textMuted,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          TextField(
+                            controller: _nameController,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: textPrimary,
+                            ),
+                            decoration: InputDecoration(
+                              isDense: true,
+                              contentPadding: EdgeInsets.zero,
+                              border: InputBorder.none,
+                              hintText: 'Driver Name',
+                              hintStyle: TextStyle(color: textMuted),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Divider(height: 1, color: borderCol),
+
+                    // 02 · PLATE
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '02 · PLATE',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1.4,
+                              color: textMuted,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          TextField(
+                            controller: _plateController,
+                            textCapitalization: TextCapitalization.characters,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.0,
+                              color: textPrimary,
+                            ),
+                            decoration: InputDecoration(
+                              isDense: true,
+                              contentPadding: EdgeInsets.zero,
+                              border: InputBorder.none,
+                              hintText: 'e.g. VRT 3342',
+                              hintStyle: TextStyle(color: textMuted),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Divider(height: 1, color: borderCol),
+
+                    // 03 · MODEL
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '03 · MODEL',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1.4,
+                              color: textMuted,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: _models.contains(_selectedModel) ? _selectedModel : _models.first,
+                              isDense: true,
+                              icon: Icon(Icons.keyboard_arrow_down, color: textMuted, size: 20),
+                              dropdownColor: cardCol,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: textPrimary,
+                              ),
+                              items: _models.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                              onChanged: (val) {
+                                if (val != null) setState(() => _selectedModel = val);
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 18),
+
+              // SIGNAL COLOUR
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'SIGNAL COLOUR',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.4,
+                      color: textMuted,
+                    ),
+                  ),
+                  ValueListenableBuilder<Accent>(
+                    valueListenable: Accent.current,
+                    builder: (context, cur, _) => Row(
+                      children: Accent.all.map((a) {
+                        final isSel = cur.id == a.id;
+                        final circleCol = isDark ? a.night : a.day;
                         return GestureDetector(
-                          onTap: () => setState(() => _skinKey = s.key),
+                          onTap: () {
+                            Accent.set(a);
+                            setState(() {});
+                          },
                           child: Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 10),
-                            padding: const EdgeInsets.all(3),
+                            margin: const EdgeInsets.only(left: 10),
+                            padding: const EdgeInsets.all(2.5),
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: isSel ? t.accent : Colors.transparent,
-                                width: 2.5,
+                                color: isSel ? limeAccent : Colors.transparent,
+                                width: 1.5,
                               ),
                             ),
                             child: Container(
-                              width: 32,
-                              height: 32,
+                              width: 22,
+                              height: 22,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: s.primaryColor,
-                                border: Border.all(color: t.border),
-                                boxShadow: isSel
-                                    ? [
-                                        BoxShadow(
-                                          color: t.accent.withValues(alpha: 0.4),
-                                          blurRadius: 8,
-                                        ),
-                                      ]
-                                    : null,
+                                color: circleCol,
+                                border: Border.all(color: borderCol, width: 0.8),
                               ),
-                              child: isSel
-                                  ? Icon(
-                                      Icons.check,
-                                      size: 16,
-                                      color: s.primaryColor.computeLuminance() > 0.5 ? Colors.black87 : Colors.white,
-                                    )
-                                  : null,
                             ),
                           ),
                         );
                       }).toList(),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 26),
 
-              // Driver & Vehicle Details Group Card
-              Container(
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  color: t.surface,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: t.border),
-                ),
-                child: Column(
-                  children: [
-                    // Driver Profile Name
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      child: Row(
-                        children: [
-                          Icon(Icons.person_outline, color: t.ink2, size: 22),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('DRIVER NAME', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: t.ink3)),
-                                TextField(
-                                  controller: _nameController,
-                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: t.ink),
-                                  decoration: InputDecoration(
-                                    isDense: true,
-                                    contentPadding: const EdgeInsets.symmetric(vertical: 4),
-                                    border: InputBorder.none,
-                                    hintText: 'e.g. Mohd Afix',
-                                    hintStyle: TextStyle(color: t.ink3),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Divider(height: 1, indent: 52, color: t.border),
-
-                    // Car Plate Registration
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      child: Row(
-                        children: [
-                          Icon(Icons.badge_outlined, color: t.ink2, size: 22),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('CAR PLATE REGISTRATION', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: t.ink3)),
-                                TextField(
-                                  controller: _plateController,
-                                  textCapitalization: TextCapitalization.characters,
-                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: t.ink),
-                                  decoration: InputDecoration(
-                                    isDense: true,
-                                    contentPadding: const EdgeInsets.symmetric(vertical: 4),
-                                    border: InputBorder.none,
-                                    hintText: 'e.g. VRT 3342',
-                                    hintStyle: TextStyle(color: t.ink3),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Divider(height: 1, indent: 52, color: t.border),
-
-                    // Vehicle Model Selector
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      child: Row(
-                        children: [
-                          Icon(Icons.directions_car_outlined, color: t.ink2, size: 22),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('VEHICLE MODEL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: t.ink3)),
-                                const SizedBox(height: 4),
-                                DropdownButtonHideUnderline(
-                                  child: DropdownButton<String>(
-                                    value: _models.contains(_selectedModel) ? _selectedModel : _models.first,
-                                    isDense: true,
-                                    icon: Icon(Icons.keyboard_arrow_down, color: t.ink3),
-                                    dropdownColor: t.surface,
-                                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: t.ink),
-                                    items: _models.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                                    onChanged: (val) {
-                                      if (val != null) setState(() => _selectedModel = val);
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // Cockpit Accent Colour Palette
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: t.surface,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: t.border),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Cockpit Accent Colour',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: t.ink),
-                        ),
-                        ValueListenableBuilder<Accent>(
-                          valueListenable: Accent.current,
-                          builder: (context, a, child) => Text(
-                            a.name,
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: t.accent),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Highlights active controls, energy gauges, and telemetry dials.',
-                      style: TextStyle(fontSize: 12, color: t.ink2),
-                    ),
-                    const SizedBox(height: 14),
-                    ValueListenableBuilder<Accent>(
-                      valueListenable: Accent.current,
-                      builder: (context, cur, _) => Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: Accent.all.map((a) {
-                          final isSel = cur.id == a.id;
-                          return GestureDetector(
-                            onTap: () {
-                              Accent.set(a);
-                              setState(() {});
-                            },
-                            child: Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: t.isDark ? a.night : a.day,
-                                border: Border.all(
-                                  color: isSel ? t.ink : Colors.transparent,
-                                  width: 2.5,
-                                ),
-                                boxShadow: isSel
-                                    ? [
-                                        BoxShadow(
-                                          color: (t.isDark ? a.night : a.day).withValues(alpha: 0.5),
-                                          blurRadius: 6,
-                                        ),
-                                      ]
-                                    : null,
-                              ),
-                              child: isSel
-                                  ? Icon(
-                                      Icons.check,
-                                      size: 18,
-                                      color: t.isDark ? a.onNight : a.onDay,
-                                    )
-                                  : null,
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // Theme Switcher (Tesla Light vs Obsidian Dark)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: t.surface,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: t.border),
+              // Continue → Button (Cyber Lime solid fill)
+              ElevatedButton(
+                onPressed: _finishSetup,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: limeAccent,
+                  foregroundColor: const Color(0xFF0A0B0E),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          themeCtrl.isDarkMode ? Icons.nightlight_round : Icons.wb_sunny_rounded,
-                          color: t.accent,
-                          size: 22,
-                        ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              themeCtrl.isDarkMode ? 'Obsidian Dark Theme' : 'Tesla Light Theme',
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: t.ink),
-                            ),
-                            Text(
-                              themeCtrl.isDarkMode ? 'Neon cyberpunk cockpit' : 'Crisp daylight contrast',
-                              style: TextStyle(fontSize: 11.5, color: t.ink2),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    Switch(
-                      value: themeCtrl.isDarkMode,
-                      activeTrackColor: t.accent.withValues(alpha: 0.5),
-                      activeThumbColor: t.accent,
-                      onChanged: (val) {
-                        themeCtrl.setThemeMode(val ? ThemeMode.dark : ThemeMode.light);
-                        setState(() {});
-                      },
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 28),
-
-              // Primary "Start TiggoMate Cockpit" Button
-              FilledButton(
-                onPressed: _finishSetup,
-                style: FilledButton.styleFrom(
-                  backgroundColor: t.accent,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  elevation: 4,
-                  shadowColor: t.accent.withValues(alpha: 0.4),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
+                  children: const [
+                    SizedBox(width: 24),
                     Text(
-                      widget.isRevisit ? 'Save Setup Changes' : 'Start TiggoMate Cockpit',
+                      'Continue',
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: t.onAccent,
-                        letterSpacing: 0.3,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.2,
+                        color: Color(0xFF0A0B0E),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Icon(Icons.arrow_forward_rounded, color: t.onAccent, size: 20),
+                    Padding(
+                      padding: EdgeInsets.only(right: 16),
+                      child: Text('→', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0A0B0E))),
+                    ),
                   ],
                 ),
               ),
 
-              if (!widget.isRevisit) ...[
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () {
-                    AuthSheet.show(
-                      context,
-                      onProfileUpdated: () {
-                        final u = AuthService().currentUser;
-                        if (u.isAuthenticated) {
-                          _nameController.text = u.displayName;
-                          _plateController.text = u.carPlate;
-                          _finishSetup();
-                        }
-                      },
-                    );
-                  },
+              const SizedBox(height: 12),
+
+              Center(
+                child: TextButton(
+                  onPressed: _finishSetup,
                   child: Text(
-                    'Have an existing account? Sign In with Cloud',
-                    style: TextStyle(fontSize: 12.5, color: t.ink2),
+                    "I'll do this later",
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: textMuted,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
-              ],
-
-              const SizedBox(height: 16),
+              ),
+              const SizedBox(height: 8),
             ],
           ),
         ),

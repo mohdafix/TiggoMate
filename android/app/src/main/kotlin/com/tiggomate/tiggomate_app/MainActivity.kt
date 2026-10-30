@@ -1,16 +1,23 @@
 package com.tiggomate.tiggomate_app
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.speech.RecognizerIntent
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.util.Locale
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.tiggomate/quick_actions"
+    private val QUICK_ACTIONS_CHANNEL = "com.tiggomate/quick_actions"
+    private val SPEECH_CHANNEL = "com.tiggomate/speech"
+    private val SPEECH_REQUEST_CODE = 9912
+
     private var initialActionUri: String? = null
-    private var methodChannel: MethodChannel? = null
+    private var quickActionsChannel: MethodChannel? = null
+    private var pendingSpeechResult: MethodChannel.Result? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -20,7 +27,8 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).also { channel ->
+        // 1. Quick Actions & Widget MethodChannel
+        quickActionsChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, QUICK_ACTIONS_CHANNEL).also { channel ->
             channel.setMethodCallHandler { call, result ->
                 when (call.method) {
                     "getInitialAction" -> {
@@ -58,6 +66,43 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+
+        // 2. Native Speech Recognition Channel
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SPEECH_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "startListening" -> {
+                    try {
+                        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                            putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak Tiggo 7 Command or Question...")
+                        }
+                        pendingSpeechResult = result
+                        startActivityForResult(intent, SPEECH_REQUEST_CODE)
+                    } catch (e: Exception) {
+                        result.error("UNAVAILABLE", "Speech recognition unavailable: ${e.localizedMessage}", null)
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == SPEECH_REQUEST_CODE) {
+            if (resultCode == Activity.RESULT_OK && data != null) {
+                val matches = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                if (!matches.isNullOrEmpty()) {
+                    pendingSpeechResult?.success(matches[0])
+                } else {
+                    pendingSpeechResult?.success(null)
+                }
+            } else {
+                pendingSpeechResult?.success(null)
+            }
+            pendingSpeechResult = null
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -65,7 +110,7 @@ class MainActivity : FlutterActivity() {
         setIntent(intent)
         val actionUri = intent.dataString
         if (actionUri != null) {
-            methodChannel?.invokeMethod("onQuickAction", actionUri)
+            quickActionsChannel?.invokeMethod("onQuickAction", actionUri)
         }
     }
 }

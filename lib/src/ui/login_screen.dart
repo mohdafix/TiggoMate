@@ -117,17 +117,17 @@ class _LoginScreenState extends State<LoginScreen> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: cardBg,
-                        border: Border.all(color: const Color(0xFF00D2AA).withValues(alpha: 0.4), width: 2),
+                        border: Border.all(color: const Color(0xFFD2F835).withValues(alpha: 0.4), width: 2),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF00D2AA).withValues(alpha: isDark ? 0.15 : 0.2),
+                            color: const Color(0xFFD2F835).withValues(alpha: isDark ? 0.15 : 0.2),
                             blurRadius: 24,
                             spreadRadius: 4,
                           ),
                         ],
                       ),
                       child: const Center(
-                        child: Icon(Icons.electric_bolt_rounded, size: 44, color: Color(0xFF00D2AA)),
+                        child: Icon(Icons.electric_bolt_rounded, size: 44, color: Color(0xFFD2F835)),
                       ),
                     ),
                   ),
@@ -189,9 +189,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(vertical: 10),
                                     decoration: BoxDecoration(
-                                      color: !_isSignUp ? const Color(0xFF00D2AA).withValues(alpha: 0.2) : Colors.transparent,
+                                      color: !_isSignUp ? const Color(0xFFD2F835).withValues(alpha: 0.2) : Colors.transparent,
                                       borderRadius: BorderRadius.circular(8),
-                                      border: !_isSignUp ? Border.all(color: const Color(0xFF00D2AA)) : null,
+                                      border: !_isSignUp ? Border.all(color: const Color(0xFFD2F835)) : null,
                                     ),
                                     child: Text(
                                       'Sign In',
@@ -199,7 +199,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       style: TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.bold,
-                                        color: !_isSignUp ? const Color(0xFF00D2AA) : textSec,
+                                        color: !_isSignUp ? const Color(0xFFD2F835) : textSec,
                                       ),
                                     ),
                                   ),
@@ -215,9 +215,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(vertical: 10),
                                     decoration: BoxDecoration(
-                                      color: _isSignUp ? const Color(0xFF00D2AA).withValues(alpha: 0.2) : Colors.transparent,
+                                      color: _isSignUp ? const Color(0xFFD2F835).withValues(alpha: 0.2) : Colors.transparent,
                                       borderRadius: BorderRadius.circular(8),
-                                      border: _isSignUp ? Border.all(color: const Color(0xFF00D2AA)) : null,
+                                      border: _isSignUp ? Border.all(color: const Color(0xFFD2F835)) : null,
                                     ),
                                     child: Text(
                                       'Create Account',
@@ -225,7 +225,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       style: TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.bold,
-                                        color: _isSignUp ? const Color(0xFF00D2AA) : textSec,
+                                        color: _isSignUp ? const Color(0xFFD2F835) : textSec,
                                       ),
                                     ),
                                   ),
@@ -267,12 +267,12 @@ class _LoginScreenState extends State<LoginScreen> {
                             controller: _nameController,
                             decoration: InputDecoration(
                               labelText: 'Driver Name',
-                              prefixIcon: const Icon(Icons.person_outline, size: 20, color: Color(0xFF00D2AA)),
+                              prefixIcon: const Icon(Icons.person_outline, size: 20, color: Color(0xFFD2F835)),
                               filled: true,
                               fillColor: inputBg,
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
                               enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
-                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF00D2AA))),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFD2F835))),
                             ),
                           ),
                           const SizedBox(height: 14),
@@ -281,12 +281,12 @@ class _LoginScreenState extends State<LoginScreen> {
                             textCapitalization: TextCapitalization.characters,
                             decoration: InputDecoration(
                               labelText: 'Car Plate Number',
-                              prefixIcon: const Icon(Icons.directions_car_outlined, size: 20, color: Color(0xFF00D2AA)),
+                              prefixIcon: const Icon(Icons.directions_car_outlined, size: 20, color: Color(0xFFD2F835)),
                               filled: true,
                               fillColor: inputBg,
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
                               enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
-                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF00D2AA))),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFD2F835))),
                             ),
                           ),
                           const SizedBox(height: 14),
@@ -299,12 +299,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           decoration: InputDecoration(
                             labelText: 'Email Address',
                             hintText: 'e.g. driver@tiggomate.my',
-                            prefixIcon: const Icon(Icons.email_outlined, size: 20, color: Color(0xFF00D2AA)),
+                            prefixIcon: const Icon(Icons.email_outlined, size: 20, color: Color(0xFFD2F835)),
                             filled: true,
                             fillColor: inputBg,
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
                             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF00D2AA))),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFD2F835))),
                           ),
                         ),
                         const SizedBox(height: 14),
@@ -315,7 +315,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           obscureText: _obscurePassword,
                           decoration: InputDecoration(
                             labelText: 'Password',
-                            prefixIcon: const Icon(Icons.lock_outline, size: 20, color: Color(0xFF00D2AA)),
+                            prefixIcon: const Icon(Icons.lock_outline, size: 20, color: Color(0xFFD2F835)),
                             suffixIcon: IconButton(
                               icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, size: 18, color: textSec),
                               onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
@@ -324,7 +324,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             fillColor: inputBg,
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
                             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF00D2AA))),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFD2F835))),
                           ),
                         ),
                         const SizedBox(height: 20),
@@ -333,7 +333,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ElevatedButton(
                           onPressed: _loading ? null : _handleEmailAuth,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF00D2AA),
+                            backgroundColor: const Color(0xFFD2F835),
                             foregroundColor: Colors.black,
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

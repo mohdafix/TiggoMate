@@ -61,11 +61,11 @@ class AppThemeController extends ChangeNotifier {
 /// 1. Obsidian Dark Mode: High-contrast cyberpunk PHEV cockpit (#090D12).
 /// 2. Tesla Light Mode: Pure minimalist white/off-white studio aesthetic (#F7F8FA).
 class AppTheme {
-  // Common Accents
-  static const Color evTealDark = Color(0xFF00D2AA);
-  static const Color evTealLight = Color(0xFF00A389);
-  static const Color petrolAmberDark = Color(0xFFFF9F1C);
-  static const Color petrolAmberLight = Color(0xFFD97706);
+  // Common Accents (Cyber Minimalist Automotive Palette)
+  static const Color evTealDark = Color(0xFFD2F835);
+  static const Color evTealLight = Color(0xFF65A30D);
+  static const Color petrolAmberDark = Color(0xFFFF6E40);
+  static const Color petrolAmberLight = Color(0xFFEA580C);
 
   /// Tesla-Style Light Theme
   static ThemeData light([Accent? a]) {
@@ -197,11 +197,11 @@ class AppTheme {
     final onAccentColor = curAccent.onNight;
     final tokens = AppTokens.dark.copyWith(accent: accentColor, onAccent: onAccentColor);
 
-    const bg = Color(0xFF090D12);
-    const cardBg = Color(0xFF131922);
-    const border = Color(0xFF232D3D);
+    const bg = Color(0xFF0A0B0E);
+    const cardBg = Color(0xFF12141A);
+    const border = Color(0xFF1E222B);
     const textPrimary = Colors.white;
-    const textSecondary = Colors.white70;
+    const textSecondary = Color(0xFFA3ACB9);
 
     return ThemeData(
       useMaterial3: true,
@@ -325,27 +325,27 @@ class AppColors {
 
   AppColors(this.context) : isDark = Theme.of(context).brightness == Brightness.dark;
 
-  Color get bg => isDark ? const Color(0xFF090D12) : const Color(0xFFF7F8FA);
-  Color get cardBg => isDark ? const Color(0xFF0D1219) : Colors.white;
-  Color get tileBg => isDark ? const Color(0xFF131922) : const Color(0xFFF3F4F6);
-  Color get border => isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB);
+  Color get bg => isDark ? const Color(0xFF0A0B0E) : const Color(0xFFF7F8FA);
+  Color get cardBg => isDark ? const Color(0xFF12141A) : Colors.white;
+  Color get tileBg => isDark ? const Color(0xFF181B22) : const Color(0xFFF3F4F6);
+  Color get border => isDark ? const Color(0xFF1E222B) : const Color(0xFFE5E7EB);
   
   Color get textPrimary => isDark ? Colors.white : const Color(0xFF111827);
-  Color get textSecondary => isDark ? Colors.white70 : const Color(0xFF4B5563);
-  Color get textMuted => isDark ? Colors.white38 : const Color(0xFF9CA3AF);
+  Color get textSecondary => isDark ? const Color(0xFFA3ACB9) : const Color(0xFF4B5563);
+  Color get textMuted => isDark ? const Color(0xFF717684) : const Color(0xFF9CA3AF);
 
   Color get accent => context.tokens.accent;
   Color get onAccent => context.tokens.onAccent;
-  Color get evTeal => context.tokens.accent;
-  Color get petrolAmber => isDark ? AppTheme.petrolAmberDark : AppTheme.petrolAmberLight;
+  Color get evTeal => isDark ? const Color(0xFFD2F835) : context.tokens.accent;
+  Color get petrolAmber => const Color(0xFFFF6E40);
 
-  Color get trackBg => isDark ? const Color(0xFF1E2837) : const Color(0xFFE5E7EB);
+  Color get trackBg => isDark ? const Color(0xFF1A1D24) : const Color(0xFFE5E7EB);
   
-  // Dock & Control Buttons (Tesla style in light mode)
-  Color get dockBg => isDark ? const Color(0xFF131922).withValues(alpha: 0.85) : Colors.white.withValues(alpha: 0.95);
-  Color get dockBtnBg => isDark ? const Color(0xFF1C2433) : const Color(0xFFF3F4F6);
+  // Dock & Control Buttons (Tesla / Cyber style)
+  Color get dockBg => isDark ? const Color(0xFF12141A).withValues(alpha: 0.95) : Colors.white.withValues(alpha: 0.95);
+  Color get dockBtnBg => isDark ? const Color(0xFF181B22) : const Color(0xFFF3F4F6);
   Color get dockBtnIcon => isDark ? Colors.white : const Color(0xFF1F2937);
-  Color get dockShadow => isDark ? Colors.black.withValues(alpha: 0.3) : Colors.black.withValues(alpha: 0.08);
+  Color get dockShadow => isDark ? Colors.black.withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.08);
 
   // Studio vehicle stage background
   Gradient get stageFloorGradient => isDark

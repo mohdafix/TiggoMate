@@ -155,10 +155,10 @@ class _AuthSheetState extends State<AuthSheet> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF00D2AA).withValues(alpha: 0.15),
+                        color: const Color(0xFFD2F835).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(Icons.cloud_sync, color: Color(0xFF00D2AA), size: 22),
+                      child: const Icon(Icons.cloud_sync, color: Color(0xFFD2F835), size: 22),
                     ),
                     const SizedBox(width: 12),
                     Column(
@@ -193,10 +193,10 @@ class _AuthSheetState extends State<AuthSheet> {
                       children: [
                         CircleAvatar(
                           radius: 24,
-                          backgroundColor: const Color(0xFF00D2AA).withValues(alpha: 0.2),
+                          backgroundColor: const Color(0xFFD2F835).withValues(alpha: 0.2),
                           child: Text(
                             user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : 'U',
-                            style: const TextStyle(color: Color(0xFF00D2AA), fontSize: 18, fontWeight: FontWeight.bold),
+                            style: const TextStyle(color: Color(0xFFD2F835), fontSize: 18, fontWeight: FontWeight.bold),
                           ),
                         ),
                         const SizedBox(width: 14),
@@ -209,11 +209,11 @@ class _AuthSheetState extends State<AuthSheet> {
                               const SizedBox(height: 4),
                               Row(
                                 children: [
-                                  Container(width: 6, height: 6, decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF00D2AA))),
+                                  Container(width: 6, height: 6, decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFFD2F835))),
                                   const SizedBox(width: 6),
                                   Text(
                                     'Cloud Synced • Plate ${user.carPlate}',
-                                    style: const TextStyle(fontSize: 11, color: Color(0xFF00D2AA)),
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFFD2F835)),
                                   ),
                                 ],
                               ),
@@ -264,8 +264,8 @@ class _AuthSheetState extends State<AuthSheet> {
                   ),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 13),
-                    side: const BorderSide(color: Color(0xFF2F81F7), width: 1.2),
-                    backgroundColor: const Color(0xFF2F81F7).withValues(alpha: isDark ? 0.12 : 0.08),
+                    side: const BorderSide(color: Color(0xFFD2F835), width: 1.2),
+                    backgroundColor: const Color(0xFFD2F835).withValues(alpha: isDark ? 0.12 : 0.08),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                 ),
@@ -345,7 +345,7 @@ class _AuthSheetState extends State<AuthSheet> {
                 child: ElevatedButton(
                   onPressed: _loading ? null : _handleEmailAuth,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00D2AA),
+                    backgroundColor: const Color(0xFFD2F835),
                     foregroundColor: const Color(0xFF090D12),
                     padding: const EdgeInsets.symmetric(vertical: 13),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),

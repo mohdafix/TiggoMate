@@ -237,7 +237,7 @@ class VehicleTelemetry {
     final double rlT = (m['tyre_rl_temp'] as num?)?.toDouble() ?? 30.0;
     final double rrT = (m['tyre_rr_temp'] as num?)?.toDouble() ?? 30.0;
 
-    // Fuel Range calculation based on Chery Tiggo 7 PHEV 60L fuel tank
+    // Fuel Range calculation based on Chery Tiggo 7 PHEV 51L fuel tank
     final int estimatedFuelRange = (m['fuel_range_km'] as num?)?.toInt() ?? 838;
 
     return VehicleTelemetry(

@@ -10,13 +10,12 @@ class Accent {
   const Accent(this.id, this.name, this.day, this.onDay, this.night, this.onNight);
 
   static const all = <Accent>[
+    Accent('lime', 'Cyber Lime', Color(0xFF65A30D), Colors.white, Color(0xFFD2F835), Color(0xFF0A0B0E)),
+    Accent('cyan', 'Electric Cyan', Color(0xFF0284C7), Colors.white, Color(0xFF40C4FF), Color(0xFF0A0B0E)),
+    Accent('orange', 'Petrol Orange', Color(0xFFEA580C), Colors.white, Color(0xFFFF6E40), Color(0xFF0A0B0E)),
+    Accent('white', 'Pure White', Color(0xFF334155), Colors.white, Color(0xFFFFFFFF), Color(0xFF0A0B0E)),
     Accent('teal', 'Teal', Color(0xFF0F766E), Colors.white, Color(0xFF2DD4BF), Color(0xFF042F2E)),
     Accent('blue', 'Blue', Color(0xFF1D4ED8), Colors.white, Color(0xFF60A5FA), Color(0xFF0B1B3F)),
-    Accent('indigo', 'Indigo', Color(0xFF4338CA), Colors.white, Color(0xFF818CF8), Color(0xFF1E1B4B)),
-    Accent('purple', 'Purple', Color(0xFF7E22CE), Colors.white, Color(0xFFC084FC), Color(0xFF2E1065)),
-    Accent('pink', 'Pink', Color(0xFFBE185D), Colors.white, Color(0xFFF472B6), Color(0xFF500724)),
-    Accent('red', 'Red', Color(0xFFB91C1C), Colors.white, Color(0xFFF87171), Color(0xFF450A0A)),
-    Accent('orange', 'Orange', Color(0xFFC2410C), Colors.white, Color(0xFFFB923C), Color(0xFF431407)),
     Accent('amber', 'Amber', Color(0xFFA16207), Colors.white, Color(0xFFFBBF24), Color(0xFF422006)),
   ];
 
@@ -31,8 +30,10 @@ class Accent {
     try {
       final prefs = await SharedPreferences.getInstance();
       final id = prefs.getString(_kAccentPrefKey);
-      if (id != null) {
+      if (id != null && id != 'teal' && id != 'blue') {
         current.value = byId(id);
+      } else {
+        current.value = all.first; // Default to Cyber Lime
       }
     } catch (_) {}
   }

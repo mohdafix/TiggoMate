@@ -45,17 +45,17 @@ class AppTokens extends ThemeExtension<AppTokens> {
   );
 
   static const dark = AppTokens(
-    bg: Color(0xFF0F1115),
-    surface: Color(0xFF181B21),
-    surface2: Color(0xFF20242B),
-    border: Color(0xFF2A2F37),
+    bg: Color(0xFF0A0B0E),
+    surface: Color(0xFF12141A),
+    surface2: Color(0xFF1A1D24),
+    border: Color(0xFF1E222B),
     ink: Color(0xFFF1F5F9),
     ink2: Color(0xFFA3ACB9),
-    ink3: Color(0xFF7C8594),
-    accent: Color(0xFF2DD4BF),
-    onAccent: Color(0xFF042F2E),
+    ink3: Color(0xFF717684),
+    accent: Color(0xFFD2F835),
+    onAccent: Color(0xFF0A0B0E),
     danger: Color(0xFFF87171),
-    ok: Color(0xFF4ADE80),
+    ok: Color(0xFFD2F835),
   );
 
   bool get isDark => bg.computeLuminance() < 0.5;
