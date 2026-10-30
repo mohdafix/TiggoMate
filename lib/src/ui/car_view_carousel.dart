@@ -5,7 +5,7 @@ import '../carlinko/vehicle_skin.dart';
 import '../carlinko/vehicle_telemetry.dart';
 import 'blueprint_car_canvas.dart';
 
-/// Swipeable car card: TPMS top view → Paint Studio → 3D Orbit.
+/// Swipeable car card: 3D Orbit View → TPMS top view → Vehicle Livery.
 class CarViewCarousel extends StatefulWidget {
   final VehicleTelemetry telemetry;
   final bool isBound;
@@ -34,7 +34,7 @@ class CarViewCarousel extends StatefulWidget {
 
 class _CarViewCarouselState extends State<CarViewCarousel> {
   static const int _pageCount = 3;
-  static const int _orbitPage = 2;
+  static const int _orbitPage = 0;
 
   late final PageController _pageController;
   late int _page;
@@ -71,19 +71,19 @@ class _CarViewCarouselState extends State<CarViewCarousel> {
   }
 
   String get _label => const [
-        'TOP VIEW · TPMS COLD',
-        'VEHICLE PAINT STUDIO',
         '3D ORBIT VIEWER',
+        'TOP VIEW · TPMS COLD',
+        'VEHICLE LIVERY',
       ][_page];
 
   String get _hint {
     switch (_page) {
       case 0:
-        return 'SPEC 230 KPA';
-      case 1:
-        return 'EXTERIOR COLOR';
-      default:
         return _orbitActive ? 'DRAG TO ORBIT' : 'TAP TO ORBIT';
+      case 1:
+        return 'SPEC 230 KPA';
+      default:
+        return 'TAP TO CHANGE';
     }
   }
 
@@ -135,25 +135,25 @@ class _CarViewCarouselState extends State<CarViewCarousel> {
               physics: _orbitActive ? const NeverScrollableScrollPhysics() : null,
               onPageChanged: _onPageChanged,
               children: [
-                BlueprintCarStage(
-                  telemetry: widget.telemetry,
-                  isBound: widget.isBound,
-                  accentColor: widget.accentColor,
-                ),
-                _PaintStudioPanel(
-                  selectedKey: widget.selectedSkinKey,
-                  onSelected: widget.onSkinSelected,
-                  accentColor: widget.accentColor,
-                  borderCol: borderCol,
-                  textMuted: textMuted,
-                  textPrimary: textPrimary,
-                ),
                 _OrbitViewerPanel(
                   active: _orbitActive,
                   background: cardBg,
                   accentColor: widget.accentColor,
                   onActivate: () => setState(() => _orbitActive = true),
                   onDeactivate: () => setState(() => _orbitActive = false),
+                ),
+                BlueprintCarStage(
+                  telemetry: widget.telemetry,
+                  isBound: widget.isBound,
+                  accentColor: widget.accentColor,
+                ),
+                _VehicleLiveryPanel(
+                  selectedKey: widget.selectedSkinKey,
+                  onSelected: widget.onSkinSelected,
+                  accentColor: widget.accentColor,
+                  borderCol: borderCol,
+                  textMuted: textMuted,
+                  textPrimary: textPrimary,
                 ),
               ],
             ),
@@ -173,9 +173,11 @@ class _CarViewCarouselState extends State<CarViewCarousel> {
   }
 }
 
-// ─── Panel 1: Paint Studio ──────────────────────────────────────────────────
+// ─── Panel 3: Vehicle Livery ────────────────────────────────────────────────
+// Just shows the car in whichever paint is currently selected (plus swatches
+// to change it) — not an editing "studio", so the label stays plain.
 
-class _PaintStudioPanel extends StatelessWidget {
+class _VehicleLiveryPanel extends StatelessWidget {
   final String selectedKey;
   final ValueChanged<String> onSelected;
   final Color accentColor;
@@ -183,7 +185,7 @@ class _PaintStudioPanel extends StatelessWidget {
   final Color textMuted;
   final Color textPrimary;
 
-  const _PaintStudioPanel({
+  const _VehicleLiveryPanel({
     required this.selectedKey,
     required this.onSelected,
     required this.accentColor,
@@ -306,7 +308,7 @@ class _SkinSwatch extends StatelessWidget {
   }
 }
 
-// ─── Panel 2: 3D Orbit ──────────────────────────────────────────────────────
+// ─── Panel 1: 3D Orbit ──────────────────────────────────────────────────────
 
 class _OrbitViewerPanel extends StatefulWidget {
   final bool active;
@@ -334,9 +336,51 @@ class _OrbitViewerPanelState extends State<_OrbitViewerPanel>
   @override
   bool get wantKeepAlive => true;
 
+  // This is now the carousel's first page, so it's what loads the moment the
+  // dashboard opens. Defer actually mounting the WebView + 24 MB GLB until
+  // the user taps in, rather than eating that cost on every cold open.
+  bool _loaded = false;
+
+  void _load() {
+    setState(() => _loaded = true);
+    widget.onActivate();
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
+
+    if (!_loaded) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _load,
+          child: Container(
+            color: widget.background,
+            alignment: Alignment.center,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.threesixty, size: 34, color: widget.accentColor),
+                const SizedBox(height: 8),
+                Text(
+                  'TAP TO LOAD 3D VIEW',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.0,
+                    color: widget.accentColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: Stack(

@@ -117,11 +117,15 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
 
-      // The skin render lives on the carousel's Paint Studio page
+      // The skin render lives on the carousel's Vehicle Livery page (3rd page:
+      // 3D Orbit -> TPMS -> Livery), so swipe twice to reach it.
       await tester.drag(find.byType(PageView), const Offset(-500, 0));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
-      expect(find.text('VEHICLE PAINT STUDIO'), findsOneWidget);
+      await tester.drag(find.byType(PageView), const Offset(-500, 0));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.text('VEHICLE LIVERY'), findsOneWidget);
 
       // Verify initial car image is khaki white
       final initialImageFinder = find.byWidgetPredicate(

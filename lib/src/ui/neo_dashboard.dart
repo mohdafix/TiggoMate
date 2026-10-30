@@ -1125,7 +1125,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             ),
             const SizedBox(height: 14),
 
-            // 3. SWIPEABLE CAR VIEW CAROUSEL (TPMS → Paint Studio → 3D Orbit)
+            // 3. SWIPEABLE CAR VIEW CAROUSEL (3D Orbit View → TPMS → Vehicle Livery)
             CarViewCarousel(
               telemetry: _telemetry,
               isBound: isBound,

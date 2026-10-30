@@ -187,7 +187,12 @@ void main() {
     expect(find.text('TIGGO GREY WOLF'), findsOneWidget);
     expect(find.text('VAG 7777'), findsOneWidget);
 
-    // Bound telemetry comes from the repository
+    // Bound telemetry comes from the repository. Carousel opens on the 3D
+    // orbit view; swipe once to reach the TPMS top view.
+    expect(find.text('3D ORBIT VIEWER'), findsOneWidget);
+    await tester.drag(find.byType(PageView), const Offset(-800, 0));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('TOP VIEW · TPMS COLD'), findsOneWidget);
     expect(find.text('235'), findsNWidgets(2));
     expect(find.text('TOTAL RANGE'), findsOneWidget);
@@ -211,11 +216,11 @@ void main() {
     AppNotification.dismiss();
     await tester.pump(const Duration(seconds: 4));
 
-    // Swipe to Paint Studio and pick a skin from its swatches
+    // Swipe to the Vehicle Livery page and pick a skin from its swatches
     await tester.drag(find.byType(PageView), const Offset(-800, 0));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
-    expect(find.text('VEHICLE PAINT STUDIO'), findsOneWidget);
+    expect(find.text('VEHICLE LIVERY'), findsOneWidget);
 
     // PageView ignores taps until the swipe has fully settled
     await tester.pump(const Duration(seconds: 1));
@@ -270,6 +275,12 @@ void main() {
     // Placeholders instead of readings
     expect(find.text('EV --% · -- km'), findsOneWidget);
     expect(find.text('Fuel --% · -- km'), findsOneWidget);
+
+    // TPMS readings live on the carousel's TPMS page; swipe once from the
+    // default 3D-orbit-view page to reach it.
+    await tester.drag(find.byType(PageView), const Offset(-800, 0));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('kPa · --°'), findsNWidgets(4));
 
     repo.dispose();
