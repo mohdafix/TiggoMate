@@ -3,11 +3,19 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'mytnb_crypto.dart';
+
 // ---------------- CONSTANTS ----------------
 const String myTnbSitecoreLoginUrl = 'https://www.mytnb.com.my/api/sitecore/Account/Login';
 const String myTnbSsoHandlerUrl = 'https://myaccount.mytnb.com.my/SSO/SSOHandler';
 const String myTnbRestBaseUrl = 'https://api.mytnb.com.my';
+// AWS API gateway: encrypted-payload account auto-discovery.
+const String myTnbAwsApiBaseUrl = 'https://api.mytnb.com.my/core/api';
+// Legacy ASMX backend: encrypted-payload usage/billing telemetry.
+const String myTnbLegacyBaseUrl = 'https://mytnbapp.tnb.com.my/v7/mytnbws.asmx';
 const String myTnbDefaultApiKey = 'gpUS5pe4aO2yMbId7bFa13dGfYYnBWbjn3vqn0d7';
+// Static "SecureKey k1" the mobile app sends with every legacy ASMX request.
+const String myTnbSecureKeyK1 = 'E6148656-205B-494C-BC95-CC241423E72F';
 const String myTnbUserAgent = 'RestSharp/110.2.0.0';
 
 // ---------------- EXCEPTIONS ----------------
@@ -45,6 +53,17 @@ class MyTnbSession {
   final bool isDemo;
   final DateTime connectedAt;
 
+  /// Login username as myTNB's SSO returned it (falls back to [email]).
+  /// Sent as `eid`/`UserName` on every encrypted request.
+  final String userName;
+
+  /// Random per-session key sent as the `SecureKey` header on legacy ASMX
+  /// calls (generated locally, like the mobile app does — not issued by TNB).
+  final String secureKey;
+
+  /// Random per-session device identifier sent as `deviceId`/`did`.
+  final String deviceId;
+
   const MyTnbSession({
     required this.email,
     required this.userId,
@@ -54,6 +73,9 @@ class MyTnbSession {
     this.isLoggedIn = true,
     this.isDemo = false,
     required this.connectedAt,
+    this.userName = '',
+    this.secureKey = '',
+    this.deviceId = '',
   });
 
   Map<String, dynamic> toJson() => {
@@ -65,6 +87,9 @@ class MyTnbSession {
         'isLoggedIn': isLoggedIn,
         'isDemo': isDemo,
         'connectedAt': connectedAt.toIso8601String(),
+        'userName': userName,
+        'secureKey': secureKey,
+        'deviceId': deviceId,
       };
 
   factory MyTnbSession.fromJson(Map<String, dynamic> json) => MyTnbSession(
@@ -78,6 +103,9 @@ class MyTnbSession {
         connectedAt: json['connectedAt'] != null
             ? DateTime.tryParse(json['connectedAt'] as String) ?? DateTime.now()
             : DateTime.now(),
+        userName: json['userName'] as String? ?? '',
+        secureKey: json['secureKey'] as String? ?? '',
+        deviceId: json['deviceId'] as String? ?? '',
       );
 }
 
@@ -367,6 +395,7 @@ class MyTnbClient {
 
       String userId = 'MYTNB-USER';
       String displayName = email.split('@').first;
+      String userName = email.trim();
 
       if (jwtToken != null) {
         try {
@@ -382,6 +411,7 @@ class MyTnbClient {
               final ui = jsonDecode(jwtData['UserInfo'] as String) as Map<String, dynamic>;
               userId = ui['UserId']?.toString() ?? userId;
               displayName = ui['DisplayName']?.toString() ?? ui['UserName']?.toString() ?? displayName;
+              userName = ui['UserName']?.toString() ?? userName;
             }
           }
         } catch (e) {
@@ -425,6 +455,9 @@ class MyTnbClient {
         isLoggedIn: true,
         isDemo: false,
         connectedAt: DateTime.now(),
+        userName: userName,
+        secureKey: MyTnbCrypto.generateUuidV4(),
+        deviceId: MyTnbCrypto.generateUuidV4(),
       );
     } catch (e) {
       if (e is MyTnbException) rethrow;
@@ -471,115 +504,222 @@ class MyTnbClient {
       ];
     }
 
-    // For live session: Attempt real auto-discovery from myTNB portal & API
-    try {
-      if (session.cookies.isNotEmpty) {
-        final dashReq = await _client.getUrl(Uri.parse('https://myaccount.mytnb.com.my/AccountManagement/IndividualDashboard'));
-        dashReq.headers.set('User-Agent', myTnbUserAgent);
-        dashReq.headers.set('Cookie', session.cookies.join('; '));
-        final dashResp = await dashReq.close();
-        if (dashResp.statusCode == 200) {
-          final html = await utf8.decodeStream(dashResp);
-          // Look for 12-digit Malaysian Contract Account numbers (typically starting with 21 or 22)
-          final caRegex = RegExp(r'(?:caNo=|ca_no=|accountNumber["\s:=]+|ContractAccount["\s:=]+)?\b(2[0-9]{11})\b');
-          final matches = caRegex.allMatches(html);
-          final caNumbers = <String>{};
-          for (final m in matches) {
-            final ca = m.group(1);
-            if (ca != null) caNumbers.add(ca);
-          }
+    // For a live session: discover linked accounts, then pull each one's
+    // real bill/usage telemetry, from myTNB's actual encrypted API (ported
+    // from the open-source python-mytnb client) — not a guess.
+    return _fetchLiveAccounts(session);
+  }
 
-          if (caNumbers.isNotEmpty) {
-            final accounts = <MyTnbAccount>[];
-            for (final ca in caNumbers) {
-              double usage = 450.0;
-              double bill = 0.0;
-              bool isSmart = true;
-              const String premiseAddress = 'Malaysia';
+  Map<String, dynamic> _baseUserInfo(MyTnbSession session) => {
+        'eid': session.userName.isNotEmpty ? session.userName : session.email,
+        'sspuid': session.userId,
+        'did': session.deviceId,
+        'ft': '',
+        'lang': 'EN',
+        'sec_auth_k1': myTnbSecureKeyK1,
+        'sec_auth_k2': '',
+        'ses_param1': '',
+        'ses_param2': '',
+      };
 
-              // Query the Smart Meter index page directly (TRIL endpoint from python-mytnb / ha-mytnb)
-              try {
-                final smUri = Uri.parse('https://myaccount.mytnb.com.my/AccountManagement/SmartMeter/Index/TRIL?caNo=$ca');
-                final smReq = await _client.getUrl(smUri);
-                smReq.headers.set('User-Agent', myTnbUserAgent);
-                smReq.headers.set('Cookie', session.cookies.join('; '));
-                final smResp = await smReq.close();
-                if (smResp.statusCode == 200) {
-                  final smHtml = await utf8.decodeStream(smResp);
+  Map<String, dynamic> _baseDeviceInfo(MyTnbSession session) => {
+        'deviceId': session.deviceId,
+        'appVersion': '4.0.2',
+        'osType': '1', // 1 = Android (this app's native platform)
+        'osVersion': '14',
+        'deviceDesc': 'EN',
+        'versionCode': '1425',
+      };
 
-                  // Extract kWh consumption (e.g. "512.4 kWh")
-                  final kwhMatch = RegExp(r'([0-9]+(?:\.[0-9]+)?)\s*(?:kWh|kwh)').firstMatch(smHtml);
-                  if (kwhMatch != null) {
-                    usage = double.tryParse(kwhMatch.group(1)!) ?? usage;
-                  }
+  bool _parseFlag(dynamic value) {
+    if (value is bool) return value;
+    final s = value?.toString().toLowerCase();
+    return s == 'true' || s == '1';
+  }
 
-                  // Extract bill amount (e.g. "RM 186.60")
-                  final smBillMatch = RegExp(r'RM\s*([0-9,]+(?:\.[0-9]{2})?)').firstMatch(smHtml);
-                  if (smBillMatch != null) {
-                    bill = double.tryParse(smBillMatch.group(1)!.replaceAll(',', '')) ?? bill;
-                  }
+  /// POST an AES-256-CBC + RSA-OAEP encrypted body to the legacy ASMX API
+  /// and unwrap the `{"d": {...}}` envelope, surfacing any TNB-reported
+  /// error instead of papering over it.
+  Future<Map<String, dynamic>> _postLegacyEncrypted({
+    required MyTnbSession session,
+    required String endpoint,
+    required Map<String, dynamic> data,
+  }) async {
+    final payload = MyTnbCrypto.encryptRequest(data);
+    final req = await _client.postUrl(Uri.parse('$myTnbLegacyBaseUrl/$endpoint'));
+    req.headers.set('Content-Type', 'application/json');
+    req.headers.set(
+      'Accept',
+      'application/json,text/json,text/x-json,text/javascript,application/xml,text/xml',
+    );
+    req.headers.set('Lang', 'EN');
+    req.headers.set('UserInfo', jsonEncode({
+      'RoleId': '16',
+      'UserId': session.userId,
+      'UserName': session.userName.isNotEmpty ? session.userName : session.email,
+      'Lang': 'EN',
+    }));
+    req.headers.set('SecureKey', session.secureKey);
+    req.headers.set('User-Agent', myTnbUserAgent);
+    req.write(jsonEncode({'dt': payload.toJson()}));
 
-                  // Check if SMR / Smart Meter is active
-                  isSmart = smHtml.contains('Smart') || smHtml.contains('SMR') || smHtml.contains('smartliving');
-                }
-              } catch (_) {}
-
-              // Fallback bill from dashboard HTML if not found on smart meter page
-              if (bill <= 0.0) {
-                final billMatch = RegExp(r'RM\s*([0-9,]+(?:\.[0-9]{2})?)').firstMatch(html);
-                bill = billMatch != null ? double.tryParse(billMatch.group(1)!.replaceAll(',', '')) ?? 160.0 : 160.0;
-              }
-
-              if (bill <= 0.0 && usage > 0) {
-                bill = TnbTariffCalculator.calculateDomesticBill(usage);
-              }
-
-              final effective = TnbTariffCalculator.calculateEffectiveTariff(usage);
-
-              accounts.add(
-                MyTnbAccount(
-                  accountNumber: ca,
-                  accountDesc: isSmart ? 'Home (Smart Meter)' : 'Home (Standard Meter)',
-                  address: premiseAddress,
-                  ownerName: session.displayName.isNotEmpty ? session.displayName : 'TNB Customer',
-                  isSmartMeter: isSmart,
-                  currentCharges: double.parse(bill.toStringAsFixed(2)),
-                  currentUsageKwh: usage,
-                  projectedCostRm: double.parse((bill * 1.15).toStringAsFixed(2)),
-                  lastReadingTime: isSmart ? 'Live Smart Meter Sync' : 'Monthly Bill Cycle',
-                  effectiveTariff: effective,
-                  isDemo: false,
-                ),
-              );
-            }
-            return accounts;
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Real myTNB portal auto-fetch error: $e');
+    final resp = await req.close();
+    if (resp.statusCode == 403) {
+      throw const MyTnbGeoBlockedException();
+    }
+    if (resp.statusCode != 200) {
+      throw MyTnbException('myTNB $endpoint failed with HTTP ${resp.statusCode}', 'HTTP_${resp.statusCode}');
     }
 
-    // Fallback if portal auto-fetch was blocked by TNB WAF/Cloudflare:
-    final double defaultUsage = 450.0;
-    final effective = TnbTariffCalculator.calculateEffectiveTariff(defaultUsage);
-    final charges = TnbTariffCalculator.calculateDomesticBill(defaultUsage);
+    final text = await utf8.decodeStream(resp);
+    final parsed = jsonDecode(text) as Map<String, dynamic>;
+    final d = (parsed['d'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
 
-    return [
-      MyTnbAccount(
-        accountNumber: 'Tap EDIT to Enter CA',
-        accountDesc: 'Auto-Sync Blocked by TNB WAF',
-        address: 'Malaysian IP / WAF Protected',
-        ownerName: session.displayName.isNotEmpty ? session.displayName : session.email.split('@').first,
-        isSmartMeter: true,
-        currentCharges: double.parse(charges.toStringAsFixed(2)),
-        currentUsageKwh: defaultUsage,
-        projectedCostRm: 180.00,
-        lastReadingTime: 'Pending Manual CA Setup',
-        effectiveTariff: effective,
-        isDemo: false,
-      ),
-    ];
+    // 7200/7204 are TNB's own "success" codes; anything else is a real error.
+    final errorCode = d['ErrorCode']?.toString();
+    if (errorCode != null && errorCode != '7200' && errorCode != '7204') {
+      final message = d['DisplayMessage'] ?? d['displayMessage'] ?? d['Message'] ?? d['message'];
+      throw MyTnbException((message ?? 'myTNB $endpoint returned error $errorCode').toString(), errorCode);
+    }
+    return d;
+  }
+
+  Future<List<MyTnbAccount>> _fetchLiveAccounts(MyTnbSession session) async {
+    // 1. Discover every account linked to this login via the AWS gateway.
+    final discoveryData = {
+      'usrInf': {..._baseUserInfo(session), 'IsWhiteList': false},
+      'deviceInf': _baseDeviceInfo(session),
+      'featureInfo': <dynamic>[],
+    };
+    final discoveryPayload = MyTnbCrypto.encryptRequest(discoveryData);
+
+    final discoveryReq = await _client.postUrl(Uri.parse('$myTnbAwsApiBaseUrl/v3/account/GetAccount'));
+    discoveryReq.headers.set('Content-Type', 'application/json');
+    discoveryReq.headers.set(
+      'Accept',
+      'application/json,text/json,text/x-json,text/javascript,application/xml,text/xml',
+    );
+    discoveryReq.headers.set('User-Agent', myTnbUserAgent);
+    discoveryReq.write(jsonEncode({'dt': discoveryPayload.toJson()}));
+
+    final discoveryResp = await discoveryReq.close();
+    if (discoveryResp.statusCode == 403) {
+      throw const MyTnbGeoBlockedException();
+    }
+    if (discoveryResp.statusCode != 200) {
+      throw MyTnbException(
+        'myTNB account discovery failed with HTTP ${discoveryResp.statusCode}',
+        'DISCOVER_HTTP_${discoveryResp.statusCode}',
+      );
+    }
+
+    final discoveryText = await utf8.decodeStream(discoveryResp);
+    final discoveryJson = jsonDecode(discoveryText) as Map<String, dynamic>;
+    final rawAccounts = (discoveryJson['data'] as List?) ?? const [];
+    if (rawAccounts.isEmpty) {
+      throw const MyTnbException('No myTNB accounts are linked to this login.', 'NO_ACCOUNTS');
+    }
+
+    final accounts = <MyTnbAccount>[];
+    for (final raw in rawAccounts) {
+      if (raw is! Map) continue;
+      final map = raw.cast<String, dynamic>();
+      final caNo = (map['accNum'] ?? '').toString();
+      if (caNo.isEmpty) continue;
+
+      final smartMeterCode = (map['smartMeterCode'] ?? map['SmartMeterCode'] ?? '').toString();
+      final isSmart = smartMeterCode.isNotEmpty;
+      final isOwned = _parseFlag(map['isOwned']);
+
+      double currentCharges = 0.0;
+      double currentUsageKwh = 0.0;
+      String lastReadingTime = 'Pending Sync';
+
+      // 2. Current outstanding bill. Best-effort: a failure here shouldn't
+      // hide an account that *was* discovered — it just stays unknown ("--").
+      try {
+        final due = await _postLegacyEncrypted(
+          session: session,
+          endpoint: 'GetAccountDueAmount',
+          data: {
+            'contractAccount': caNo,
+            'isOwnedAccount': isOwned ? 'true' : 'false',
+            'usrInf': _baseUserInfo(session),
+          },
+        );
+        final dueData = due['data'];
+        final dueMap = dueData is Map ? (dueData['AccountAmountDue'] ?? dueData) : null;
+        if (dueMap is Map) {
+          currentCharges = double.tryParse('${dueMap['amountDue'] ?? ''}') ?? 0.0;
+        }
+      } catch (e) {
+        debugPrint('myTNB GetAccountDueAmount failed for $caNo: $e');
+      }
+
+      // 3. Current-cycle usage in kWh.
+      try {
+        final usage = await _postLegacyEncrypted(
+          session: session,
+          endpoint: 'GetAccountUsageSmart',
+          data: {
+            'contractAccount': caNo,
+            'isOwner': isOwned ? 'true' : 'false',
+            'metercode': '',
+            'usrInf': _baseUserInfo(session),
+          },
+        );
+        final usageData = usage['data'];
+        final byMonth = usageData is Map ? usageData['ByMonth'] : null;
+        final months = (byMonth is Map ? byMonth['Months'] : null);
+        if (months is List) {
+          final monthMaps = months.whereType<Map>().toList();
+          if (monthMaps.isNotEmpty) {
+            final current = monthMaps.firstWhere(
+              (m) => m['IsUnbilled'] == true,
+              orElse: () => monthMaps.last,
+            );
+            currentUsageKwh = double.tryParse('${current['UsageTotal'] ?? ''}') ?? 0.0;
+            final month = current['Month']?.toString() ?? '';
+            final year = current['Year']?.toString() ?? '';
+            lastReadingTime = (month.isNotEmpty || year.isNotEmpty)
+                ? 'Smart Meter: $month $year'
+                : 'Live Smart Meter Sync';
+          }
+        }
+      } catch (e) {
+        debugPrint('myTNB GetAccountUsageSmart failed for $caNo: $e');
+      }
+
+      final effectiveTariff =
+          currentUsageKwh > 0 ? TnbTariffCalculator.calculateEffectiveTariff(currentUsageKwh) : 0.0;
+      final accDesc = (map['accDesc'] ?? '').toString();
+      final ownerName = (map['ownerName'] ?? '').toString();
+
+      accounts.add(
+        MyTnbAccount(
+          accountNumber: caNo,
+          accountDesc: accDesc.isNotEmpty ? accDesc : (isSmart ? 'Home (Smart Meter)' : 'Home (Standard Meter)'),
+          address: (map['accountStAddress'] ?? '').toString(),
+          ownerName: ownerName.isNotEmpty
+              ? ownerName
+              : (session.displayName.isNotEmpty ? session.displayName : 'TNB Customer'),
+          isSmartMeter: isSmart,
+          currentCharges: double.parse(currentCharges.toStringAsFixed(2)),
+          currentUsageKwh: currentUsageKwh,
+          // The real "projected" bill isn't fetched; showing the same real
+          // due amount twice beats inventing a markup guess.
+          projectedCostRm: double.parse(currentCharges.toStringAsFixed(2)),
+          lastReadingTime: lastReadingTime,
+          effectiveTariff: effectiveTariff,
+          isDemo: false,
+        ),
+      );
+    }
+
+    if (accounts.isEmpty) {
+      throw const MyTnbException('myTNB returned accounts with no valid account number.', 'NO_VALID_ACCOUNTS');
+    }
+    return accounts;
   }
 }
 
