@@ -22,7 +22,7 @@ import '../widgets/home_widget_service.dart';
 import 'climate_control_sheet.dart';
 import 'window_sunroof_sheet.dart';
 import 'remote_engine_sheet.dart';
-import 'blueprint_car_canvas.dart';
+import 'car_view_carousel.dart';
 import 'ask_assistant_sheet.dart';
 import 'energy_screen.dart';
 import '../mytnb/mytnb_api.dart';
@@ -69,6 +69,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
   double _homeAcCost = 0.0;
   double _petrolCost = 0.0;
   double _publicEvCost = 0.0;
+  int _carViewPage = 0; // remembered carousel page (survives card rebuilds)
 
   String get _selectedVehicleColorKey => VehicleSkinManager.instance.currentSkinKey;
 
@@ -1107,11 +1108,15 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             ),
             const SizedBox(height: 14),
 
-            // 3. BLUEPRINT TOP-VIEW CAR WITH 4-WHEEL TPMS CALLOUTS
-            BlueprintCarCanvas(
+            // 3. SWIPEABLE CAR VIEW CAROUSEL (TPMS → Paint Studio → 3D Orbit)
+            CarViewCarousel(
               telemetry: _telemetry,
               isBound: isBound,
               accentColor: limeAccent,
+              selectedSkinKey: _selectedVehicleColorKey,
+              onSkinSelected: _updateVehicleColor,
+              initialPage: _carViewPage,
+              onPageChanged: (i) => _carViewPage = i, // no setState needed
             ),
             const SizedBox(height: 18),
 

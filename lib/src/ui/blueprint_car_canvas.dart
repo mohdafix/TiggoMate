@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../carlinko/vehicle_telemetry.dart';
 
-/// Cyber Minimalist Top-Down Blueprint Car Canvas with TPMS Callouts
+/// Cyber Minimalist Top-Down Blueprint Car Canvas with TPMS Callouts (full card)
 class BlueprintCarCanvas extends StatelessWidget {
   final VehicleTelemetry telemetry;
   final bool isBound;
@@ -22,6 +22,62 @@ class BlueprintCarCanvas extends StatelessWidget {
     final cardBg = isDark ? const Color(0xFF12141A) : Colors.white;
     final borderCol = isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0);
     final textMuted = isDark ? const Color(0xFF717684) : const Color(0xFF64748B);
+
+    final headerStyle = TextStyle(
+      fontFamily: 'monospace',
+      fontSize: 10,
+      letterSpacing: 1.2,
+      color: textMuted,
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderCol, width: 1),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('TOP VIEW · TPMS COLD', style: headerStyle.copyWith(fontWeight: FontWeight.w700)),
+              Text('SPEC 230 KPA', style: headerStyle.copyWith(fontWeight: FontWeight.w600)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          BlueprintCarStage(
+            telemetry: telemetry,
+            isBound: isBound,
+            accentColor: accentColor,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The bare 180 px blueprint stage (painter + 4 TPMS readouts), no card chrome.
+/// Used by [BlueprintCarCanvas] and by the dashboard's CarViewCarousel.
+class BlueprintCarStage extends StatelessWidget {
+  final VehicleTelemetry telemetry;
+  final bool isBound;
+  final Color accentColor;
+  final double height;
+
+  const BlueprintCarStage({
+    super.key,
+    required this.telemetry,
+    required this.isBound,
+    required this.accentColor,
+    this.height = 180,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textMuted = isDark ? const Color(0xFF717684) : const Color(0xFF64748B);
     final textPrimary = isDark ? Colors.white : const Color(0xFF0A0B0E);
 
     final flKpa = isBound && telemetry.tyreFlPressureKpa > 0 ? telemetry.tyreFlPressureKpa.round() : 232;
@@ -34,117 +90,32 @@ class BlueprintCarCanvas extends StatelessWidget {
     final rlTemp = isBound && telemetry.tyreRlTempC > 0 ? telemetry.tyreRlTempC.round() : 30;
     final rrTemp = isBound && telemetry.tyreRrTempC > 0 ? telemetry.tyreRrTempC.round() : 30;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderCol, width: 1),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Column(
+    Widget readout(String label, int kpa, int temp, bool alignRight) => _TpmsCornerReadout(
+          label: label,
+          kpa: kpa,
+          tempC: temp,
+          alignRight: alignRight,
+          textMuted: textMuted,
+          textPrimary: textPrimary,
+        );
+
+    return SizedBox(
+      height: height,
+      child: Stack(
         children: [
-          // Header: TOP VIEW · TPMS COLD  SPEC 230 KPA
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'TOP VIEW · TPMS COLD',
-                style: TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
-                  color: textMuted,
-                ),
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _CarBlueprintPainter(
+                accent: accentColor,
+                lineColor: isDark ? const Color(0xFF2A313D) : const Color(0xFFCBD5E1),
+                bodyFill: isDark ? const Color(0xFF0F1117) : const Color(0xFFF1F5F9),
               ),
-              Text(
-                'SPEC 230 KPA',
-                style: TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1.2,
-                  color: textMuted,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-
-          // Blueprint Stage with 4 Corner Readouts and Top-Down Car Silhouette
-          SizedBox(
-            height: 180,
-            child: Stack(
-              children: [
-                // Top-Down Blueprint Painter
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: _CarBlueprintPainter(
-                      accent: accentColor,
-                      lineColor: isDark ? const Color(0xFF2A313D) : const Color(0xFFCBD5E1),
-                      bodyFill: isDark ? const Color(0xFF0F1117) : const Color(0xFFF1F5F9),
-                    ),
-                  ),
-                ),
-
-                // Front Left TPMS Readout
-                Positioned(
-                  top: 4,
-                  left: 4,
-                  child: _TpmsCornerReadout(
-                    label: 'FL',
-                    kpa: flKpa,
-                    tempC: flTemp,
-                    alignRight: false,
-                    textMuted: textMuted,
-                    textPrimary: textPrimary,
-                  ),
-                ),
-
-                // Front Right TPMS Readout
-                Positioned(
-                  top: 4,
-                  right: 4,
-                  child: _TpmsCornerReadout(
-                    label: 'FR',
-                    kpa: frKpa,
-                    tempC: frTemp,
-                    alignRight: true,
-                    textMuted: textMuted,
-                    textPrimary: textPrimary,
-                  ),
-                ),
-
-                // Rear Left TPMS Readout
-                Positioned(
-                  bottom: 4,
-                  left: 4,
-                  child: _TpmsCornerReadout(
-                    label: 'RL',
-                    kpa: rlKpa,
-                    tempC: rlTemp,
-                    alignRight: false,
-                    textMuted: textMuted,
-                    textPrimary: textPrimary,
-                  ),
-                ),
-
-                // Rear Right TPMS Readout
-                Positioned(
-                  bottom: 4,
-                  right: 4,
-                  child: _TpmsCornerReadout(
-                    label: 'RR',
-                    kpa: rrKpa,
-                    tempC: rrTemp,
-                    alignRight: true,
-                    textMuted: textMuted,
-                    textPrimary: textPrimary,
-                  ),
-                ),
-              ],
             ),
           ),
+          Positioned(top: 4, left: 4, child: readout('FL', flKpa, flTemp, false)),
+          Positioned(top: 4, right: 4, child: readout('FR', frKpa, frTemp, true)),
+          Positioned(bottom: 4, left: 4, child: readout('RL', rlKpa, rlTemp, false)),
+          Positioned(bottom: 4, right: 4, child: readout('RR', rrKpa, rrTemp, true)),
         ],
       ),
     );
