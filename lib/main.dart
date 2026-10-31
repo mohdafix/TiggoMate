@@ -1386,6 +1386,32 @@ class MaintenanceTab extends StatefulWidget {
 }
 
 class _MaintenanceTabState extends State<MaintenanceTab> {
+  void _confirmCompleteAppointment(BuildContext context, ServiceAppointment apt) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF131922) : Colors.white,
+        title: const Text('Mark as Done?'),
+        content: Text('Mark your ${apt.serviceType} at ${apt.centreName} as completed?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Not Yet'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ServiceAppointmentManager.instance.completeAppointment(apt.id);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: context.tokens.accent, foregroundColor: const Color(0xFF0A0B0E)),
+            child: const Text('Mark Done'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _confirmCancelAppointment(BuildContext context, ServiceAppointment apt) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
@@ -1804,6 +1830,17 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
     );
   }
 
+  /// Formats a km value with thousands separators, e.g. 10000 -> "10,000".
+  String _formatKmThousands(int km) {
+    final s = km.toString();
+    final buf = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+      buf.write(s[i]);
+    }
+    return buf.toString();
+  }
+
   Widget _buildScheduleAndPricingView(BuildContext context, bool isDark) {
     final bgCol = isDark ? const Color(0xFF0A0B0E) : const Color(0xFFF6F8FA);
     final cardCol = isDark ? const Color(0xFF12141A) : Colors.white;
@@ -1815,7 +1852,24 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
     final currentKm = AppVehicleRepository.instance.isVehicleBound && AppVehicleRepository.instance.currentTelemetry.odometerKm > 0
         ? AppVehicleRepository.instance.currentTelemetry.odometerKm
         : 842;
-    final kmLeft = (1000 - currentKm).clamp(0, 1000);
+
+    // Find the next upcoming milestone from the real schedule instead of
+    // always counting down to the first (1,000 km) one. _milestones is
+    // already ascending by km.
+    ServiceMilestone? nextMilestone;
+    int previousMilestoneKm = 0;
+    for (final m in _milestones) {
+      if (m.km > currentKm) {
+        nextMilestone = m;
+        break;
+      }
+      previousMilestoneKm = m.km;
+    }
+    final hasNextMilestone = nextMilestone != null;
+    final kmLeft = hasNextMilestone ? (nextMilestone.km - currentKm).clamp(0, nextMilestone.km) : 0;
+    final milestoneSpanKm = hasNextMilestone ? (nextMilestone.km - previousMilestoneKm) : 1;
+    final milestoneProgress =
+        hasNextMilestone ? ((currentKm - previousMilestoneKm) / milestoneSpanKm).clamp(0.02, 1.0) : 1.0;
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
@@ -1861,7 +1915,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
               ),
             ),
             Text(
-              '$kmLeft km to first service',
+              hasNextMilestone ? '$kmLeft km to ${nextMilestone.title}' : 'All scheduled services up to date',
               style: TextStyle(
                 fontFamily: 'monospace',
                 fontSize: 12,
@@ -1873,7 +1927,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
         ),
         const SizedBox(height: 12),
 
-        // 2. MILESTONE SLIDER (0 ── 500 ── 1,000)
+        // 2. MILESTONE SLIDER (previous milestone ── midpoint ── next milestone)
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: SizedBox(
@@ -1882,7 +1936,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
               children: [
                 Container(color: isDark ? const Color(0xFF161922) : const Color(0xFFE2E8F0)),
                 FractionallySizedBox(
-                  widthFactor: (currentKm / 1000.0).clamp(0.05, 1.0),
+                  widthFactor: milestoneProgress,
                   child: Container(color: limeAccent),
                 ),
               ],
@@ -1894,9 +1948,15 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('0', style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: textMuted)),
-            Text('500', style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: textMuted)),
-            Text('1,000', style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: textMuted)),
+            Text(_formatKmThousands(previousMilestoneKm), style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: textMuted)),
+            Text(
+              _formatKmThousands(hasNextMilestone ? (previousMilestoneKm + nextMilestone.km) ~/ 2 : previousMilestoneKm),
+              style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: textMuted),
+            ),
+            Text(
+              _formatKmThousands(hasNextMilestone ? nextMilestone.km : previousMilestoneKm),
+              style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: textMuted),
+            ),
           ],
         ),
         const SizedBox(height: 20),
@@ -1969,6 +2029,10 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                         onPressed: () => _confirmCancelAppointment(context, upcoming),
                         child: const Text('Cancel Booking', style: TextStyle(color: Colors.redAccent, fontSize: 11)),
                       ),
+                      TextButton(
+                        onPressed: () => _confirmCompleteAppointment(context, upcoming),
+                        child: Text('Mark Done', style: TextStyle(color: limeAccent, fontSize: 11, fontWeight: FontWeight.w700)),
+                      ),
                     ],
                   ),
                 ],
@@ -1977,7 +2041,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
           },
         ),
 
-        // 3. NEXT · MONTH 1: 1,000 KM INSPECTION CARD
+        // 3. NEXT MILESTONE CARD — driven by the real odometer, not pinned to milestone 1
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -1989,7 +2053,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'NEXT · MONTH 1',
+                hasNextMilestone ? 'NEXT · MONTH ${nextMilestone.month}' : 'SCHEDULE COMPLETE',
                 style: TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 9.5,
@@ -2002,42 +2066,52 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    '1,000 km inspection',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: textPrimary,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
+                  Expanded(
                     child: Text(
-                      'FOC',
+                      hasNextMilestone
+                          ? nextMilestone.title
+                          : 'All scheduled services up to ${_formatKmThousands(previousMilestoneKm)} km done',
                       style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
                         color: textPrimary,
                       ),
                     ),
                   ),
+                  if (hasNextMilestone)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        nextMilestone.isLabourFoc ? 'FOC' : 'RM ${nextMilestone.compulsoryFee.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: textPrimary,
+                        ),
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(height: 14),
 
-              // Checklist Items
-              _buildServiceCheckRow('CarLinko telematics pairing', '0.00', textPrimary, textMuted),
-              const SizedBox(height: 8),
-              _buildServiceCheckRow('3DHT & BMS diagnostic scan', '0.00', textPrimary, textMuted),
-              const SizedBox(height: 8),
-              _buildServiceCheckRow('HV harness torque check', '0.00', textPrimary, textMuted),
-              const SizedBox(height: 8),
-              _buildServiceCheckRow('Tyre pressure & torque', '0.00', textPrimary, textMuted),
+              // Checklist items, straight from this milestone's own part list.
+              if (hasNextMilestone)
+                for (int i = 0; i < nextMilestone.compulsoryParts.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 8),
+                  _buildServiceCheckRow(
+                    nextMilestone.compulsoryParts[i]['name'] as String,
+                    ((nextMilestone.compulsoryParts[i]['price'] as num) == 0
+                        ? 'FOC'
+                        : 'RM ${(nextMilestone.compulsoryParts[i]['price'] as num).toStringAsFixed(2)}'),
+                    textPrimary,
+                    textMuted,
+                  ),
+                ],
               const SizedBox(height: 18),
 
               // Action Buttons Row: [ Find 3S/4S ] & [ Book slot ]
@@ -2064,12 +2138,13 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  if (hasNextMilestone) const SizedBox(width: 10),
+                  if (hasNextMilestone)
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () => BookServiceAppointmentSheet.show(
                         context,
-                        initialServiceType: '1,000 km 1st Inspection & Activation (FOC)',
+                        initialServiceType: nextMilestone!.title,
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: limeAccent,

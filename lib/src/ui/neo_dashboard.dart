@@ -681,7 +681,26 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     );
   }
 
-  void _handleRemoteCommand(String action) {
+  /// Sends [command] to CarLinko and waits for the real result, instead of
+  /// firing it and immediately assuming success. On failure, [onRevert]
+  /// undoes whatever optimistic UI state was set and a real error is shown.
+  Future<void> _sendCommandAndReport(
+    String command, {
+    required String successMessage,
+    required String failureMessage,
+    VoidCallback? onRevert,
+  }) async {
+    final ok = await widget.repository.sendRemoteCommand(command);
+    if (!mounted) return;
+    if (ok) {
+      _showNotification(successMessage);
+    } else {
+      onRevert?.call();
+      _showNotification(failureMessage, type: NotificationType.error);
+    }
+  }
+
+  Future<void> _handleRemoteCommand(String action) async {
     if (!widget.repository.isVehicleBound) {
       _showNotification('⚠️ Pending Car Bind: Please connect and bind CarLinko to control vehicle.');
       _openCarlinkoConnect();
@@ -689,54 +708,110 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     }
     if (action == 'lock' || action == 'door_lock') {
       final willLock = action == 'door_lock' ? true : !_isDoorsLocked;
+      final previous = _isDoorsLocked;
       setState(() => _isDoorsLocked = willLock);
-      widget.repository.sendRemoteCommand(willLock ? 'door_lock' : 'door_unlock');
-      _showNotification(willLock ? '🔒 CarLinko: Doors Locked' : '🔓 CarLinko: Doors Unlocked');
+      await _sendCommandAndReport(
+        willLock ? 'door_lock' : 'door_unlock',
+        successMessage: willLock ? '🔒 CarLinko: Doors Locked' : '🔓 CarLinko: Doors Unlocked',
+        failureMessage: '⚠️ CarLinko: Door command failed. Please retry.',
+        onRevert: () => setState(() => _isDoorsLocked = previous),
+      );
       _syncWidgetTelemetry();
     } else if (action == 'door_unlock') {
+      final previous = _isDoorsLocked;
       setState(() => _isDoorsLocked = false);
-      widget.repository.sendRemoteCommand('door_unlock');
-      _showNotification('🔓 CarLinko: Doors Unlocked');
+      await _sendCommandAndReport(
+        'door_unlock',
+        successMessage: '🔓 CarLinko: Doors Unlocked',
+        failureMessage: '⚠️ CarLinko: Door command failed. Please retry.',
+        onRevert: () => setState(() => _isDoorsLocked = previous),
+      );
       _syncWidgetTelemetry();
     } else if (action == 'climate' || action == 'climate_on') {
       final willTurnOn = action == 'climate_on' ? true : !_isAcActive;
+      final previous = _isAcActive;
       setState(() => _isAcActive = willTurnOn);
-      widget.repository.sendRemoteCommand(willTurnOn ? 'ac_on' : 'ac_off');
-      _showNotification(willTurnOn ? '❄️ Cabin Pre-cooling started (22°C)' : '❄️ Climate Pre-conditioning OFF');
+      await _sendCommandAndReport(
+        willTurnOn ? 'ac_on' : 'ac_off',
+        successMessage: willTurnOn ? '❄️ Cabin Pre-cooling started (22°C)' : '❄️ Climate Pre-conditioning OFF',
+        failureMessage: '⚠️ CarLinko: Climate command failed. Please retry.',
+        onRevert: () => setState(() => _isAcActive = previous),
+      );
       _syncWidgetTelemetry();
     } else if (action == 'climate_off') {
+      final previous = _isAcActive;
       setState(() => _isAcActive = false);
-      widget.repository.sendRemoteCommand('ac_off');
-      _showNotification('❄️ Climate Pre-conditioning OFF');
+      await _sendCommandAndReport(
+        'ac_off',
+        successMessage: '❄️ Climate Pre-conditioning OFF',
+        failureMessage: '⚠️ CarLinko: Climate command failed. Please retry.',
+        onRevert: () => setState(() => _isAcActive = previous),
+      );
       _syncWidgetTelemetry();
     } else if (action == 'windows_open') {
+      final previous = _isWindowsVented;
       setState(() => _isWindowsVented = true);
-      widget.repository.sendRemoteCommand('window_open_all');
-      _showNotification('🪟 CarLinko: All 4 Windows opened');
+      await _sendCommandAndReport(
+        // Real CarLinko command is 'window_open', not 'window_open_all'.
+        'window_open',
+        successMessage: '🪟 CarLinko: All 4 Windows opened',
+        failureMessage: '⚠️ CarLinko: Window command failed. Please retry.',
+        onRevert: () => setState(() => _isWindowsVented = previous),
+      );
     } else if (action == 'windows_close') {
+      final previous = _isWindowsVented;
       setState(() => _isWindowsVented = false);
-      widget.repository.sendRemoteCommand('window_close_all');
-      _showNotification('🪟 CarLinko: All Windows closed and secured');
+      await _sendCommandAndReport(
+        // Real CarLinko command is 'window_close', not 'window_close_all'.
+        'window_close',
+        successMessage: '🪟 CarLinko: All Windows closed and secured',
+        failureMessage: '⚠️ CarLinko: Window command failed. Please retry.',
+        onRevert: () => setState(() => _isWindowsVented = previous),
+      );
     } else if (action == 'windows' || action == 'windows_vent') {
-      setState(() => _isWindowsVented = !_isWindowsVented);
-      widget.repository.sendRemoteCommand(_isWindowsVented ? 'window_vent' : 'window_close');
-      _showNotification(_isWindowsVented ? '🪟 Windows vented (20mm)' : '🪟 All Windows closed');
+      final previous = _isWindowsVented;
+      final willVent = !_isWindowsVented;
+      setState(() => _isWindowsVented = willVent);
+      await _sendCommandAndReport(
+        willVent ? 'window_vent' : 'window_close',
+        successMessage: willVent ? '🪟 Windows vented (20mm)' : '🪟 All Windows closed',
+        failureMessage: '⚠️ CarLinko: Window command failed. Please retry.',
+        onRevert: () => setState(() => _isWindowsVented = previous),
+      );
     } else if (action == 'sunroof_open') {
-      widget.repository.sendRemoteCommand('sunroof_open');
-      _showNotification('☀️ Panoramic Sunroof opened');
+      await _sendCommandAndReport(
+        'sunroof_open',
+        successMessage: '☀️ Panoramic Sunroof opened',
+        failureMessage: '⚠️ CarLinko: Sunroof command failed. Please retry.',
+      );
     } else if (action == 'sunroof_close') {
-      widget.repository.sendRemoteCommand('sunroof_close');
-      _showNotification('☀️ Panoramic Sunroof closed');
+      await _sendCommandAndReport(
+        'sunroof_close',
+        successMessage: '☀️ Panoramic Sunroof closed',
+        failureMessage: '⚠️ CarLinko: Sunroof command failed. Please retry.',
+      );
     } else if (action == 'trunk' || action == 'trunk_open') {
-      setState(() => _isTrunkOpen = !_isTrunkOpen);
-      widget.repository.sendRemoteCommand(_isTrunkOpen ? 'trunk_open' : 'trunk_close');
-      _showNotification(_isTrunkOpen ? '🚗 Power Tailgate opened' : '🚗 Tailgate closed');
+      final previous = _isTrunkOpen;
+      final willOpen = !_isTrunkOpen;
+      setState(() => _isTrunkOpen = willOpen);
+      await _sendCommandAndReport(
+        willOpen ? 'trunk_open' : 'trunk_close',
+        successMessage: willOpen ? '🚗 Power Tailgate opened' : '🚗 Tailgate closed',
+        failureMessage: '⚠️ CarLinko: Trunk command failed. Please retry.',
+        onRevert: () => setState(() => _isTrunkOpen = previous),
+      );
     } else if (action == 'engine_start') {
-      widget.repository.sendRemoteCommand('engine_start');
-      _showNotification('⚡ 1.5T Dedicated Hybrid Engine Remote Started');
+      await _sendCommandAndReport(
+        'engine_start',
+        successMessage: '⚡ 1.5T Dedicated Hybrid Engine Remote Started',
+        failureMessage: '⚠️ CarLinko: Engine start failed. Please retry.',
+      );
     } else if (action == 'engine_stop') {
-      widget.repository.sendRemoteCommand('engine_stop');
-      _showNotification('⚡ Engine Shut Down');
+      await _sendCommandAndReport(
+        'engine_stop',
+        successMessage: '⚡ Engine Shut Down',
+        failureMessage: '⚠️ CarLinko: Engine stop failed. Please retry.',
+      );
     } else if (action == 'schedule_charging') {
       _openSmartChargingSheet();
     } else if (action == 'check_tnb') {
@@ -749,14 +824,20 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
         ),
       );
     } else if (action == 'locate') {
-      widget.repository.sendRemoteCommand('locate');
+      await _sendCommandAndReport(
+        'locate',
+        successMessage: '📢 CarLinko: Lights flashing & horn sounding',
+        failureMessage: '⚠️ CarLinko: Locate command failed. Please retry.',
+      );
+      if (!mounted) return;
       VehicleRadarSheet.show(
         context,
         telemetry: _telemetry,
-        onHornFlash: () {
-          widget.repository.sendRemoteCommand('locate');
-          _showNotification('📢 CarLinko: Lights flashing & horn sounding');
-        },
+        onHornFlash: () => _sendCommandAndReport(
+          'locate',
+          successMessage: '📢 CarLinko: Lights flashing & horn sounding',
+          failureMessage: '⚠️ CarLinko: Locate command failed. Please retry.',
+        ),
       );
     }
   }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'carlinko_api.dart';
 import 'vehicle_telemetry.dart';
 
@@ -260,19 +261,27 @@ class LiveCarLinkoRepository implements VehicleRepository {
 
   @override
   Future<bool> sendRemoteCommand(String command, {Map<String, dynamic>? params}) async {
-    if (_vehicleId != null) {
-      try {
-        final res = await _client.sendRemoteControl(
-          vehicleId: _vehicleId!,
-          command: command,
-          additionalParams: params,
-        );
-        return res['code'] == 0 || res['success'] == true;
-      } catch (e) {
-        return false;
-      }
+    if (_vehicleId == null) {
+      debugPrint('CarLinko remoteControl "$command" skipped: no vehicle bound');
+      return false;
     }
-    return false;
+    try {
+      // _client.sendRemoteControl() already throws unless CarLinko's cloud
+      // reported top-level code "0000" (see CarLinkoClient._request), so
+      // reaching here at all means the command was accepted. The returned
+      // "data" payload isn't guaranteed to carry its own code/success
+      // field, so re-checking one here was the actual bug: it silently
+      // reported "failed" even on a real, accepted command.
+      await _client.sendRemoteControl(
+        vehicleId: _vehicleId!,
+        command: command,
+        additionalParams: params,
+      );
+      return true;
+    } catch (e) {
+      debugPrint('CarLinko remoteControl "$command" failed: $e');
+      return false;
+    }
   }
 
   @override

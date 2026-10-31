@@ -114,8 +114,11 @@ void main() {
     );
 
     expect(find.text('SCHEDULE & PRICING'), findsOneWidget);
+    // No car bound, so the default 842 km fallback is used: the next real
+    // milestone from the schedule is the 1,000 km / month 1 one.
     expect(find.text('NEXT · MONTH 1'), findsOneWidget);
-    expect(find.text('1,000 km inspection'), findsOneWidget);
+    expect(find.text('1st Inspection & Telematics'), findsOneWidget);
+    expect(find.text('158 km to 1st Inspection & Telematics'), findsOneWidget);
     expect(find.text('SCHEDULE · TO 150,000 KM'), findsOneWidget);
     expect(find.text('RM 407.50'), findsOneWidget);
   });

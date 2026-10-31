@@ -21,6 +21,7 @@ class ServiceAppointment {
   final String notes;
   final DateTime createdAt;
   final bool isCancelled;
+  final bool isCompleted;
 
   const ServiceAppointment({
     required this.id,
@@ -35,6 +36,7 @@ class ServiceAppointment {
     this.notes = '',
     required this.createdAt,
     this.isCancelled = false,
+    this.isCompleted = false,
   });
 
   ServiceAppointment copyWith({
@@ -50,6 +52,7 @@ class ServiceAppointment {
     String? notes,
     DateTime? createdAt,
     bool? isCancelled,
+    bool? isCompleted,
   }) {
     return ServiceAppointment(
       id: id ?? this.id,
@@ -64,6 +67,7 @@ class ServiceAppointment {
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
       isCancelled: isCancelled ?? this.isCancelled,
+      isCompleted: isCompleted ?? this.isCompleted,
     );
   }
 
@@ -149,6 +153,7 @@ class ServiceAppointment {
         'notes': notes,
         'createdAt': createdAt.toIso8601String(),
         'isCancelled': isCancelled,
+        'isCompleted': isCompleted,
       };
 
   factory ServiceAppointment.fromJson(Map<String, dynamic> json) {
@@ -165,6 +170,7 @@ class ServiceAppointment {
       notes: json['notes'] as String? ?? '',
       createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
       isCancelled: json['isCancelled'] as bool? ?? false,
+      isCompleted: json['isCompleted'] as bool? ?? false,
     );
   }
 }
@@ -185,7 +191,7 @@ class ServiceAppointmentManager extends ChangeNotifier {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final active = _appointments.where((a) {
-      if (a.isCancelled) return false;
+      if (a.isCancelled || a.isCompleted) return false;
       final target = DateTime(a.appointmentDate.year, a.appointmentDate.month, a.appointmentDate.day);
       return !target.isBefore(today);
     }).toList();
@@ -278,6 +284,32 @@ class ServiceAppointmentManager extends ChangeNotifier {
       );
 
       HapticFeedback.lightImpact();
+      notifyListeners();
+    }
+  }
+
+  /// Mark an appointment as done/completed.
+  Future<void> completeAppointment(String id) async {
+    await load();
+    final idx = _appointments.indexWhere((a) => a.id == id);
+    if (idx != -1) {
+      final old = _appointments[idx];
+      _appointments[idx] = old.copyWith(isCompleted: true);
+      await _persist();
+      unawaited(FirebaseSyncService.instance.syncAppointment(_appointments[idx]));
+
+      VehicleAlertsManager.instance.addAlert(
+        VehicleAlertItem(
+          id: 'alert_${DateTime.now().millisecondsSinceEpoch}',
+          title: 'Service Appointment Completed',
+          message: '${old.serviceType} at ${old.centreName} marked as done.',
+          timestamp: DateTime.now(),
+          type: NotificationType.success,
+          icon: Icons.task_alt_rounded,
+        ),
+      );
+
+      HapticFeedback.mediumImpact();
       notifyListeners();
     }
   }
