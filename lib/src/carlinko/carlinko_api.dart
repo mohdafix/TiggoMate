@@ -264,14 +264,17 @@ class CarLinkoClient {
   }
 
   /// Send remote command to Chery T-Box via /user/vehicle/remoteControl
-  /// Supported commands from CarLinko protocol:
+  /// Supported commands, cross-checked against the real CarLinko app's own
+  /// string table (its command names, not ours — the earlier 'locate' and
+  /// 'window_open_all'/'window_close_all' here were wrong guesses that the
+  /// real API rejected):
   /// - 'door_lock' / 'door_unlock'
   /// - 'ac_on' / 'ac_off' (with setTemperature, airDuration)
   /// - 'window_open' / 'window_close' / 'window_vent'
   /// - 'sunroof_open' / 'sunroof_close' / 'sunroof_tilt'
   /// - 'trunk_open' / 'trunk_close'
   /// - 'engine_start' / 'engine_stop'
-  /// - 'locate' (horn & hazard flash)
+  /// - 'vehicle_locate' (horn & hazard flash)
   Future<Map<String, dynamic>> sendRemoteControl({
     required String vehicleId,
     required String command,

@@ -825,8 +825,11 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
         ),
       );
     } else if (action == 'locate') {
+      // Real CarLinko command is 'vehicle_locate' — confirmed from the
+      // official app's own string table (libapp.so), since the API itself
+      // rejected a bare 'locate' with a parameter error (code 9998).
       await _sendCommandAndReport(
-        'locate',
+        'vehicle_locate',
         successMessage: '📢 CarLinko: Lights flashing & horn sounding',
         failureMessage: '⚠️ CarLinko: Locate command failed. Please retry.',
       );
@@ -835,7 +838,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
         context,
         telemetry: _telemetry,
         onHornFlash: () => _sendCommandAndReport(
-          'locate',
+          'vehicle_locate',
           successMessage: '📢 CarLinko: Lights flashing & horn sounding',
           failureMessage: '⚠️ CarLinko: Locate command failed. Please retry.',
         ),
