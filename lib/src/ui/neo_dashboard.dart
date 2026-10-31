@@ -822,20 +822,18 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
         ),
       );
     } else if (action == 'locate') {
-      // The semantic strings ('locate', then 'vehicle_locate') both failed
-      // with a real "parameter error" from CarLinko — the API takes a raw
-      // opcode in a `data` field, not a command name at all. Confirmed
-      // against ha-carlinko's own reference client: OP_FIND_CAR = "740400".
-      await _sendCommandAndReport(
-        CarLinkoOpcodes.findCar,
-        successMessage: '📢 CarLinko: Lights flashing & horn sounding',
-        failureMessage: '⚠️ CarLinko: Locate command failed. Please retry.',
-      );
-      if (!mounted) return;
+      // Just open the locator — horn & flash is its own explicit action
+      // inside the sheet (onHornFlash below), not something "Find Car"
+      // should trigger by itself.
       VehicleRadarSheet.show(
         context,
         telemetry: _telemetry,
         onHornFlash: () => _sendCommandAndReport(
+          // The semantic strings ('locate', then 'vehicle_locate') both
+          // failed with a real "parameter error" from CarLinko — the API
+          // takes a raw opcode in a `data` field, not a command name at
+          // all. Confirmed against ha-carlinko's own reference client:
+          // OP_FIND_CAR = "740400".
           CarLinkoOpcodes.findCar,
           successMessage: '📢 CarLinko: Lights flashing & horn sounding',
           failureMessage: '⚠️ CarLinko: Locate command failed. Please retry.',
