@@ -966,6 +966,13 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     final fuelRangeText = hasFuelRange ? 'Fuel $fuelPct% · $fuelRange km' : 'Fuel --% · -- km';
     final evBarCol = isBound ? limeAccent : borderCol;
     final fuelBarCol = hasFuelRange ? orangeAccent : borderCol;
+    const voltAccent = Color(0xFF58A6FF);
+
+    // "LIVE" but every real reading came back empty (just a successful poll
+    // with nothing in it, not an auth failure) — show that honestly instead
+    // of a confident-looking "LIVE" badge over blank values.
+    final looksEmptyWhileLive =
+        isBound && evRange == 0 && fuelRange == 0 && _telemetry.volt12 <= 0 && _telemetry.odometerKm == 0;
 
     return Scaffold(
       backgroundColor: bgCol,
@@ -1155,7 +1162,9 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 decoration: BoxDecoration(
                   color: cardCol,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: borderCol),
+                  border: Border.all(
+                    color: looksEmptyWhileLive ? const Color(0xFFFFB74D).withValues(alpha: 0.6) : borderCol,
+                  ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1169,20 +1178,22 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                             height: 6,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: isBound ? limeAccent : const Color(0xFFFFB74D),
+                              color: !isBound || looksEmptyWhileLive ? const Color(0xFFFFB74D) : limeAccent,
                             ),
                           ),
                           const SizedBox(width: 8),
                           Flexible(
                             child: Text(
-                              isBound
-                                  ? 'LIVE CarLinko · synced ${_syncAgeText()} ago'
-                                  : 'Pending Car Bind · Awaiting VIN pairing',
+                              !isBound
+                                  ? 'Pending Car Bind · Awaiting VIN pairing'
+                                  : looksEmptyWhileLive
+                                      ? 'LIVE CarLinko · No data this sync'
+                                      : 'LIVE CarLinko · synced ${_syncAgeText()} ago',
                               style: TextStyle(
                                 fontFamily: 'monospace',
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: isBound ? textPrimary : const Color(0xFFFFB74D),
+                                color: !isBound || looksEmptyWhileLive ? const Color(0xFFFFB74D) : textPrimary,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -1191,15 +1202,33 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      !isBound ? '--' : (_telemetry.isParked ? 'P · Parked' : 'D · Driving'),
-                      style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: textMuted,
+                    if (!isBound || looksEmptyWhileLive)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: limeAccent,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          'RECONNECT',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0A0B0E),
+                          ),
+                        ),
+                      )
+                    else
+                      Text(
+                        _telemetry.isParked ? 'P · Parked' : 'D · Driving',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: textMuted,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -1317,8 +1346,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                               style: TextStyle(
                                 fontFamily: 'monospace',
                                 fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                                color: textMuted,
+                                fontWeight: FontWeight.w700,
+                                color: isBound ? evBarCol : textMuted,
                               ),
                             ),
                           ],
@@ -1332,8 +1361,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                               style: TextStyle(
                                 fontFamily: 'monospace',
                                 fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                                color: textMuted,
+                                fontWeight: FontWeight.w700,
+                                color: hasFuelRange ? fuelBarCol : textMuted,
                               ),
                             ),
                           ],
@@ -1344,7 +1373,11 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        Icon(Icons.battery_charging_full, size: 12, color: textMuted),
+                        Icon(
+                          Icons.battery_charging_full,
+                          size: 12,
+                          color: widget.repository.isVehicleBound && _telemetry.volt12 > 0 ? voltAccent : textMuted,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           widget.repository.isVehicleBound && _telemetry.volt12 > 0
@@ -1353,8 +1386,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                           style: TextStyle(
                             fontFamily: 'monospace',
                             fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
-                            color: textMuted,
+                            fontWeight: FontWeight.w700,
+                            color: widget.repository.isVehicleBound && _telemetry.volt12 > 0 ? voltAccent : textMuted,
                           ),
                         ),
                       ],
