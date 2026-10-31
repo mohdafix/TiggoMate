@@ -335,7 +335,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
             _current = VehicleTelemetry.fromBlobMap(state, isSimulated: false);
             _status = VehicleConnectionStatus.connected;
             _controller.add(_current);
-            _resolveLocationName(_current);
+            _resolveLocation(_current);
             return;
           }
         } catch (e) {
@@ -360,7 +360,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
       _current = VehicleTelemetry.fromBlobMap(state, isSimulated: false);
       _status = VehicleConnectionStatus.connected;
       _controller.add(_current);
-      _resolveLocationName(_current);
+      _resolveLocation(_current);
     } catch (e) {
       if (e is CarLinkoAuthException) {
         _status = VehicleConnectionStatus.authRequired;
@@ -372,22 +372,43 @@ class LiveCarLinkoRepository implements VehicleRepository {
     }
   }
 
-  /// Backfills a real street address for [telemetry]'s GPS fix via
-  /// OpenStreetMap (fire-and-forget, so a slow/failed lookup never blocks
-  /// the dashboard from showing the telemetry that already arrived).
-  void _resolveLocationName(VehicleTelemetry telemetry) {
-    if (!telemetry.hasLocation) return;
-    unawaited(
-      ReverseGeocoder.lookup(telemetry.latitude, telemetry.longitude).then((address) {
-        if (address == null || address.isEmpty) return;
-        // Only apply if nothing newer has arrived while this lookup was in
-        // flight (a later refresh would already have its own location name).
-        if (identical(_current, telemetry)) {
-          _current = _current.copyWith(locationName: address);
-          _controller.add(_current);
-        }
-      }),
-    );
+  /// Fetches the car's real GPS position from CarLinko's own locate
+  /// endpoint (the 73-byte telemetry blob never carries it — confirmed
+  /// always zero on a real car) and backfills [telemetry] with it. Prefers
+  /// CarLinko's own address when it provides one, falling back to
+  /// OpenStreetMap only when it doesn't. Fire-and-forget, so a slow/failed
+  /// lookup never blocks the dashboard from showing telemetry that already
+  /// arrived.
+  void _resolveLocation(VehicleTelemetry telemetry) {
+    final deviceSn = _deviceSn;
+    if (deviceSn == null) return;
+    unawaited(() async {
+      Map<String, dynamic> loc;
+      try {
+        loc = await _client.locateDevice(deviceSn);
+      } catch (e) {
+        debugPrint('CarLinko locateDevice failed: $e');
+        return;
+      }
+      final lat = (loc['lat'] as num?)?.toDouble();
+      final lng = (loc['lng'] as num?)?.toDouble() ?? (loc['lon'] as num?)?.toDouble();
+      if (lat == null || lng == null || (lat == 0 && lng == 0)) return;
+
+      var address = (loc['address'] as String?)?.trim();
+      if (address == null || address.isEmpty) {
+        address = await ReverseGeocoder.lookup(lat, lng);
+      }
+
+      // Only apply if nothing newer has arrived while this lookup was in
+      // flight (a later refresh would already have its own location).
+      if (!identical(_current, telemetry)) return;
+      _current = _current.copyWith(
+        latitude: lat,
+        longitude: lng,
+        locationName: address ?? _current.locationName,
+      );
+      _controller.add(_current);
+    }());
   }
 
   /// Logs the raw 73-byte telemetry hex and every decoded field. The byte

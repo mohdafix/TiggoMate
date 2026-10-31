@@ -267,6 +267,19 @@ class CarLinkoClient {
     return result == true;
   }
 
+  /// Fetch the car's live GPS position (and, when CarLinko has one, a
+  /// pre-formatted address) via the real locate endpoint. The 73-byte
+  /// telemetry blob does not carry GPS at all — its would-be lat/lon bytes
+  /// are confirmed always zero on a real car — CarLinko's own app instead
+  /// gets location from this separate endpoint, confirmed against
+  /// ha-carlinko's reference client. Returns an empty map on no fix.
+  Future<Map<String, dynamic>> locateDevice(String deviceSn) async {
+    final body = {'sn': deviceSn, 'showAddress': 1};
+    final result = await _request('POST', '/maps/deviceLocate', body: body, signParams: body);
+    if (result is Map<String, dynamic>) return result;
+    return {};
+  }
+
   /// Fetch official dealership service records.
   Future<List<Map<String, dynamic>>> getMaintenanceRecords(String vehicleId) async {
     final q = {'vehicleId': vehicleId, 'queryKey': '', 'page': '1', 'size': '20'};
@@ -443,7 +456,6 @@ class CarLinkoClient {
     int? u8(int i) => i < n ? b[i] : null;
     int? u16(int i) => (i + 1 < n) ? ((b[i] << 8) | b[i + 1]) : null;
     int? u24(int i) => (i + 2 < n) ? ((b[i] << 16) | (b[i + 1] << 8) | b[i + 2]) : null;
-    int? u32(int i) => (i + 3 < n) ? ((b[i] << 24) | (b[i + 1] << 16) | (b[i + 2] << 8) | b[i + 3]) : null;
 
     final out = <String, dynamic>{};
     out['doors'] = u8(2);
@@ -468,13 +480,10 @@ class CarLinkoClient {
     out['battery_pct'] = u8(28);
     out['range_km'] = u16(29);
 
-    // GPS coordinates if available in telematics blob (scaled by 1e6)
-    final rawLat = u32(32);
-    final rawLon = u32(36);
-    if (rawLat != null && rawLat != 0 && rawLon != null && rawLon != 0) {
-      out['lat'] = rawLat / 1000000.0;
-      out['lon'] = rawLon / 1000000.0;
-    }
+    // No GPS here: bytes 32-39 (where a u32 lat/lon pair would plausibly
+    // live) are confirmed always zero on a real car, and ha-carlinko's own
+    // reference decoder doesn't attempt this blob for location either — see
+    // CarLinkoClient.locateDevice() for the real /maps/deviceLocate source.
 
     out['wltc_range'] = u16(68);
 

@@ -12,7 +12,7 @@ const int _kMaxHistoryEntries = 50;
 
 const String _kCarLinkoTokenKey = 'tm_carlinko_token';
 const String _kCarLinkoRegionKey = 'tm_carlinko_region';
-const String _kCarLinkoVehicleIdKey = 'tm_carlinko_vehicle_id';
+const String _kCarLinkoDeviceSnKey = 'tm_carlinko_device_sn';
 
 /// One GPS fix captured by the background tracker.
 class LocationHistoryEntry {
@@ -103,22 +103,25 @@ class LocationTrackerService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString(_kCarLinkoTokenKey);
-      final vehicleId = prefs.getString(_kCarLinkoVehicleIdKey);
+      final deviceSn = prefs.getString(_kCarLinkoDeviceSnKey);
       final region = prefs.getString(_kCarLinkoRegionKey) ?? carLinkoDefaultRegion;
-      if (token == null || token.isEmpty || vehicleId == null || vehicleId.isEmpty) {
+      if (token == null || token.isEmpty || deviceSn == null || deviceSn.isEmpty) {
         // Not bound / no saved session — nothing to track yet.
         return;
       }
 
       final client = CarLinkoClient(region: region, token: token);
-      // getVehicleState() already returns the fully decoded blob (it calls
-      // parseBlob internally) — no need to parse it a second time here.
-      final state = await client.getVehicleState(vehicleId);
-      final lat = (state['lat'] as num?)?.toDouble();
-      final lon = (state['lon'] as num?)?.toDouble();
+      // The 73-byte telemetry blob never carries GPS — use the real locate
+      // endpoint (same one the dashboard uses) instead of parsing the blob.
+      final loc = await client.locateDevice(deviceSn);
+      final lat = (loc['lat'] as num?)?.toDouble();
+      final lon = (loc['lng'] as num?)?.toDouble() ?? (loc['lon'] as num?)?.toDouble();
       if (lat == null || lon == null || (lat == 0 && lon == 0)) return;
 
-      final address = await ReverseGeocoder.lookup(lat, lon);
+      var address = (loc['address'] as String?)?.trim();
+      if (address == null || address.isEmpty) {
+        address = await ReverseGeocoder.lookup(lat, lon);
+      }
 
       final history = await loadHistory();
       history.insert(
