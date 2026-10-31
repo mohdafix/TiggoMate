@@ -1,5 +1,6 @@
 import 'src/ui/book_service_appointment_sheet.dart';
 import 'src/service/service_appointment_manager.dart';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -217,13 +218,23 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     await VehicleSkinManager.instance.init();
     final s = await SettingsService.load();
     await _myTnbRepo.init();
-    if (s.carLinkoStatus == 'Active') {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        final acc = prefs.getString('tm_carlinko_account') ?? s.ownerName;
-        AppVehicleRepository.instance.setPreActivationActive(account: acc);
-      } catch (_) {}
-    }
+
+    // Try to restore a real CarLinko session (saved token) first, so the
+    // user isn't forced to log in again every cold start. This runs in the
+    // background — don't block the splash screen on a network round trip.
+    unawaited(() async {
+      final restored = await AppVehicleRepository.instance.restoreSession();
+      if (!restored && s.carLinkoStatus == 'Active') {
+        // No saved token (e.g. upgrading from a build that never saved
+        // one) — fall back to the old cosmetic "pending bind" placeholder.
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final acc = prefs.getString('tm_carlinko_account') ?? s.ownerName;
+          AppVehicleRepository.instance.setPreActivationActive(account: acc);
+        } catch (_) {}
+      }
+    }());
+
     if (mounted) {
       setState(() {
         _settings = s;

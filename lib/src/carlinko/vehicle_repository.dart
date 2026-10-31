@@ -1,7 +1,13 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'carlinko_api.dart';
 import 'vehicle_telemetry.dart';
+
+const String _kCarLinkoTokenKey = 'tm_carlinko_token';
+const String _kCarLinkoAccountKey = 'tm_carlinko_account';
+const String _kCarLinkoRegionKey = 'tm_carlinko_region';
+const String _kCarLinkoVehicleIdKey = 'tm_carlinko_vehicle_id';
 
 abstract class VehicleRepository {
   Stream<VehicleTelemetry> get telemetryStream;
@@ -173,6 +179,10 @@ class LiveCarLinkoRepository implements VehicleRepository {
         _status = VehicleConnectionStatus.connected;
         await refresh();
       }
+      // Logged in successfully (whether or not a vehicle is bound yet) —
+      // save the session so the app doesn't need a fresh login every cold
+      // start. Only the bearer token is saved, never the password.
+      await _persistSession();
     } catch (e) {
       if (e is CarLinkoAuthException) {
         _status = VehicleConnectionStatus.authRequired;
@@ -180,6 +190,101 @@ class LiveCarLinkoRepository implements VehicleRepository {
         _status = VehicleConnectionStatus.error;
       }
       rethrow;
+    }
+  }
+
+  Future<void> _persistSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = _client.token;
+      if (token == null || _account == null) return;
+      await prefs.setString(_kCarLinkoTokenKey, token);
+      await prefs.setString(_kCarLinkoAccountKey, _account!);
+      await prefs.setString(_kCarLinkoRegionKey, _client.region);
+      if (_vehicleId != null) {
+        await prefs.setString(_kCarLinkoVehicleIdKey, _vehicleId!);
+      } else {
+        await prefs.remove(_kCarLinkoVehicleIdKey);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _clearPersistedSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kCarLinkoTokenKey);
+      await prefs.remove(_kCarLinkoRegionKey);
+      await prefs.remove(_kCarLinkoVehicleIdKey);
+      // Keep the account name saved so the connect dialog can still
+      // pre-fill it; only the token/session itself is invalidated.
+    } catch (_) {}
+  }
+
+  /// Restore a previously-saved CarLinko session (if any) without asking
+  /// the user to log in again. Returns true if a usable session (logged in
+  /// to the cloud, whether or not a vehicle is bound yet) was restored.
+  Future<bool> restoreSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString(_kCarLinkoTokenKey);
+      final account = prefs.getString(_kCarLinkoAccountKey);
+      if (token == null || token.isEmpty || account == null || account.isEmpty) {
+        return false;
+      }
+      final region = prefs.getString(_kCarLinkoRegionKey) ?? 'sea';
+
+      _status = VehicleConnectionStatus.connecting;
+      _client.region = region;
+      _client.token = token;
+      _account = account;
+
+      final savedVehicleId = prefs.getString(_kCarLinkoVehicleIdKey);
+      List<Map<String, dynamic>> vehicles = [];
+      try {
+        vehicles = await _client.getVehicles();
+      } catch (e) {
+        if (e is CarLinkoAuthException) {
+          // Saved token is no longer valid — clear it so the user gets a
+          // normal login prompt instead of silently failing forever.
+          _client.token = null;
+          _status = VehicleConnectionStatus.disconnected;
+          await _clearPersistedSession();
+          return false;
+        }
+        // Network/transient error: keep the saved session, just couldn't
+        // confirm it right now. Fall back to whatever we had saved.
+        if (savedVehicleId != null) {
+          _vehicleId = savedVehicleId;
+          _isPreActivation = false;
+        } else {
+          _isPreActivation = true;
+        }
+        _status = VehicleConnectionStatus.connected;
+        _current = VehicleTelemetry.unbound(
+          label: 'CarLinko Cloud Active • Restoring session…',
+        );
+        _controller.add(_current);
+        return true;
+      }
+
+      if (vehicles.isEmpty) {
+        _vehicleId = null;
+        _isPreActivation = true;
+        _status = VehicleConnectionStatus.connected;
+        _current = VehicleTelemetry.unbound(
+          label: 'CarLinko Cloud Active • Pending Car Bind (Awaiting 3S/4S Pairing)',
+        );
+        _controller.add(_current);
+      } else {
+        _isPreActivation = false;
+        _vehicleId = vehicles.first['vehicleId']?.toString();
+        _status = VehicleConnectionStatus.connected;
+        await refresh();
+      }
+      await _persistSession();
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -213,6 +318,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
         } catch (e) {
           if (e is CarLinkoAuthException) {
             _status = VehicleConnectionStatus.authRequired;
+            await _clearPersistedSession();
             rethrow;
           }
         }
@@ -233,6 +339,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
     } catch (e) {
       if (e is CarLinkoAuthException) {
         _status = VehicleConnectionStatus.authRequired;
+        await _clearPersistedSession();
       } else {
         _status = VehicleConnectionStatus.error;
       }
@@ -257,6 +364,11 @@ class LiveCarLinkoRepository implements VehicleRepository {
     _status = VehicleConnectionStatus.disconnected;
     _current = VehicleTelemetry.unbound(label: 'Pending Car Bind • Disconnected');
     _controller.add(_current);
+    await _clearPersistedSession();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kCarLinkoAccountKey);
+    } catch (_) {}
   }
 
   @override
@@ -369,6 +481,26 @@ class AppVehicleRepository implements VehicleRepository {
       return _liveRepo.sendRemoteCommand(command, params: params);
     }
     return _mockRepo.sendRemoteCommand(command, params: params);
+  }
+
+  /// Restore a previously-saved CarLinko session (if any) so the app
+  /// doesn't force a fresh login on every cold start. Returns true if a
+  /// session was actually restored.
+  Future<bool> restoreSession() async {
+    final restored = await _liveRepo.restoreSession();
+    if (restored) {
+      _isLiveActive = true;
+      _current = _liveRepo.currentTelemetry;
+      _liveSubscription?.cancel();
+      _liveSubscription = _liveRepo.telemetryStream.listen((data) {
+        if (_isLiveActive) {
+          _current = data;
+          _controller.add(data);
+        }
+      });
+      _controller.add(_current);
+    }
+    return restored;
   }
 
   /// Explicitly reset to offline simulation mode (safe fallback before dealership activation).
