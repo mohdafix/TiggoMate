@@ -17,6 +17,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'app_notification.dart';
 import 'smart_drive_hud.dart';
+import 'location_history_sheet.dart';
 import 'widgets_shortcuts_sheet.dart';
 import '../widgets/home_widget_service.dart';
 import 'climate_control_sheet.dart';
@@ -1076,6 +1077,9 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                               MaterialPageRoute(builder: (context) => const CheryServiceCentresScreen()),
                             );
                             break;
+                          case 'location_history':
+                            LocationHistorySheet.show(context);
+                            break;
                           case 'theme':
                             AppThemeController.instance.toggleTheme(context);
                             break;
@@ -1122,6 +1126,16 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                               Icon(Icons.storefront_outlined, size: 18, color: textMuted),
                               const SizedBox(width: 10),
                               const Text('Chery Service Centres', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'location_history',
+                          child: Row(
+                            children: [
+                              Icon(Icons.location_history, size: 18, color: textMuted),
+                              const SizedBox(width: 10),
+                              const Text('Location History', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                             ],
                           ),
                         ),

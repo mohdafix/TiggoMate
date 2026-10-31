@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../firebase/firebase_sync_service.dart';
 import 'carlinko_api.dart';
+import 'reverse_geocoder.dart';
 import 'vehicle_telemetry.dart';
 
 const String _kCarLinkoTokenKey = 'tm_carlinko_token';
@@ -315,6 +316,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
             _current = VehicleTelemetry.fromBlobMap(state, isSimulated: false);
             _status = VehicleConnectionStatus.connected;
             _controller.add(_current);
+            _resolveLocationName(_current);
             return;
           }
         } catch (e) {
@@ -339,6 +341,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
       _current = VehicleTelemetry.fromBlobMap(state, isSimulated: false);
       _status = VehicleConnectionStatus.connected;
       _controller.add(_current);
+      _resolveLocationName(_current);
     } catch (e) {
       if (e is CarLinkoAuthException) {
         _status = VehicleConnectionStatus.authRequired;
@@ -348,6 +351,24 @@ class LiveCarLinkoRepository implements VehicleRepository {
       }
       rethrow;
     }
+  }
+
+  /// Backfills a real street address for [telemetry]'s GPS fix via
+  /// OpenStreetMap (fire-and-forget, so a slow/failed lookup never blocks
+  /// the dashboard from showing the telemetry that already arrived).
+  void _resolveLocationName(VehicleTelemetry telemetry) {
+    if (!telemetry.hasLocation) return;
+    unawaited(
+      ReverseGeocoder.lookup(telemetry.latitude, telemetry.longitude).then((address) {
+        if (address == null || address.isEmpty) return;
+        // Only apply if nothing newer has arrived while this lookup was in
+        // flight (a later refresh would already have its own location name).
+        if (identical(_current, telemetry)) {
+          _current = _current.copyWith(locationName: address);
+          _controller.add(_current);
+        }
+      }),
+    );
   }
 
   /// Logs the raw 73-byte telemetry hex and every decoded field. The byte
