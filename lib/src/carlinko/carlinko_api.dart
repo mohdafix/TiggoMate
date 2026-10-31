@@ -11,6 +11,41 @@ const String carLinkoDefaultRegion = 'sea'; // South East Asia (Malaysia & Thail
 const String carLinkoApiVersion = '1.12.0';
 const String carLinkoUserAgent = 'Dart/3.10 (dart:io)';
 
+/// Response codes meaning "the token is stale, log in again" — matches
+/// ha-carlinko's STALE_TOKEN_CODES exactly (confirmed, not guessed). The
+/// previous narrower {'1001','1002','401'} check here missed real cases.
+const Set<String> carLinkoStaleTokenCodes = {'9997', '40001', '40003', '401', '1001', '1002'};
+
+/// Real remote-control opcodes (sent as the `data` field, hex strings), from
+/// ha-carlinko's const.py — confirmed against the official app, unlike the
+/// semantic command names ('door_lock', 'vehicle_locate', ...) this client
+/// used before, which the real API rejected (parameter error).
+class CarLinkoOpcodes {
+  CarLinkoOpcodes._();
+
+  static const String init = '77'; // sent once before any other opcode, mirrors the app
+  static const String lock = '740100';
+  static const String unlock = '740200';
+  static const String acOn = '741001';
+  static const String acOff = '741000';
+  static const String stopCharging = '742701';
+  static const String windowsClose = '740500';
+  static const String windowsOpen = '740600';
+  static const String windowsVent = '740E00';
+  static const String findCar = '740400';
+  static const String trunkOpen = '740300';
+  static const String trunkClose = '740A00';
+  static const String sunroofClose = '740F00';
+  static const String sunroofOpen = '740F01';
+  static const String sunroofTilt = '740F02';
+  static const String defogOn = '741201';
+  static const String defogOff = '741200';
+  static const String quickCool = '742001';
+  // No confirmed opcode exists for engine start/stop in the reference this
+  // was ported from — deliberately not guessed. Treat as unsupported until
+  // a real one is found.
+}
+
 class CarLinkoException implements Exception {
   final String message;
   final String? code;
@@ -263,27 +298,33 @@ class CarLinkoClient {
     return true;
   }
 
-  /// Send remote command to Chery T-Box via /user/vehicle/remoteControl
-  /// Supported commands, cross-checked against the real CarLinko app's own
-  /// string table (its command names, not ours — the earlier 'locate' and
-  /// 'window_open_all'/'window_close_all' here were wrong guesses that the
-  /// real API rejected):
-  /// - 'door_lock' / 'door_unlock'
-  /// - 'ac_on' / 'ac_off' (with setTemperature, airDuration)
-  /// - 'window_open' / 'window_close' / 'window_vent'
-  /// - 'sunroof_open' / 'sunroof_close' / 'sunroof_tilt'
-  /// - 'trunk_open' / 'trunk_close'
-  /// - 'engine_start' / 'engine_stop'
-  /// - 'vehicle_locate' (horn & hazard flash)
+  /// Send a remote-control opcode to the Chery T-Box via
+  /// /user/vehicle/remoteControl. [opcode] is a raw hex string from
+  /// [CarLinkoOpcodes] (e.g. CarLinkoOpcodes.lock) — the real API takes the
+  /// command as a `data` field holding an opcode, not a semantic command
+  /// name; the earlier 'door_lock'/'vehicle_locate'-style strings this
+  /// client sent were wrong guesses the real API rejected.
+  ///
+  /// [deviceSn] is the vehicle's device serial number (from getVehicles()),
+  /// a separate required field alongside vehicleId. Fires an init ("77")
+  /// opcode first, same as the real app, best-effort (its failure doesn't
+  /// block the actual command).
   Future<Map<String, dynamic>> sendRemoteControl({
     required String vehicleId,
-    required String command,
-    Map<String, dynamic>? additionalParams,
+    required String deviceSn,
+    required String opcode,
   }) async {
+    if (opcode != CarLinkoOpcodes.init) {
+      try {
+        await sendRemoteControl(vehicleId: vehicleId, deviceSn: deviceSn, opcode: CarLinkoOpcodes.init);
+      } catch (_) {}
+    }
+
     final body = {
       'vehicleId': vehicleId,
-      'command': command,
-      ...?additionalParams,
+      'deviceSn': deviceSn,
+      'data': opcode,
+      'timeOut': 20,
     };
     final res = await _request('POST', '/user/vehicle/remoteControl', body: body, signParams: body);
     if (res is Map<String, dynamic>) return res;
@@ -369,7 +410,7 @@ class CarLinkoClient {
 
     final code = payload['code']?.toString() ?? 'unknown';
     if (code != '0000') {
-      if (code == '1001' || code == '1002' || code == '401') {
+      if (carLinkoStaleTokenCodes.contains(code)) {
         throw CarLinkoAuthException(payload['msg']?.toString() ?? 'Session expired', code);
       }
       throw CarLinkoException(payload['msg']?.toString() ?? 'API error', code);

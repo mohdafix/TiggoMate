@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:model_viewer_plus/model_viewer_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../carlinko/carlinko_api.dart';
 import '../carlinko/vehicle_repository.dart';
 import '../carlinko/vehicle_telemetry.dart';
 import '../carlinko/vehicle_skin.dart';
@@ -712,7 +713,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       final previous = _isDoorsLocked;
       setState(() => _isDoorsLocked = willLock);
       await _sendCommandAndReport(
-        willLock ? 'door_lock' : 'door_unlock',
+        willLock ? CarLinkoOpcodes.lock : CarLinkoOpcodes.unlock,
         successMessage: willLock ? '🔒 CarLinko: Doors Locked' : '🔓 CarLinko: Doors Unlocked',
         failureMessage: '⚠️ CarLinko: Door command failed. Please retry.',
         onRevert: () => setState(() => _isDoorsLocked = previous),
@@ -722,7 +723,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       final previous = _isDoorsLocked;
       setState(() => _isDoorsLocked = false);
       await _sendCommandAndReport(
-        'door_unlock',
+        CarLinkoOpcodes.unlock,
         successMessage: '🔓 CarLinko: Doors Unlocked',
         failureMessage: '⚠️ CarLinko: Door command failed. Please retry.',
         onRevert: () => setState(() => _isDoorsLocked = previous),
@@ -733,7 +734,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       final previous = _isAcActive;
       setState(() => _isAcActive = willTurnOn);
       await _sendCommandAndReport(
-        willTurnOn ? 'ac_on' : 'ac_off',
+        willTurnOn ? CarLinkoOpcodes.acOn : CarLinkoOpcodes.acOff,
         successMessage: willTurnOn ? '❄️ Cabin Pre-cooling started (22°C)' : '❄️ Climate Pre-conditioning OFF',
         failureMessage: '⚠️ CarLinko: Climate command failed. Please retry.',
         onRevert: () => setState(() => _isAcActive = previous),
@@ -743,7 +744,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       final previous = _isAcActive;
       setState(() => _isAcActive = false);
       await _sendCommandAndReport(
-        'ac_off',
+        CarLinkoOpcodes.acOff,
         successMessage: '❄️ Climate Pre-conditioning OFF',
         failureMessage: '⚠️ CarLinko: Climate command failed. Please retry.',
         onRevert: () => setState(() => _isAcActive = previous),
@@ -753,8 +754,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       final previous = _isWindowsVented;
       setState(() => _isWindowsVented = true);
       await _sendCommandAndReport(
-        // Real CarLinko command is 'window_open', not 'window_open_all'.
-        'window_open',
+        CarLinkoOpcodes.windowsOpen,
         successMessage: '🪟 CarLinko: All 4 Windows opened',
         failureMessage: '⚠️ CarLinko: Window command failed. Please retry.',
         onRevert: () => setState(() => _isWindowsVented = previous),
@@ -763,8 +763,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       final previous = _isWindowsVented;
       setState(() => _isWindowsVented = false);
       await _sendCommandAndReport(
-        // Real CarLinko command is 'window_close', not 'window_close_all'.
-        'window_close',
+        CarLinkoOpcodes.windowsClose,
         successMessage: '🪟 CarLinko: All Windows closed and secured',
         failureMessage: '⚠️ CarLinko: Window command failed. Please retry.',
         onRevert: () => setState(() => _isWindowsVented = previous),
@@ -774,20 +773,20 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       final willVent = !_isWindowsVented;
       setState(() => _isWindowsVented = willVent);
       await _sendCommandAndReport(
-        willVent ? 'window_vent' : 'window_close',
+        willVent ? CarLinkoOpcodes.windowsVent : CarLinkoOpcodes.windowsClose,
         successMessage: willVent ? '🪟 Windows vented (20mm)' : '🪟 All Windows closed',
         failureMessage: '⚠️ CarLinko: Window command failed. Please retry.',
         onRevert: () => setState(() => _isWindowsVented = previous),
       );
     } else if (action == 'sunroof_open') {
       await _sendCommandAndReport(
-        'sunroof_open',
+        CarLinkoOpcodes.sunroofOpen,
         successMessage: '☀️ Panoramic Sunroof opened',
         failureMessage: '⚠️ CarLinko: Sunroof command failed. Please retry.',
       );
     } else if (action == 'sunroof_close') {
       await _sendCommandAndReport(
-        'sunroof_close',
+        CarLinkoOpcodes.sunroofClose,
         successMessage: '☀️ Panoramic Sunroof closed',
         failureMessage: '⚠️ CarLinko: Sunroof command failed. Please retry.',
       );
@@ -796,22 +795,20 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       final willOpen = !_isTrunkOpen;
       setState(() => _isTrunkOpen = willOpen);
       await _sendCommandAndReport(
-        willOpen ? 'trunk_open' : 'trunk_close',
+        willOpen ? CarLinkoOpcodes.trunkOpen : CarLinkoOpcodes.trunkClose,
         successMessage: willOpen ? '🚗 Power Tailgate opened' : '🚗 Tailgate closed',
         failureMessage: '⚠️ CarLinko: Trunk command failed. Please retry.',
         onRevert: () => setState(() => _isTrunkOpen = previous),
       );
-    } else if (action == 'engine_start') {
-      await _sendCommandAndReport(
-        'engine_start',
-        successMessage: '⚡ 1.5T Dedicated Hybrid Engine Remote Started',
-        failureMessage: '⚠️ CarLinko: Engine start failed. Please retry.',
-      );
-    } else if (action == 'engine_stop') {
-      await _sendCommandAndReport(
-        'engine_stop',
-        successMessage: '⚡ Engine Shut Down',
-        failureMessage: '⚠️ CarLinko: Engine stop failed. Please retry.',
+    } else if (action == 'engine_start' || action == 'engine_stop') {
+      // No confirmed opcode exists for remote engine start/stop — every
+      // other opcode here was cross-checked against a real reference
+      // (ha-carlinko's const.py / the official app's own string table), but
+      // this one isn't in either. Rather than guess another one and risk
+      // another silent/confusing failure, say so plainly.
+      _showNotification(
+        '⚠️ Remote engine start/stop isn\'t confirmed working yet — no verified CarLinko command found for it.',
+        type: NotificationType.warning,
       );
     } else if (action == 'schedule_charging') {
       _openSmartChargingSheet();
@@ -825,11 +822,12 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
         ),
       );
     } else if (action == 'locate') {
-      // Real CarLinko command is 'vehicle_locate' — confirmed from the
-      // official app's own string table (libapp.so), since the API itself
-      // rejected a bare 'locate' with a parameter error (code 9998).
+      // The semantic strings ('locate', then 'vehicle_locate') both failed
+      // with a real "parameter error" from CarLinko — the API takes a raw
+      // opcode in a `data` field, not a command name at all. Confirmed
+      // against ha-carlinko's own reference client: OP_FIND_CAR = "740400".
       await _sendCommandAndReport(
-        'vehicle_locate',
+        CarLinkoOpcodes.findCar,
         successMessage: '📢 CarLinko: Lights flashing & horn sounding',
         failureMessage: '⚠️ CarLinko: Locate command failed. Please retry.',
       );
@@ -838,7 +836,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
         context,
         telemetry: _telemetry,
         onHornFlash: () => _sendCommandAndReport(
-          'vehicle_locate',
+          CarLinkoOpcodes.findCar,
           successMessage: '📢 CarLinko: Lights flashing & horn sounding',
           failureMessage: '⚠️ CarLinko: Locate command failed. Please retry.',
         ),

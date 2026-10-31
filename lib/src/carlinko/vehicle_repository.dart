@@ -10,6 +10,12 @@ const String _kCarLinkoTokenKey = 'tm_carlinko_token';
 const String _kCarLinkoAccountKey = 'tm_carlinko_account';
 const String _kCarLinkoRegionKey = 'tm_carlinko_region';
 const String _kCarLinkoVehicleIdKey = 'tm_carlinko_vehicle_id';
+const String _kCarLinkoDeviceSnKey = 'tm_carlinko_device_sn';
+
+/// Pulls the vehicle's device serial number from a /user/vehicle row. Real
+/// API responses use either key depending on the account (per ha-carlinko).
+String? _extractDeviceSn(Map<String, dynamic> vehicle) =>
+    vehicle['deviceId']?.toString() ?? vehicle['deviceSn']?.toString();
 
 abstract class VehicleRepository {
   Stream<VehicleTelemetry> get telemetryStream;
@@ -116,6 +122,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
   VehicleTelemetry _current;
   VehicleConnectionStatus _status = VehicleConnectionStatus.disconnected;
   String? _vehicleId;
+  String? _deviceSn;
   String? _account;
   bool _isPreActivation = false;
 
@@ -178,6 +185,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
       } else {
         _isPreActivation = false;
         _vehicleId = vehicles.first['vehicleId']?.toString();
+        _deviceSn = _extractDeviceSn(vehicles.first);
         _status = VehicleConnectionStatus.connected;
         await refresh();
       }
@@ -208,6 +216,11 @@ class LiveCarLinkoRepository implements VehicleRepository {
       } else {
         await prefs.remove(_kCarLinkoVehicleIdKey);
       }
+      if (_deviceSn != null) {
+        await prefs.setString(_kCarLinkoDeviceSnKey, _deviceSn!);
+      } else {
+        await prefs.remove(_kCarLinkoDeviceSnKey);
+      }
     } catch (_) {}
   }
 
@@ -217,6 +230,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
       await prefs.remove(_kCarLinkoTokenKey);
       await prefs.remove(_kCarLinkoRegionKey);
       await prefs.remove(_kCarLinkoVehicleIdKey);
+      await prefs.remove(_kCarLinkoDeviceSnKey);
       // Keep the account name saved so the connect dialog can still
       // pre-fill it; only the token/session itself is invalidated.
     } catch (_) {}
@@ -241,6 +255,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
       _account = account;
 
       final savedVehicleId = prefs.getString(_kCarLinkoVehicleIdKey);
+      final savedDeviceSn = prefs.getString(_kCarLinkoDeviceSnKey);
       List<Map<String, dynamic>> vehicles = [];
       try {
         vehicles = await _client.getVehicles();
@@ -257,6 +272,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
         // confirm it right now. Fall back to whatever we had saved.
         if (savedVehicleId != null) {
           _vehicleId = savedVehicleId;
+          _deviceSn = savedDeviceSn;
           _isPreActivation = false;
         } else {
           _isPreActivation = true;
@@ -271,6 +287,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
 
       if (vehicles.isEmpty) {
         _vehicleId = null;
+        _deviceSn = null;
         _isPreActivation = true;
         _status = VehicleConnectionStatus.connected;
         _current = VehicleTelemetry.unbound(
@@ -280,6 +297,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
       } else {
         _isPreActivation = false;
         _vehicleId = vehicles.first['vehicleId']?.toString();
+        _deviceSn = _extractDeviceSn(vehicles.first);
         _status = VehicleConnectionStatus.connected;
         await refresh();
       }
@@ -310,6 +328,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
           final vehicles = await _client.getVehicles();
           if (vehicles.isNotEmpty) {
             _vehicleId = vehicles.first['vehicleId']?.toString();
+            _deviceSn = _extractDeviceSn(vehicles.first);
             _isPreActivation = false;
             final state = await _client.getVehicleState(_vehicleId!);
             _logRawTelemetryBlob(state);
@@ -394,6 +413,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
   Future<void> disconnect() async {
     _client.token = null;
     _vehicleId = null;
+    _deviceSn = null;
     _account = null;
     _isPreActivation = false;
     _status = VehicleConnectionStatus.disconnected;
@@ -406,10 +426,14 @@ class LiveCarLinkoRepository implements VehicleRepository {
     } catch (_) {}
   }
 
+  /// [command] is a raw hex opcode from [CarLinkoOpcodes] (e.g.
+  /// CarLinkoOpcodes.lock) — the real remoteControl API takes an opcode in
+  /// its `data` field, not a semantic command name. [params] is unused; the
+  /// real request body has no per-command extra fields.
   @override
   Future<bool> sendRemoteCommand(String command, {Map<String, dynamic>? params}) async {
-    if (_vehicleId == null) {
-      debugPrint('CarLinko remoteControl "$command" skipped: no vehicle bound');
+    if (_vehicleId == null || _deviceSn == null) {
+      debugPrint('CarLinko remoteControl "$command" skipped: no vehicle/deviceSn bound');
       return false;
     }
     try {
@@ -421,8 +445,8 @@ class LiveCarLinkoRepository implements VehicleRepository {
       // reported "failed" even on a real, accepted command.
       await _client.sendRemoteControl(
         vehicleId: _vehicleId!,
-        command: command,
-        additionalParams: params,
+        deviceSn: _deviceSn!,
+        opcode: command,
       );
       return true;
     } catch (e) {
