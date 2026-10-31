@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../carlinko/carlinko_api.dart';
 import '../carlinko/vehicle_repository.dart';
 import '../theme/app_tokens.dart';
+
+// Encrypted (Android Keystore / iOS Keychain) storage for the optional
+// "Remember password" feature — never plain SharedPreferences, since this
+// is a real account password rather than a disposable session token.
+const _secureStorage = FlutterSecureStorage();
+const String _kCarLinkoSavedPasswordKey = 'tm_carlinko_saved_password';
+const String _kCarLinkoSavedPasswordAccountKey = 'tm_carlinko_saved_password_account';
 
 class CarlinkoConnectDialog extends StatefulWidget {
   final VehicleRepository repository;
@@ -29,6 +37,7 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
   bool _syncing = false;
   String? _statusMessage;
   bool _isError = false;
+  bool _rememberPassword = false;
   late bool _showLoginForm;
 
   @override
@@ -37,6 +46,7 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
     _showLoginForm = !widget.repository.isCloudConnected;
     _accountController.text = widget.currentAccount;
     _loadSavedAccount();
+    _loadSavedPassword();
   }
 
   Future<void> _loadSavedAccount() async {
@@ -53,6 +63,33 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
     } catch (_) {}
   }
 
+  /// Only prefills the password if it was saved for this same account, so
+  /// switching the email field doesn't silently carry over someone else's
+  /// saved password.
+  Future<void> _loadSavedPassword() async {
+    try {
+      final savedAccount = await _secureStorage.read(key: _kCarLinkoSavedPasswordAccountKey);
+      final savedPassword = await _secureStorage.read(key: _kCarLinkoSavedPasswordKey);
+      if (savedAccount != null &&
+          savedPassword != null &&
+          savedAccount.isNotEmpty &&
+          savedAccount == _accountController.text.trim() &&
+          mounted) {
+        setState(() {
+          _passwordController.text = savedPassword;
+          _rememberPassword = true;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _forgetSavedPassword() async {
+    try {
+      await _secureStorage.delete(key: _kCarLinkoSavedPasswordKey);
+      await _secureStorage.delete(key: _kCarLinkoSavedPasswordAccountKey);
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     _accountController.dispose();
@@ -66,6 +103,9 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('tm_carlinko_status', 'Unactivated');
       await widget.repository.disconnect();
+      // Signing out is an explicit intent to log out — don't leave a saved
+      // password behind for the next person to open the app.
+      await _forgetSavedPassword();
       if (mounted) {
         setState(() {
           _loading = false;
@@ -139,6 +179,15 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
         await prefs.setString('tm_carlinko_status', 'Active');
         await prefs.setString('tm_carlinko_account', acc);
       } catch (_) {}
+
+      if (_rememberPassword) {
+        try {
+          await _secureStorage.write(key: _kCarLinkoSavedPasswordKey, value: pwd);
+          await _secureStorage.write(key: _kCarLinkoSavedPasswordAccountKey, value: acc);
+        } catch (_) {}
+      } else {
+        await _forgetSavedPassword();
+      }
 
       if (mounted) {
         setState(() {
@@ -598,7 +647,27 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        InkWell(
+          onTap: () => setState(() => _rememberPassword = !_rememberPassword),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              children: [
+                Checkbox(
+                  value: _rememberPassword,
+                  onChanged: (val) => setState(() => _rememberPassword = val ?? false),
+                ),
+                const Expanded(
+                  child: Text(
+                    'Remember password on this device (encrypted storage)',
+                    style: TextStyle(fontSize: 12.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
 
         // Region Dropdown
         DropdownButtonFormField<String>(
