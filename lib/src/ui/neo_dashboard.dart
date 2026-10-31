@@ -1340,6 +1340,25 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         ),
                       ],
                     ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Icon(Icons.battery_charging_full, size: 12, color: textMuted),
+                        const SizedBox(width: 4),
+                        Text(
+                          widget.repository.isVehicleBound && _telemetry.volt12 > 0
+                              ? '12V Aux: ${_telemetry.volt12.toStringAsFixed(2)}V'
+                              : '12V Aux: -- V',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
