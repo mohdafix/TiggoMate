@@ -48,12 +48,26 @@ class AskAssistantSheet extends StatefulWidget {
   State<AskAssistantSheet> createState() => _AskAssistantSheetState();
 }
 
-class _AskAssistantSheetState extends State<AskAssistantSheet> {
+class _AskAssistantSheetState extends State<AskAssistantSheet> with TickerProviderStateMixin {
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _actionConfirmed = false;
   bool _isAiThinking = false;
   bool _isListening = false;
+
+  // Pulsing "listening" rings around the mic button, like a voice
+  // assistant's waveform/orb — loops only while actually listening.
+  late final AnimationController _listenPulseCtrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  )..repeat();
+
+  // Bouncing dots for the "AI is thinking" indicator — cheap enough to
+  // just run continuously, only shown while _isAiThinking is true.
+  late final AnimationController _thinkingDotsCtrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat();
 
   String? _apiKey;
   String? _provider;
@@ -85,6 +99,8 @@ class _AskAssistantSheetState extends State<AskAssistantSheet> {
   void dispose() {
     _inputController.dispose();
     _scrollController.dispose();
+    _listenPulseCtrl.dispose();
+    _thinkingDotsCtrl.dispose();
     super.dispose();
   }
 
@@ -1096,15 +1112,8 @@ class _AskAssistantSheetState extends State<AskAssistantSheet> {
                     padding: const EdgeInsets.only(bottom: 12),
                     child: Row(
                       children: [
-                        SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(limeAccent),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
+                        _ThinkingDots(animation: _thinkingDotsCtrl, color: limeAccent),
+                        const SizedBox(width: 10),
                         Text(
                           'AI Copilot is reasoning...',
                           style: TextStyle(
@@ -1205,26 +1214,60 @@ class _AskAssistantSheetState extends State<AskAssistantSheet> {
                 ),
                 const SizedBox(width: 8),
 
-                // Voice Mic Button
+                // Voice Mic Button — pulses expanding rings while listening,
+                // like a voice assistant's waveform/orb.
                 InkWell(
                   onTap: _listenVoice,
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: _isListening ? const Color(0xFFFF5252) : (isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0)),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: _isListening ? const Color(0xFFFF5252) : borderCol,
-                      ),
-                    ),
-                    child: Center(
-                      child: Icon(
-                        _isListening ? Icons.mic : Icons.mic_none_rounded,
-                        size: 20,
-                        color: _isListening ? Colors.white : limeAccent,
-                      ),
+                  borderRadius: BorderRadius.circular(32),
+                  child: SizedBox(
+                    width: 56,
+                    height: 56,
+                    child: AnimatedBuilder(
+                      animation: _listenPulseCtrl,
+                      builder: (context, _) {
+                        final t = _listenPulseCtrl.value;
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            if (_isListening) ...[
+                              _PulseRing(progress: t, color: const Color(0xFFFF5252)),
+                              _PulseRing(progress: (t + 0.5) % 1.0, color: const Color(0xFFFF5252)),
+                            ],
+                            Transform.scale(
+                              scale: _isListening ? 1.0 + (0.06 * (0.5 - (t - 0.5).abs()) * 2) : 1.0,
+                              child: Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: _isListening
+                                      ? const Color(0xFFFF5252)
+                                      : (isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0)),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: _isListening ? const Color(0xFFFF5252) : borderCol,
+                                  ),
+                                  boxShadow: _isListening
+                                      ? [
+                                          BoxShadow(
+                                            color: const Color(0xFFFF5252).withValues(alpha: 0.5),
+                                            blurRadius: 12,
+                                            spreadRadius: 1,
+                                          ),
+                                        ]
+                                      : null,
+                                ),
+                                child: Center(
+                                  child: Icon(
+                                    _isListening ? Icons.mic : Icons.mic_none_rounded,
+                                    size: 20,
+                                    color: _isListening ? Colors.white : limeAccent,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -1380,6 +1423,70 @@ class _ActionExecutionCardState extends State<_ActionExecutionCard> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// A single expanding, fading ring for the voice-listening pulse animation.
+/// [progress] runs 0→1; the ring grows and fades out as it approaches 1.
+class _PulseRing extends StatelessWidget {
+  final double progress;
+  final Color color;
+
+  const _PulseRing({required this.progress, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final size = 38.0 + (progress * 20.0);
+    final opacity = (1.0 - progress).clamp(0.0, 1.0) * 0.5;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: color.withValues(alpha: opacity), width: 1.5),
+      ),
+    );
+  }
+}
+
+/// Three dots that bounce in sequence, like a messaging app's "typing"
+/// indicator, for the "AI is reasoning" state.
+class _ThinkingDots extends StatelessWidget {
+  final Animation<double> animation;
+  final Color color;
+
+  const _ThinkingDots({required this.animation, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, _) {
+        return SizedBox(
+          width: 28,
+          height: 14,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(3, (i) {
+              // Stagger each dot's bounce by a third of the cycle.
+              final phase = (animation.value + (i * 0.33)) % 1.0;
+              final bounce = (1.0 - (2 * phase - 1).abs()).clamp(0.0, 1.0);
+              return Transform.translate(
+                offset: Offset(0, -4 * bounce),
+                child: Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.5 + (0.5 * bounce)),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              );
+            }),
+          ),
+        );
+      },
     );
   }
 }
