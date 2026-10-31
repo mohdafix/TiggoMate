@@ -434,6 +434,18 @@ class CarLinkoClient {
 
     out['wltc_range'] = u16(68);
 
+    // Confirmed against a real Tiggo 7 PHEV reading (2026-11-01): this byte
+    // position holds the fuel range directly, matching the car's own
+    // "395 km" fuel-range display exactly. Previously never decoded, so
+    // VehicleTelemetry.fromBlobMap's fuel_range_km always defaulted to 0.
+    final rawFuelRange = u16(70);
+    out['fuel_range_km'] = (rawFuelRange == null || rawFuelRange >= 0x3FE) ? null : rawFuelRange;
+
+    // Confirmed against the same reading: fuel tank level, matching the
+    // car's own "46% Fuel capacity" gauge exactly.
+    final rawFuelCap = u8(21);
+    out['fuel_capacity_pct'] = (rawFuelCap == null || rawFuelCap > 100) ? null : rawFuelCap;
+
     final cons = u8(55);
     out['consumption'] = cons != null ? (cons * 0.1) : null;
 
@@ -448,16 +460,23 @@ class CarLinkoClient {
     out['charge_power_kw'] = (chargeState != null && chargeState > 0 && rawPower != null) ? (rawPower * 0.1) : null;
 
     // Direct TPMS (order: FL, FR, RL, RR)
-    // Pressure: kPa = raw * 1.375 (0x00 or 0xFF = no reading)
-    // Temperature: degC = raw * 0.5 - 25
+    // Pressure: kPa = raw * 1.75 + 3 (0x00 or 0xFF = no reading)
+    // Temperature: degC = raw * 0.6 - 34.2
+    // Both formulas were re-derived and confirmed against a real Tiggo 7
+    // PHEV reading (2026-11-01) — the previously-used ha-carlinko formulas
+    // (raw*1.375 / raw*0.5-25) were ported from a different Chery model and
+    // read consistently low: pressure by ~29%, temperature by ~3-4°C.
+    // Pressure now matches the car's own display exactly; temperature is
+    // within 0.4°C (one reading's worth of data — refine further if a
+    // second real-car comparison shows drift).
     final positions = ['fl', 'fr', 'rl', 'rr'];
     for (int i = 0; i < positions.length; i++) {
       final pos = positions[i];
       final pRaw = u8(44 + i);
-      out['tyre_${pos}_pressure'] = (pRaw == null || pRaw == 0 || pRaw == 0xFF) ? null : (pRaw * 1.375);
+      out['tyre_${pos}_pressure'] = (pRaw == null || pRaw == 0 || pRaw == 0xFF) ? null : (pRaw * 1.75 + 3.0);
 
       final tRaw = u8(48 + i);
-      out['tyre_${pos}_temp'] = (tRaw == null || tRaw == 0 || tRaw == 0xFF) ? null : (tRaw * 0.5 - 25.0);
+      out['tyre_${pos}_temp'] = (tRaw == null || tRaw == 0 || tRaw == 0xFF) ? null : (tRaw * 0.6 - 34.2);
     }
 
     return out;

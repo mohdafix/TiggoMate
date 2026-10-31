@@ -60,7 +60,8 @@ class BlueprintCarCanvas extends StatelessWidget {
 
 /// The bare 180 px blueprint stage (painter + 4 TPMS readouts), no card chrome.
 /// Used by [BlueprintCarCanvas] and by the dashboard's CarViewCarousel.
-class BlueprintCarStage extends StatelessWidget {
+/// Tap the unit chip (top-right) to cycle kPa -> psi -> bar.
+class BlueprintCarStage extends StatefulWidget {
   final VehicleTelemetry telemetry;
   final bool isBound;
   final Color accentColor;
@@ -75,27 +76,43 @@ class BlueprintCarStage extends StatelessWidget {
   });
 
   @override
+  State<BlueprintCarStage> createState() => _BlueprintCarStageState();
+}
+
+class _BlueprintCarStageState extends State<BlueprintCarStage> {
+  TyrePressureUnit _unit = TyrePressureUnit.kpa;
+
+  @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textMuted = isDark ? const Color(0xFF717684) : const Color(0xFF64748B);
     final textPrimary = isDark ? Colors.white : const Color(0xFF0A0B0E);
 
     // A missing reading stays blank rather than showing a plausible number
-    int? reading(double value) => isBound && value > 0 ? value.round() : null;
+    double? kpaReading(double value) => widget.isBound && value > 0 ? value : null;
 
-    final flKpa = reading(telemetry.tyreFlPressureKpa);
-    final frKpa = reading(telemetry.tyreFrPressureKpa);
-    final rlKpa = reading(telemetry.tyreRlPressureKpa);
-    final rrKpa = reading(telemetry.tyreRrPressureKpa);
+    // Convert to the selected unit; psi/bar get a decimal, kPa stays whole.
+    String? format(double? kpa) {
+      final converted = _unit.fromKpa(kpa);
+      if (converted == null) return null;
+      return _unit == TyrePressureUnit.kpa ? converted.round().toString() : converted.toStringAsFixed(1);
+    }
 
-    final flTemp = reading(telemetry.tyreFlTempC);
-    final frTemp = reading(telemetry.tyreFrTempC);
-    final rlTemp = reading(telemetry.tyreRlTempC);
-    final rrTemp = reading(telemetry.tyreRrTempC);
+    final flP = format(kpaReading(widget.telemetry.tyreFlPressureKpa));
+    final frP = format(kpaReading(widget.telemetry.tyreFrPressureKpa));
+    final rlP = format(kpaReading(widget.telemetry.tyreRlPressureKpa));
+    final rrP = format(kpaReading(widget.telemetry.tyreRrPressureKpa));
 
-    Widget readout(String label, int? kpa, int? temp, bool alignRight) => _TpmsCornerReadout(
+    int? reading(double value) => widget.isBound && value > 0 ? value.round() : null;
+    final flTemp = reading(widget.telemetry.tyreFlTempC);
+    final frTemp = reading(widget.telemetry.tyreFrTempC);
+    final rlTemp = reading(widget.telemetry.tyreRlTempC);
+    final rrTemp = reading(widget.telemetry.tyreRrTempC);
+
+    Widget readout(String label, String? pressure, int? temp, bool alignRight) => _TpmsCornerReadout(
           label: label,
-          kpa: kpa,
+          pressure: pressure,
+          unitLabel: _unit.label,
           tempC: temp,
           alignRight: alignRight,
           textMuted: textMuted,
@@ -103,22 +120,54 @@ class BlueprintCarStage extends StatelessWidget {
         );
 
     return SizedBox(
-      height: height,
+      height: widget.height,
       child: Stack(
         children: [
           Positioned.fill(
             child: CustomPaint(
               painter: _CarBlueprintPainter(
-                accent: accentColor,
+                accent: widget.accentColor,
                 lineColor: isDark ? const Color(0xFF2A313D) : const Color(0xFFCBD5E1),
                 bodyFill: isDark ? const Color(0xFF0F1117) : const Color(0xFFF1F5F9),
               ),
             ),
           ),
-          Positioned(top: 4, left: 4, child: readout('FL', flKpa, flTemp, false)),
-          Positioned(top: 4, right: 4, child: readout('FR', frKpa, frTemp, true)),
-          Positioned(bottom: 4, left: 4, child: readout('RL', rlKpa, rlTemp, false)),
-          Positioned(bottom: 4, right: 4, child: readout('RR', rrKpa, rrTemp, true)),
+          Positioned(top: 4, left: 4, child: readout('FL', flP, flTemp, false)),
+          Positioned(top: 4, right: 4, child: readout('FR', frP, frTemp, true)),
+          Positioned(bottom: 4, left: 4, child: readout('RL', rlP, rlTemp, false)),
+          Positioned(bottom: 4, right: 4, child: readout('RR', rrP, rrTemp, true)),
+          Positioned(
+            top: 4,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Semantics(
+                button: true,
+                label: 'Tyre pressure unit, currently ${_unit.label}',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => setState(() => _unit = _unit.next),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF181B22) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: isDark ? const Color(0xFF2A313D) : const Color(0xFFCBD5E1)),
+                    ),
+                    child: Text(
+                      _unit.label,
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: widget.accentColor,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -127,7 +176,8 @@ class BlueprintCarStage extends StatelessWidget {
 
 class _TpmsCornerReadout extends StatelessWidget {
   final String label;
-  final int? kpa;
+  final String? pressure;
+  final String unitLabel;
   final int? tempC;
   final bool alignRight;
   final Color textMuted;
@@ -135,7 +185,8 @@ class _TpmsCornerReadout extends StatelessWidget {
 
   const _TpmsCornerReadout({
     required this.label,
-    required this.kpa,
+    required this.pressure,
+    required this.unitLabel,
     required this.tempC,
     required this.alignRight,
     required this.textMuted,
@@ -158,7 +209,7 @@ class _TpmsCornerReadout extends StatelessWidget {
           ),
         ),
         Text(
-          '${kpa ?? '--'}',
+          pressure ?? '--',
           style: TextStyle(
             fontFamily: 'monospace',
             fontSize: 22,
@@ -168,7 +219,7 @@ class _TpmsCornerReadout extends StatelessWidget {
           ),
         ),
         Text(
-          'kPa · ${tempC ?? '--'}°',
+          '$unitLabel · ${tempC ?? '--'}°',
           style: TextStyle(
             fontFamily: 'monospace',
             fontSize: 10,

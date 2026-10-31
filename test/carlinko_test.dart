@@ -63,10 +63,13 @@ void main() {
 
       expect(telemetry.isSimulated, isFalse);
       expect(telemetry.dataSourceLabel, contains('LIVE CARLINKO'));
-      // The sample blob has no fuel range or tyre readings, so neither is invented
-      expect(telemetry.fuelRangeKm, equals(0));
-      expect(telemetry.totalRangeKm, equals(telemetry.electricRangeKm));
+      // This fixture's tyre bytes are the 0xFF "no reading" sentinel, so
+      // that field stays unknown rather than inventing a value.
       expect(telemetry.tyreFlPressureKpa, equals(0.0));
+      // The fixture's fuel-range bytes (confirmed against a real car
+      // reading) decode to a real, non-sentinel value here.
+      expect(telemetry.fuelRangeKm, equals(248));
+      expect(telemetry.totalRangeKm, equals(telemetry.electricRangeKm + 248));
     });
 
     test('VehicleTelemetry.fromBlobMap reports missing fields as unknown, not plausible values', () {

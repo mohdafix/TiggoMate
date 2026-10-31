@@ -6,10 +6,39 @@ enum VehicleConnectionStatus {
   error,
 }
 
+/// Display unit for tyre pressure readouts.
+enum TyrePressureUnit {
+  kpa('kPa'),
+  psi('psi'),
+  bar('bar');
+
+  final String label;
+  const TyrePressureUnit(this.label);
+
+  /// Next unit in the cycle (kPa -> psi -> bar -> kPa), for a tap-to-switch control.
+  TyrePressureUnit get next => TyrePressureUnit.values[(index + 1) % TyrePressureUnit.values.length];
+
+  /// Converts a kPa reading to this unit. Returns null unchanged (no reading).
+  double? fromKpa(double? kpa) {
+    if (kpa == null) return null;
+    switch (this) {
+      case TyrePressureUnit.kpa:
+        return kpa;
+      case TyrePressureUnit.psi:
+        return VehicleTelemetry.kpaToPsi(kpa);
+      case TyrePressureUnit.bar:
+        return VehicleTelemetry.kpaToBar(kpa);
+    }
+  }
+}
+
 class VehicleTelemetry {
   final int batteryPct;
   final int electricRangeKm;
   final int fuelRangeKm;
+  /// Fuel tank level, 0-100. 0 means unknown (no reading), same convention
+  /// as [batteryPct]'s other telemetry fields.
+  final int fuelCapacityPct;
   final int totalRangeKm;
   final int odometerKm;
   final double volt12;
@@ -63,6 +92,7 @@ class VehicleTelemetry {
     this.batteryPct = 0,
     this.electricRangeKm = 0,
     this.fuelRangeKm = 0,
+    this.fuelCapacityPct = 0,
     this.totalRangeKm = 0,
     this.odometerKm = 0,
     this.volt12 = 0.0,
@@ -239,6 +269,7 @@ class VehicleTelemetry {
 
     // 0 means unknown: the blob reports no fuel range unless it sends fuel_range_km
     final int estimatedFuelRange = (m['fuel_range_km'] as num?)?.toInt() ?? 0;
+    final int fuelCap = (m['fuel_capacity_pct'] as num?)?.toInt() ?? 0;
 
     final double lat = (m['lat'] as num?)?.toDouble() ?? 0.0;
     final double lon = (m['lon'] as num?)?.toDouble() ?? 0.0;
@@ -248,6 +279,7 @@ class VehicleTelemetry {
       batteryPct: batt.clamp(0, 100),
       electricRangeKm: evRange,
       fuelRangeKm: estimatedFuelRange,
+      fuelCapacityPct: fuelCap.clamp(0, 100),
       totalRangeKm: evRange + estimatedFuelRange,
       odometerKm: odo,
       volt12: v12,
@@ -294,6 +326,7 @@ class VehicleTelemetry {
         'batteryPct': batteryPct,
         'electricRangeKm': electricRangeKm,
         'fuelRangeKm': fuelRangeKm,
+        'fuelCapacityPct': fuelCapacityPct,
         'totalRangeKm': totalRangeKm,
         'odometerKm': odometerKm,
         'volt12': volt12,
@@ -343,6 +376,7 @@ class VehicleTelemetry {
         batteryPct: (json['batteryPct'] as num?)?.toInt() ?? 0,
         electricRangeKm: (json['electricRangeKm'] as num?)?.toInt() ?? 0,
         fuelRangeKm: (json['fuelRangeKm'] as num?)?.toInt() ?? 0,
+        fuelCapacityPct: (json['fuelCapacityPct'] as num?)?.toInt() ?? 0,
         totalRangeKm: (json['totalRangeKm'] as num?)?.toInt() ?? 0,
         odometerKm: (json['odometerKm'] as num?)?.toInt() ?? 0,
         volt12: (json['volt12'] as num?)?.toDouble() ?? 0.0,
@@ -391,10 +425,20 @@ class VehicleTelemetry {
   /// Convert kPa to PSI for dual automotive readouts.
   static double kpaToPsi(double kpa) => kpa * 0.145038;
 
+  /// Convert kPa to bar for dual automotive readouts.
+  static double kpaToBar(double kpa) => kpa * 0.01;
+
+  /// Convert PSI to kPa (inverse of [kpaToPsi]).
+  static double psiToKpa(double psi) => psi / 0.145038;
+
+  /// Convert bar to kPa (inverse of [kpaToBar]).
+  static double barToKpa(double bar) => bar * 100.0;
+
   VehicleTelemetry copyWith({
     int? batteryPct,
     int? electricRangeKm,
     int? fuelRangeKm,
+    int? fuelCapacityPct,
     int? totalRangeKm,
     int? odometerKm,
     double? volt12,
@@ -443,6 +487,7 @@ class VehicleTelemetry {
       batteryPct: batteryPct ?? this.batteryPct,
       electricRangeKm: electricRangeKm ?? this.electricRangeKm,
       fuelRangeKm: fuelRangeKm ?? this.fuelRangeKm,
+      fuelCapacityPct: fuelCapacityPct ?? this.fuelCapacityPct,
       totalRangeKm: totalRangeKm ?? this.totalRangeKm,
       odometerKm: odometerKm ?? this.odometerKm,
       volt12: volt12 ?? this.volt12,
