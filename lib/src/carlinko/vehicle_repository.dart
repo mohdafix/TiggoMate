@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../firebase/firebase_sync_service.dart';
 import 'carlinko_api.dart';
 import 'vehicle_telemetry.dart';
 
@@ -310,6 +311,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
             _vehicleId = vehicles.first['vehicleId']?.toString();
             _isPreActivation = false;
             final state = await _client.getVehicleState(_vehicleId!);
+            _logRawTelemetryBlob(state);
             _current = VehicleTelemetry.fromBlobMap(state, isSimulated: false);
             _status = VehicleConnectionStatus.connected;
             _controller.add(_current);
@@ -333,6 +335,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
 
     try {
       final state = await _client.getVehicleState(_vehicleId!);
+      _logRawTelemetryBlob(state);
       _current = VehicleTelemetry.fromBlobMap(state, isSimulated: false);
       _status = VehicleConnectionStatus.connected;
       _controller.add(_current);
@@ -345,6 +348,17 @@ class LiveCarLinkoRepository implements VehicleRepository {
       }
       rethrow;
     }
+  }
+
+  /// Logs the raw 73-byte telemetry hex and every decoded field. The byte
+  /// offsets in CarLinkoClient.parseBlob were ported from reverse-engineering
+  /// a different Chery model; fields like 12V voltage, SOH or fuel level may
+  /// be at the wrong offset (or simply not present) for this car. Compare
+  /// this log against the car's own dash readouts to find/fix any that are
+  /// wrong — grep logcat for "CarLinko raw blob".
+  void _logRawTelemetryBlob(Map<String, dynamic> state) {
+    debugPrint('CarLinko raw blob: ${state['rawHex']}');
+    debugPrint('CarLinko decoded fields: $state');
   }
 
   @override
@@ -408,12 +422,17 @@ class AppVehicleRepository implements VehicleRepository {
   AppVehicleRepository._internal() {
     _isLiveActive = true;
     _current = _liveRepo.currentTelemetry;
-    _liveSubscription = _liveRepo.telemetryStream.listen((data) {
-      if (_isLiveActive) {
-        _current = data;
-        _controller.add(data);
-      }
-    });
+    _liveSubscription = _liveRepo.telemetryStream.listen(_handleLiveTelemetry);
+  }
+
+  /// Shared by every place that (re)subscribes to the live telemetry
+  /// stream: updates the unified stream and backs up a real reading to
+  /// Firestore (fire-and-forget; sync failures never block the UI).
+  void _handleLiveTelemetry(VehicleTelemetry data) {
+    if (!_isLiveActive) return;
+    _current = data;
+    _controller.add(data);
+    unawaited(FirebaseSyncService.instance.syncTelemetrySnapshot(data));
   }
 
   factory AppVehicleRepository() => instance;
@@ -492,12 +511,7 @@ class AppVehicleRepository implements VehicleRepository {
       _isLiveActive = true;
       _current = _liveRepo.currentTelemetry;
       _liveSubscription?.cancel();
-      _liveSubscription = _liveRepo.telemetryStream.listen((data) {
-        if (_isLiveActive) {
-          _current = data;
-          _controller.add(data);
-        }
-      });
+      _liveSubscription = _liveRepo.telemetryStream.listen(_handleLiveTelemetry);
       _controller.add(_current);
     }
     return restored;
@@ -516,12 +530,7 @@ class AppVehicleRepository implements VehicleRepository {
     _liveRepo.setPreActivationMode(account: account);
     _current = _liveRepo.currentTelemetry;
     _liveSubscription?.cancel();
-    _liveSubscription = _liveRepo.telemetryStream.listen((data) {
-      if (_isLiveActive) {
-        _current = data;
-        _controller.add(data);
-      }
-    });
+    _liveSubscription = _liveRepo.telemetryStream.listen(_handleLiveTelemetry);
     _controller.add(_current);
   }
 
@@ -532,12 +541,7 @@ class AppVehicleRepository implements VehicleRepository {
       _isLiveActive = true;
       _current = _liveRepo.currentTelemetry;
       _liveSubscription?.cancel();
-      _liveSubscription = _liveRepo.telemetryStream.listen((data) {
-        if (_isLiveActive) {
-          _current = data;
-          _controller.add(data);
-        }
-      });
+      _liveSubscription = _liveRepo.telemetryStream.listen(_handleLiveTelemetry);
       _controller.add(_current);
     } catch (e) {
       _isLiveActive = true;

@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import '../auth/auth_service.dart';
+import '../carlinko/vehicle_telemetry.dart';
 import '../service/service_appointment_manager.dart';
 import '../ui/app_notification.dart';
 import '../ui/settings_screen.dart';
@@ -332,5 +333,53 @@ class FirebaseSyncService {
       debugPrint('[FirebaseSync] Fetch alerts error: $e');
       return [];
     }
+  }
+
+  // =========================================================================
+  // 6. LAST KNOWN VEHICLE TELEMETRY SNAPSHOT SYNCHRONIZATION
+  // =========================================================================
+
+  /// Push the most recent real (non-simulated) telemetry reading to
+  /// Firestore, so the last known car state is backed up / visible from
+  /// another device even when this device has no live CarLinko session.
+  Future<void> syncTelemetrySnapshot(VehicleTelemetry telemetry) async {
+    final uid = currentUserId;
+    if (uid == null) return;
+    if (telemetry.isSimulated || !telemetry.isBound) return;
+
+    try {
+      final userRef = _userDoc(uid);
+      if (userRef == null) return;
+
+      final snapshotMap = telemetry.toJson();
+      snapshotMap['syncedAt'] = FieldValue.serverTimestamp();
+
+      await userRef.collection('telemetry').doc('last').set(
+            snapshotMap,
+            SetOptions(merge: true),
+          );
+      debugPrint('[FirebaseSync] Telemetry snapshot synced (odometer: ${telemetry.odometerKm} km)');
+    } catch (e) {
+      debugPrint('[FirebaseSync] Telemetry snapshot sync error: $e');
+    }
+  }
+
+  /// Fetch the last known telemetry snapshot from Firestore, if any.
+  Future<VehicleTelemetry?> fetchLastTelemetrySnapshot() async {
+    final uid = currentUserId;
+    if (uid == null) return null;
+
+    try {
+      final userRef = _userDoc(uid);
+      if (userRef == null) return null;
+
+      final doc = await userRef.collection('telemetry').doc('last').get();
+      if (doc.exists && doc.data() != null) {
+        return VehicleTelemetry.fromJson(doc.data()!);
+      }
+    } catch (e) {
+      debugPrint('[FirebaseSync] Fetch telemetry snapshot error: $e');
+    }
+    return null;
   }
 }
