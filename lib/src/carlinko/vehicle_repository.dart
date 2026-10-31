@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../firebase/firebase_sync_service.dart';
+import '../service/vehicle_alert_notifier.dart';
 import 'carlinko_api.dart';
 import 'reverse_geocoder.dart';
 import 'vehicle_telemetry.dart';
@@ -336,6 +337,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
             _status = VehicleConnectionStatus.connected;
             _controller.add(_current);
             _resolveLocation(_current);
+            unawaited(VehicleAlertNotifier.checkAndNotify(_current));
             return;
           }
         } catch (e) {
@@ -361,6 +363,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
       _status = VehicleConnectionStatus.connected;
       _controller.add(_current);
       _resolveLocation(_current);
+      unawaited(VehicleAlertNotifier.checkAndNotify(_current));
     } catch (e) {
       if (e is CarLinkoAuthException) {
         _status = VehicleConnectionStatus.authRequired;

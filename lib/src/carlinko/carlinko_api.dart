@@ -502,6 +502,12 @@ class CarLinkoClient {
     final cons = u8(55);
     out['consumption'] = cons != null ? (cons * 0.1) : null;
 
+    // Confirmed against the same reading: byte 53 * 0.1 = 6.1 L/100km,
+    // matching the real CarLinko app's "Fuel consumption: 6.10 L/100km"
+    // exactly (2026-11-01).
+    final fuelCons = u8(53);
+    out['fuel_consumption_l100km'] = fuelCons != null ? (fuelCons * 0.1) : null;
+
     out['charge_mode'] = u8(56);
     final chargeState = u8(57);
     out['charge_state'] = chargeState;

@@ -5,6 +5,8 @@ import 'package:workmanager/workmanager.dart';
 
 import '../carlinko/carlinko_api.dart';
 import '../carlinko/reverse_geocoder.dart';
+import '../carlinko/vehicle_telemetry.dart';
+import 'vehicle_alert_notifier.dart';
 
 const String _kTaskName = 'tm_location_tracker_task';
 const String _kHistoryKey = 'tm_location_history';
@@ -13,6 +15,7 @@ const int _kMaxHistoryEntries = 50;
 const String _kCarLinkoTokenKey = 'tm_carlinko_token';
 const String _kCarLinkoRegionKey = 'tm_carlinko_region';
 const String _kCarLinkoDeviceSnKey = 'tm_carlinko_device_sn';
+const String _kCarLinkoVehicleIdKey = 'tm_carlinko_vehicle_id';
 
 /// One GPS fix captured by the background tracker.
 class LocationHistoryEntry {
@@ -111,6 +114,21 @@ class LocationTrackerService {
       }
 
       final client = CarLinkoClient(region: region, token: token);
+
+      // Door-ajar / low-12V alerts, so they still fire while the app is
+      // closed (mirrors CarLinko's own vehicle alerts). Best-effort: a
+      // failure here must not block the GPS capture below.
+      final vehicleId = prefs.getString(_kCarLinkoVehicleIdKey);
+      if (vehicleId != null && vehicleId.isNotEmpty) {
+        try {
+          final state = await client.getVehicleState(vehicleId);
+          final telemetry = VehicleTelemetry.fromBlobMap(state, isSimulated: false);
+          await VehicleAlertNotifier.checkAndNotify(telemetry);
+        } catch (e) {
+          debugPrint('LocationTrackerService: alert check failed: $e');
+        }
+      }
+
       // The 73-byte telemetry blob never carries GPS — use the real locate
       // endpoint (same one the dashboard uses) instead of parsing the blob.
       final loc = await client.locateDevice(deviceSn);

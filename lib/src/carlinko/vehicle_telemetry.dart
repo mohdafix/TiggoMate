@@ -46,6 +46,8 @@ class VehicleTelemetry {
   final bool isCharging;
   final double chargePowerKw;
   final int? chargeRemainMin;
+  /// Average fuel consumption, L/100km. 0 means unknown.
+  final double fuelConsumptionL100km;
   final bool acOn;
   final int acTemp;
   final bool doorsOpen;
@@ -100,6 +102,7 @@ class VehicleTelemetry {
     this.isCharging = false,
     this.chargePowerKw = 0.0,
     this.chargeRemainMin,
+    this.fuelConsumptionL100km = 0.0,
     this.acOn = false,
     this.acTemp = 22,
     this.doorsOpen = false,
@@ -255,6 +258,7 @@ class VehicleTelemetry {
     final bool charging = (m['charge_state'] as num?)?.toInt() == 1;
     final double pwr = (m['charge_power_kw'] as num?)?.toDouble() ?? 0.0;
     final int? remMin = (m['charge_remain_min'] as num?)?.toInt();
+    final double fuelCons = (m['fuel_consumption_l100km'] as num?)?.toDouble() ?? 0.0;
 
     // TPMS: 0 means no reading, and the UI shows it as blank
     final double flP = (m['tyre_fl_pressure'] as num?)?.toDouble() ?? 0.0;
@@ -287,6 +291,7 @@ class VehicleTelemetry {
       isCharging: charging,
       chargePowerKw: pwr,
       chargeRemainMin: remMin,
+      fuelConsumptionL100km: fuelCons,
       acOn: m['ac_on'] == true,
       acTemp: (m['ac_temp'] as num?)?.toInt() ?? 23,
       doorsOpen: ((m['doors'] as num?)?.toInt() ?? 0) != 0,
@@ -334,6 +339,7 @@ class VehicleTelemetry {
         'isCharging': isCharging,
         'chargePowerKw': chargePowerKw,
         'chargeRemainMin': chargeRemainMin,
+        'fuelConsumptionL100km': fuelConsumptionL100km,
         'acOn': acOn,
         'acTemp': acTemp,
         'doorsOpen': doorsOpen,
@@ -384,6 +390,7 @@ class VehicleTelemetry {
         isCharging: json['isCharging'] as bool? ?? false,
         chargePowerKw: (json['chargePowerKw'] as num?)?.toDouble() ?? 0.0,
         chargeRemainMin: (json['chargeRemainMin'] as num?)?.toInt(),
+        fuelConsumptionL100km: (json['fuelConsumptionL100km'] as num?)?.toDouble() ?? 0.0,
         acOn: json['acOn'] as bool? ?? false,
         acTemp: (json['acTemp'] as num?)?.toInt() ?? 22,
         doorsOpen: json['doorsOpen'] as bool? ?? false,
@@ -446,6 +453,7 @@ class VehicleTelemetry {
     bool? isCharging,
     double? chargePowerKw,
     int? chargeRemainMin,
+    double? fuelConsumptionL100km,
     bool? acOn,
     int? acTemp,
     bool? doorsOpen,
@@ -495,6 +503,7 @@ class VehicleTelemetry {
       isCharging: isCharging ?? this.isCharging,
       chargePowerKw: chargePowerKw ?? this.chargePowerKw,
       chargeRemainMin: chargeRemainMin ?? this.chargeRemainMin,
+      fuelConsumptionL100km: fuelConsumptionL100km ?? this.fuelConsumptionL100km,
       acOn: acOn ?? this.acOn,
       acTemp: acTemp ?? this.acTemp,
       doorsOpen: doorsOpen ?? this.doorsOpen,

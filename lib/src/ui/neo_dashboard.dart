@@ -3185,6 +3185,32 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     ],
                   ),
                 ),
+                if (widget.repository.isVehicleBound && _telemetry.fuelConsumptionL100km > 0) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: colors.tileBg,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: colors.border),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.local_gas_station, size: 16, color: colors.petrolAmber),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Fuel: ${_telemetry.fuelConsumptionL100km.toStringAsFixed(1)} L/100km',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colors.textPrimary),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

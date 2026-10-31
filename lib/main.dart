@@ -1,6 +1,7 @@
 import 'src/ui/book_service_appointment_sheet.dart';
 import 'src/service/service_appointment_manager.dart';
 import 'src/service/location_tracker_service.dart';
+import 'src/service/vehicle_alert_notifier.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -64,6 +65,10 @@ void main() async {
   // Background GPS tracker (~every 15 min, independent of the app being
   // open). No-ops quickly inside the task itself if no car is bound yet.
   unawaited(LocationTrackerService.initializeAndSchedule());
+
+  // Android 13+ requires this prompt before a local notification (door
+  // ajar / low 12V alerts) can actually show.
+  unawaited(VehicleAlertNotifier.requestPermission());
 
   runApp(const TiggoMateApp());
 }
