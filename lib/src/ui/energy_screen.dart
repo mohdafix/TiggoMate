@@ -33,7 +33,7 @@ class _EnergyScreenState extends State<EnergyScreen> {
   final double _powerKw = 3.3;
 
   // Tiggo 7 PHEV Battery Size in Malaysia
-  static const double batteryCapacityKwh = 19.27;
+  static const double batteryCapacityKwh = 18.3;
 
   /// Null when the car has not reported a battery level.
   int? get currentSoc =>
@@ -52,7 +52,7 @@ class _EnergyScreenState extends State<EnergyScreen> {
   double get offPeakCost => addsKwh * 0.280; // TNB off-peak residential rate
   double get peakCost => addsKwh * 0.570;    // TNB peak block rate
   double get ron95Cost {
-    // 19.27 kWh gives ~90 km EV range. 90 km on petrol (5.5L/100km) = 4.95L * RM 2.05 = ~RM 10.15
+    // 18.3 kWh gives ~90 km EV range. 90 km on petrol (5.5L/100km) = 4.95L * RM 2.05 = ~RM 10.15
     final equivKm = (addsKwh / batteryCapacityKwh) * 90.0;
     final petrolLitres = (equivKm / 100.0) * 5.5;
     return petrolLitres * widget.fuelPrice;

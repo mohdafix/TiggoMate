@@ -4,7 +4,9 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -18,10 +20,17 @@ class MainActivity : FlutterActivity() {
     private var initialActionUri: String? = null
     private var quickActionsChannel: MethodChannel? = null
     private var pendingSpeechResult: MethodChannel.Result? = null
+    private var speechRecognizer: SpeechRecognizer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         initialActionUri = intent?.dataString
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        speechRecognizer?.destroy()
+        speechRecognizer = null
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -72,20 +81,82 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SPEECH_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "startListening" -> {
+                    startSpeechRecognition(result)
+                }
+                "stopListening" -> {
                     try {
-                        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-                            putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak Tiggo 7 Command or Question...")
-                        }
-                        pendingSpeechResult = result
-                        startActivityForResult(intent, SPEECH_REQUEST_CODE)
+                        speechRecognizer?.stopListening()
+                        result.success(true)
                     } catch (e: Exception) {
-                        result.error("UNAVAILABLE", "Speech recognition unavailable: ${e.localizedMessage}", null)
+                        result.success(false)
                     }
                 }
                 else -> result.notImplemented()
             }
+        }
+    }
+
+    private fun startSpeechRecognition(result: MethodChannel.Result) {
+        runOnUiThread {
+            if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+                tryLaunchSpeechIntent(result)
+                return@runOnUiThread
+            }
+
+            try {
+                speechRecognizer?.destroy()
+                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
+                    setRecognitionListener(object : RecognitionListener {
+                        override fun onReadyForSpeech(params: Bundle?) {}
+                        override fun onBeginningOfSpeech() {}
+                        override fun onRmsChanged(rmsdB: Float) {}
+                        override fun onBufferReceived(buffer: ByteArray?) {}
+                        override fun onEndOfSpeech() {}
+                        override fun onError(error: Int) {
+                            if (pendingSpeechResult != null) {
+                                tryLaunchSpeechIntent(pendingSpeechResult!!)
+                            }
+                        }
+                        override fun onResults(results: Bundle?) {
+                            val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                            if (!matches.isNullOrEmpty()) {
+                                pendingSpeechResult?.success(matches[0])
+                            } else {
+                                pendingSpeechResult?.success(null)
+                            }
+                            pendingSpeechResult = null
+                        }
+                        override fun onPartialResults(partialResults: Bundle?) {}
+                        override fun onEvent(eventType: Int, params: Bundle?) {}
+                    })
+                }
+
+                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                    putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+                    putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+                }
+                pendingSpeechResult = result
+                speechRecognizer?.startListening(intent)
+            } catch (e: Exception) {
+                tryLaunchSpeechIntent(result)
+            }
+        }
+    }
+
+    private fun tryLaunchSpeechIntent(result: MethodChannel.Result) {
+        try {
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak Tiggo 7 Command or Question...")
+            }
+            pendingSpeechResult = result
+            startActivityForResult(intent, SPEECH_REQUEST_CODE)
+        } catch (e: Exception) {
+            result.error("UNAVAILABLE", "Speech recognition unavailable: ${e.localizedMessage}", null)
+            pendingSpeechResult = null
         }
     }
 

@@ -167,7 +167,7 @@ class VehicleAlertsManager extends ChangeNotifier {
       VehicleAlertItem(
         id: 'seed-2',
         title: 'Doors Locked & Armed',
-        message: 'CarLinko: Proximity auto-lock engaged. All 4 doors secured.',
+        message: 'Proximity auto-lock engaged. All 4 doors secured.',
         timestamp: now.subtract(const Duration(hours: 1, minutes: 42)),
         type: NotificationType.info,
         icon: Icons.lock_outline_rounded,
@@ -429,7 +429,7 @@ class AppNotification {
       case NotificationType.error:
         return 'System Notice';
       case NotificationType.info:
-        return 'CarLinko Telematics';
+        return 'Vehicle Telematics';
     }
   }
 
@@ -613,7 +613,7 @@ class _HudAlertBannerWidgetState extends State<_HudAlertBannerWidget> with Singl
                                   border: Border.all(color: accent.withValues(alpha: 0.3)),
                                 ),
                                 child: Text(
-                                  'CARLINKO',
+                                  'TELEMATICS',
                                   style: TextStyle(
                                     fontFamily: 'monospace',
                                     fontSize: 8.5,

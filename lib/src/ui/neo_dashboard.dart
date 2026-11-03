@@ -25,10 +25,10 @@ import 'climate_control_sheet.dart';
 import 'window_sunroof_sheet.dart';
 import 'remote_engine_sheet.dart';
 import 'car_view_carousel.dart';
-import 'ask_assistant_sheet.dart';
 import 'energy_screen.dart';
 import '../mytnb/mytnb_api.dart';
 import 'mytnb_connect_dialog.dart';
+import '../service/phone_parking_location.dart';
 
 class NeoDashboard extends StatefulWidget {
   final VehicleRepository repository;
@@ -58,7 +58,7 @@ class NeoDashboard extends StatefulWidget {
   State<NeoDashboard> createState() => _NeoDashboardState();
 }
 
-class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderStateMixin {
+class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late VehicleTelemetry _telemetry;
   bool _scheduledCharging = true;
   bool _isAdvancedView = false;
@@ -67,6 +67,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
   bool _isAcActive = false;
   bool _isWindowsVented = false;
   bool _isTrunkOpen = false;
+  bool _wasParked = true;
   bool _spendingExpanded = false;
   double _homeAcCost = 0.0;
   double _petrolCost = 0.0;
@@ -78,6 +79,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
   StreamSubscription<String>? _quickActionSubscription;
+  Timer? _refreshTimer;
 
   void _handleSkinChanged() {
     if (mounted) {
@@ -96,11 +98,13 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
+    unawaited(PhoneParkingLocationService.captureNow());
     _telemetry = widget.repository.currentTelemetry;
     _isDoorsLocked = !_telemetry.doorsOpen;
     _isAcActive = _telemetry.acOn;
     _isTrunkOpen = _telemetry.trunkOpen;
     _isWindowsVented = _telemetry.windowsOpen;
+    _wasParked = _telemetry.isParked;
     VehicleSkinManager.instance.addListener(_handleSkinChanged);
 
     // Initialize native Android Home Widget and App Shortcuts listeners
@@ -121,6 +125,14 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
 
     widget.repository.telemetryStream.listen((data) {
       if (mounted) {
+        // The car just transitioned to parked -- grab the phone's own GPS
+        // position now, while it's still near the car, as a fallback for
+        // when CarLinko's own GPS fetch fails (see PhoneParkingLocationService).
+        if (data.isParked && !_wasParked) {
+          unawaited(PhoneParkingLocationService.captureNow());
+        }
+        _wasParked = data.isParked;
+
         setState(() {
           _telemetry = data;
           _isDoorsLocked = !data.doorsOpen;
@@ -140,12 +152,37 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     _pulseAnimation = Tween<double>(begin: 0.85, end: 1.25).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+
+    // Telemetry was previously only fetched once, at cold app-start --
+    // nothing ever re-fetched it, so stale state (climate on/off, doors,
+    // GPS) only cleared up if the user killed and reopened the app.
+    // Poll while the dashboard is visible, and refresh immediately
+    // whenever the app comes back to the foreground.
+    WidgetsBinding.instance.addObserver(this);
+    _refreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (widget.repository.isVehicleBound) {
+        widget.repository.refresh().catchError((e) {
+          debugPrint('Periodic CarLinko refresh failed (will retry): $e');
+        });
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && widget.repository.isVehicleBound) {
+      widget.repository.refresh().catchError((e) {
+        debugPrint('Resume CarLinko refresh failed: $e');
+      });
+    }
   }
 
   @override
   void dispose() {
     VehicleSkinManager.instance.removeListener(_handleSkinChanged);
     _quickActionSubscription?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _refreshTimer?.cancel();
     _pulseController.dispose();
     super.dispose();
   }
@@ -339,7 +376,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Direct internal valve sensor transmits real-time telemetry over Chery CarLinko CAN-bus.',
+                        'Direct internal valve sensor transmits real-time telemetry over vehicle CAN-bus.',
                         style: TextStyle(fontSize: 11, color: colors.textSecondary),
                       ),
                     ),
@@ -432,7 +469,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text('Battery Pack Size', style: TextStyle(fontSize: 12, color: colors.textSecondary)),
-                        Text('19.27 kWh LFP (${_telemetry.batteryPct}% SoC)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colors.evTeal)),
+                        Text('18.3 kWh LFP (${_telemetry.batteryPct}% SoC)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colors.evTeal)),
                       ],
                     ),
                     Divider(height: 20, color: colors.border),
@@ -714,8 +751,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       setState(() => _isDoorsLocked = willLock);
       await _sendCommandAndReport(
         willLock ? CarLinkoOpcodes.lock : CarLinkoOpcodes.unlock,
-        successMessage: willLock ? '🔒 CarLinko: Doors Locked' : '🔓 CarLinko: Doors Unlocked',
-        failureMessage: '⚠️ CarLinko: Door command failed. Please retry.',
+        successMessage: willLock ? '🔒 Doors Locked' : '🔓 Doors Unlocked',
+        failureMessage: '⚠️ Door command failed. Please retry.',
         onRevert: () => setState(() => _isDoorsLocked = previous),
       );
       _syncWidgetTelemetry();
@@ -724,8 +761,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       setState(() => _isDoorsLocked = false);
       await _sendCommandAndReport(
         CarLinkoOpcodes.unlock,
-        successMessage: '🔓 CarLinko: Doors Unlocked',
-        failureMessage: '⚠️ CarLinko: Door command failed. Please retry.',
+        successMessage: '🔓 Doors Unlocked',
+        failureMessage: '⚠️ Door command failed. Please retry.',
         onRevert: () => setState(() => _isDoorsLocked = previous),
       );
       _syncWidgetTelemetry();
@@ -736,7 +773,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       await _sendCommandAndReport(
         willTurnOn ? CarLinkoOpcodes.acOn : CarLinkoOpcodes.acOff,
         successMessage: willTurnOn ? '❄️ Cabin Pre-cooling started (22°C)' : '❄️ Climate Pre-conditioning OFF',
-        failureMessage: '⚠️ CarLinko: Climate command failed. Please retry.',
+        failureMessage: '⚠️ Climate command failed. Please retry.',
         onRevert: () => setState(() => _isAcActive = previous),
       );
       _syncWidgetTelemetry();
@@ -746,7 +783,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       await _sendCommandAndReport(
         CarLinkoOpcodes.acOff,
         successMessage: '❄️ Climate Pre-conditioning OFF',
-        failureMessage: '⚠️ CarLinko: Climate command failed. Please retry.',
+        failureMessage: '⚠️ Climate command failed. Please retry.',
         onRevert: () => setState(() => _isAcActive = previous),
       );
       _syncWidgetTelemetry();
@@ -755,8 +792,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       setState(() => _isWindowsVented = true);
       await _sendCommandAndReport(
         CarLinkoOpcodes.windowsOpen,
-        successMessage: '🪟 CarLinko: All 4 Windows opened',
-        failureMessage: '⚠️ CarLinko: Window command failed. Please retry.',
+        successMessage: '🪟 All 4 Windows opened',
+        failureMessage: '⚠️ Window command failed. Please retry.',
         onRevert: () => setState(() => _isWindowsVented = previous),
       );
     } else if (action == 'windows_close') {
@@ -764,8 +801,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       setState(() => _isWindowsVented = false);
       await _sendCommandAndReport(
         CarLinkoOpcodes.windowsClose,
-        successMessage: '🪟 CarLinko: All Windows closed and secured',
-        failureMessage: '⚠️ CarLinko: Window command failed. Please retry.',
+        successMessage: '🪟 All Windows closed and secured',
+        failureMessage: '⚠️ Window command failed. Please retry.',
         onRevert: () => setState(() => _isWindowsVented = previous),
       );
     } else if (action == 'windows' || action == 'windows_vent') {
@@ -775,20 +812,20 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       await _sendCommandAndReport(
         willVent ? CarLinkoOpcodes.windowsVent : CarLinkoOpcodes.windowsClose,
         successMessage: willVent ? '🪟 Windows vented (20mm)' : '🪟 All Windows closed',
-        failureMessage: '⚠️ CarLinko: Window command failed. Please retry.',
+        failureMessage: '⚠️ Window command failed. Please retry.',
         onRevert: () => setState(() => _isWindowsVented = previous),
       );
     } else if (action == 'sunroof_open') {
       await _sendCommandAndReport(
         CarLinkoOpcodes.sunroofOpen,
         successMessage: '☀️ Panoramic Sunroof opened',
-        failureMessage: '⚠️ CarLinko: Sunroof command failed. Please retry.',
+        failureMessage: '⚠️ Sunroof command failed. Please retry.',
       );
     } else if (action == 'sunroof_close') {
       await _sendCommandAndReport(
         CarLinkoOpcodes.sunroofClose,
         successMessage: '☀️ Panoramic Sunroof closed',
-        failureMessage: '⚠️ CarLinko: Sunroof command failed. Please retry.',
+        failureMessage: '⚠️ Sunroof command failed. Please retry.',
       );
     } else if (action == 'trunk' || action == 'trunk_open') {
       final previous = _isTrunkOpen;
@@ -797,18 +834,15 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       await _sendCommandAndReport(
         willOpen ? CarLinkoOpcodes.trunkOpen : CarLinkoOpcodes.trunkClose,
         successMessage: willOpen ? '🚗 Power Tailgate opened' : '🚗 Tailgate closed',
-        failureMessage: '⚠️ CarLinko: Trunk command failed. Please retry.',
+        failureMessage: '⚠️ Trunk command failed. Please retry.',
         onRevert: () => setState(() => _isTrunkOpen = previous),
       );
     } else if (action == 'engine_start' || action == 'engine_stop') {
-      // No confirmed opcode exists for remote engine start/stop — every
-      // other opcode here was cross-checked against a real reference
-      // (ha-carlinko's const.py / the official app's own string table), but
-      // this one isn't in either. Rather than guess another one and risk
-      // another silent/confusing failure, say so plainly.
-      _showNotification(
-        '⚠️ Remote engine start/stop isn\'t confirmed working yet — no verified CarLinko command found for it.',
-        type: NotificationType.warning,
+      final isStart = action == 'engine_start';
+      await _sendCommandAndReport(
+        isStart ? CarLinkoOpcodes.engineStart : CarLinkoOpcodes.engineStop,
+        successMessage: isStart ? '⚡ Engine Start / Ignition command sent' : '🛑 Engine Stop command sent',
+        failureMessage: '⚠️ Engine command failed. Please retry.',
       );
     } else if (action == 'schedule_charging') {
       _openSmartChargingSheet();
@@ -835,8 +869,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
           // all. Confirmed against ha-carlinko's own reference client:
           // OP_FIND_CAR = "740400".
           CarLinkoOpcodes.findCar,
-          successMessage: '📢 CarLinko: Lights flashing & horn sounding',
-          failureMessage: '⚠️ CarLinko: Locate command failed. Please retry.',
+          successMessage: '📢 Lights flashing & horn sounding',
+          failureMessage: '⚠️ Locate command failed. Please retry.',
         ),
       );
     }
@@ -977,9 +1011,36 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     return Scaffold(
       backgroundColor: bgCol,
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-          children: [
+        child: RefreshIndicator(
+          color: limeAccent,
+          backgroundColor: cardCol,
+          onRefresh: () async {
+            HapticFeedback.mediumImpact();
+            try {
+              await widget.repository.refresh();
+              if (context.mounted) {
+                AppNotification.show(
+                  context,
+                  message: 'Vehicle status refreshed',
+                  type: NotificationType.info,
+                  icon: Icons.sync_rounded,
+                );
+              }
+            } catch (e) {
+              if (context.mounted) {
+                AppNotification.show(
+                  context,
+                  message: 'Refresh failed: ${e.toString()}',
+                  type: NotificationType.error,
+                  icon: Icons.sync_problem_rounded,
+                );
+              }
+            }
+          },
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            children: [
             // 1. TOP HEADER: Model subtitle + Big Plate + Bell + Menu
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1200,8 +1261,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                               !isBound
                                   ? 'Pending Car Bind · Awaiting VIN pairing'
                                   : looksEmptyWhileLive
-                                      ? 'LIVE CarLinko · No data this sync'
-                                      : 'LIVE CarLinko · synced ${_syncAgeText()} ago',
+                                      ? 'LIVE · No data this sync'
+                                      : 'LIVE · synced ${_syncAgeText()} ago',
                               style: TextStyle(
                                 fontFamily: 'monospace',
                                 fontSize: 11,
@@ -1405,6 +1466,25 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         ),
                       ],
                     ),
+                    if (isBound) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Icon(Icons.local_gas_station, size: 12, color: fuelBarCol),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Fuel Consumption: ${_telemetry.fuelConsumptionL100km.toStringAsFixed(1)} L/100km',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: fuelBarCol,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1512,15 +1592,10 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             ),
             const SizedBox(height: 18),
 
-            // 6. BOTTOM AI COMMAND PROMPT BAR
+            // 6. BOTTOM AI COMMAND PROMPT BAR -- deep-links into the merged
+            // Assistant tab instead of opening a separate chat sheet.
             GestureDetector(
-              onTap: () => AskAssistantSheet.show(
-                context,
-                carPlate: widget.carPlateNumber,
-                vehicleModel: 'CHERY TIGGO 7 PHEV · CSH',
-                batteryPct: _telemetry.batteryPct,
-                onExecuteCommand: (cmd) => _handleRemoteCommand(cmd),
-              ),
+              onTap: widget.onOpenAssistant,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
@@ -1574,7 +1649,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildCyberRemoteCard({
@@ -3185,7 +3261,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     ],
                   ),
                 ),
-                if (widget.repository.isVehicleBound && _telemetry.fuelConsumptionL100km > 0) ...[
+                if (widget.repository.isVehicleBound) ...[
                   const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -3426,7 +3502,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        isBound && _telemetry.isCharging ? '⚡ 3.3 kW AC' : '19.27 kWh LFP',
+                        isBound && _telemetry.isCharging ? '⚡ 3.3 kW AC' : '18.3 kWh LFP',
                         style: TextStyle(
                           fontSize: 8.5,
                           fontWeight: FontWeight.w600,
@@ -3587,7 +3663,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        '⛽ 51L Tank (RON95)',
+                        '⛽ 60L Tank (RON95)',
                         style: TextStyle(
                           fontSize: 8.5,
                           fontWeight: FontWeight.w600,
@@ -3969,18 +4045,20 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          'GPS Locked',
+                          _telemetry.hasLocation ? 'GPS Locked' : 'Locating...',
                           style: TextStyle(
                             fontSize: 9.5,
                             fontWeight: FontWeight.bold,
-                            color: colors.evTeal,
+                            color: _telemetry.hasLocation ? colors.evTeal : const Color(0xFF60A5FA),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      _telemetry.locationName,
+                      _telemetry.locationName.isNotEmpty && _telemetry.locationName != 'Pending Car Bind'
+                          ? _telemetry.locationName
+                          : 'Locating vehicle position...',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -4121,7 +4199,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('19.27 kWh LFP Traction Battery', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          const Text('18.3 kWh LFP Traction Battery', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                           const SizedBox(height: 2),
                           Text('${_telemetry.batteryPct}% SoC • ${_telemetry.electricRangeKm} km EV Range • AC Type 2', style: TextStyle(fontSize: 11, color: colors.textSecondary)),
                         ],

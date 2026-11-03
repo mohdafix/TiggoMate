@@ -16,6 +16,7 @@ analyzer:
     - windows/**
     - macos/**
     - linux/**
+    - j5-ev-dashboard/**
 include: package:flutter_lints/flutter.yaml
 
 linter:

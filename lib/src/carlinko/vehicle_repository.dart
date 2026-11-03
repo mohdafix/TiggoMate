@@ -1,8 +1,10 @@
+import '../service/phone_parking_location.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../firebase/firebase_sync_service.dart';
 import '../service/vehicle_alert_notifier.dart';
+import '../service/auto_trip_and_charge_service.dart';
 import 'carlinko_api.dart';
 import 'reverse_geocoder.dart';
 import 'vehicle_telemetry.dart';
@@ -16,7 +18,11 @@ const String _kCarLinkoDeviceSnKey = 'tm_carlinko_device_sn';
 /// Pulls the vehicle's device serial number from a /user/vehicle row. Real
 /// API responses use either key depending on the account (per ha-carlinko).
 String? _extractDeviceSn(Map<String, dynamic> vehicle) =>
-    vehicle['deviceId']?.toString() ?? vehicle['deviceSn']?.toString();
+    vehicle['deviceId']?.toString() ??
+    vehicle['deviceSn']?.toString() ??
+    vehicle['sn']?.toString() ??
+    vehicle['vin']?.toString() ??
+    vehicle['vehicleId']?.toString();
 
 abstract class VehicleRepository {
   Stream<VehicleTelemetry> get telemetryStream;
@@ -153,7 +159,11 @@ class LiveCarLinkoRepository implements VehicleRepository {
   bool get isPreActivationMode => _isPreActivation;
 
   @override
-  bool get isVehicleBound => _vehicleId != null && _status == VehicleConnectionStatus.connected && !_isPreActivation;
+  bool get isVehicleBound =>
+      _vehicleId != null &&
+      _status != VehicleConnectionStatus.disconnected &&
+      _status != VehicleConnectionStatus.authRequired &&
+      !_isPreActivation;
 
   @override
   String? get connectedAccount => _account;
@@ -383,34 +393,66 @@ class LiveCarLinkoRepository implements VehicleRepository {
   /// lookup never blocks the dashboard from showing telemetry that already
   /// arrived.
   void _resolveLocation(VehicleTelemetry telemetry) {
-    final deviceSn = _deviceSn;
-    if (deviceSn == null) return;
     unawaited(() async {
-      Map<String, dynamic> loc;
-      try {
-        loc = await _client.locateDevice(deviceSn);
-      } catch (e) {
-        debugPrint('CarLinko locateDevice failed: $e');
+      double? lat;
+      double? lng;
+      String? address;
+
+      final deviceSn = _deviceSn;
+      if (deviceSn != null) {
+        try {
+          final loc = await _client.locateDevice(deviceSn, vehicleId: _vehicleId);
+          double? parseCoord(dynamic val) {
+            if (val == null) return null;
+            if (val is num) return val.toDouble();
+            if (val is String) return double.tryParse(val.trim());
+            return null;
+          }
+
+          lat = parseCoord(loc['lat']) ??
+              parseCoord(loc['latitude']) ??
+              parseCoord(loc['gpsLat']) ??
+              parseCoord(loc['pointLat']) ??
+              (loc['point'] is Map ? parseCoord(loc['point']['lat']) : null);
+          lng = parseCoord(loc['lng']) ??
+              parseCoord(loc['lon']) ??
+              parseCoord(loc['longitude']) ??
+              parseCoord(loc['gpsLng']) ??
+              parseCoord(loc['pointLng']) ??
+              (loc['point'] is Map ? parseCoord(loc['point']['lng']) : null);
+          address = (loc['address'] as String?)?.trim() ?? (loc['locationName'] as String?)?.trim();
+        } catch (e) {
+          debugPrint('CarLinko locateDevice failed: $e');
+        }
+      }
+
+      if (lat != null && lng != null && (lat != 0 && lng != 0)) {
+        if (address == null || address.isEmpty) {
+          address = await ReverseGeocoder.lookup(lat, lng);
+        }
+        _current = _current.copyWith(
+          latitude: lat,
+          longitude: lng,
+          locationName: address ?? _current.locationName,
+        );
+        _controller.add(_current);
         return;
       }
-      final lat = (loc['lat'] as num?)?.toDouble();
-      final lng = (loc['lng'] as num?)?.toDouble() ?? (loc['lon'] as num?)?.toDouble();
-      if (lat == null || lng == null || (lat == 0 && lng == 0)) return;
 
-      var address = (loc['address'] as String?)?.trim();
-      if (address == null || address.isEmpty) {
-        address = await ReverseGeocoder.lookup(lat, lng);
+      var fallback = await PhoneParkingLocationService.loadLast();
+      if (fallback == null || fallback.latitude == 0.0) {
+        await PhoneParkingLocationService.captureNow();
+        fallback = await PhoneParkingLocationService.loadLast();
       }
 
-      // Only apply if nothing newer has arrived while this lookup was in
-      // flight (a later refresh would already have its own location).
-      if (!identical(_current, telemetry)) return;
-      _current = _current.copyWith(
-        latitude: lat,
-        longitude: lng,
-        locationName: address ?? _current.locationName,
-      );
-      _controller.add(_current);
+      if (fallback != null && fallback.latitude != 0.0) {
+        _current = _current.copyWith(
+          latitude: fallback.latitude,
+          longitude: fallback.longitude,
+          locationName: fallback.address ?? _current.locationName,
+        );
+        _controller.add(_current);
+      }
     }());
   }
 
@@ -475,6 +517,16 @@ class LiveCarLinkoRepository implements VehicleRepository {
       return true;
     } catch (e) {
       debugPrint('CarLinko remoteControl "$command" failed: $e');
+      if (command == CarLinkoOpcodes.acOff) {
+        try {
+          await _client.sendRemoteControl(
+            vehicleId: _vehicleId!,
+            deviceSn: _deviceSn!,
+            opcode: CarLinkoOpcodes.acOffAlt,
+          );
+          return true;
+        } catch (_) {}
+      }
       return false;
     }
   }
@@ -502,6 +554,9 @@ class AppVehicleRepository implements VehicleRepository {
     _current = data;
     _controller.add(data);
     unawaited(FirebaseSyncService.instance.syncTelemetrySnapshot(data));
+    try {
+      AutoTripAndChargeService.instance.processTelemetry(data);
+    } catch (_) {}
   }
 
   factory AppVehicleRepository() => instance;

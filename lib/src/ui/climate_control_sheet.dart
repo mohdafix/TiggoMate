@@ -351,7 +351,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                                           ? (_targetTemp < 22.0
                                               ? const Color(0xFFD2F835)
                                               : (_targetTemp > 25.0 ? const Color(0xFFFF6E40) : const Color(0xFFD2F835)))
-                                          : colors.textPrimary,
+                                          : colors.textMuted,
                                       letterSpacing: -1.0,
                                     ),
                                   ),
@@ -369,9 +369,11 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                                 ],
                               ),
                               Text(
-                                _targetTemp <= 18.0
-                                    ? 'MAX COOL (LO)'
-                                    : (_targetTemp >= 32.0 ? 'MAX HEAT (HI)' : 'Normal Dual-Zone Climate'),
+                                !_acOn
+                                    ? 'Climate is off -- turn on to apply'
+                                    : (_targetTemp <= 18.0
+                                        ? 'MAX COOL (LO)'
+                                        : (_targetTemp >= 32.0 ? 'MAX HEAT (HI)' : 'Normal Dual-Zone Climate')),
                                 style: TextStyle(
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.bold,
@@ -814,8 +816,8 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                 icon: const Icon(Icons.send_rounded, size: 16, color: Colors.black),
                 label: Text(
                   _acOn
-                      ? 'TRANSMIT CLIMATE (${_targetTemp.toStringAsFixed(1)}°C · ${_durationMin}M)'
-                      : 'TRANSMIT CLIMATE SHUTDOWN',
+                      ? 'TURN ON CLIMATE (${_targetTemp.toStringAsFixed(1)}°C)'
+                      : 'TURN OFF CLIMATE',
                   style: const TextStyle(
                     fontFamily: 'monospace',
                     fontWeight: FontWeight.w800,

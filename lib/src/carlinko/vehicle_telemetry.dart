@@ -141,6 +141,40 @@ class VehicleTelemetry {
     this.dataSourceLabel = 'Pending Car Bind',
   });
 
+  /// Full live status as a readable block, for handing to the AI assistant
+  /// so it can answer questions about any current vehicle state instead of
+  /// just the few fields explicitly threaded through as separate params.
+  String get aiStatusSummary {
+    final lines = <String>[
+      'Odometer: $odometerKm km',
+      'Battery: $batteryPct% (EV range ~$electricRangeKm km)${isCharging ? ', Charging: yes (${chargePowerKw.toStringAsFixed(1)} kW${chargeRemainMin != null ? ', ~$chargeRemainMin min remaining' : ''})' : ', Charging: no'}',
+      'Fuel: $fuelCapacityPct% (range ~$fuelRangeKm km)${fuelConsumptionL100km > 0 ? ', consumption ${fuelConsumptionL100km.toStringAsFixed(1)} L/100km' : ''}',
+      'Total combined range: ~$totalRangeKm km',
+      '12V aux battery: ${volt12 > 0 ? '${volt12.toStringAsFixed(2)} V' : 'unknown'}',
+      'Speed: ${speedKmH.toStringAsFixed(0)} km/h',
+      'Engine: ${engineOn ? 'running' : 'off'}',
+      'Doors: ${doorsOpen ? 'open' : 'locked/closed'}',
+      'Trunk: ${trunkOpen ? 'open' : 'closed'}',
+      'Windows: ${windowsOpen ? 'open/vented' : 'closed'}',
+      'Sunroof: ${sunroofOpen ? 'open' : 'closed'}',
+      'Climate: ${acOn ? 'on, target $acTemp°C, fan gear ${fanGear == 0 ? 'auto' : fanGear}' : 'off'}',
+      if (rapidCool) 'Rapid cool: active',
+      if (frontDefrost) 'Front defrost: active',
+      if (rearDefrost) 'Rear defrost: active',
+      if (airPurifier) 'Air purifier: active',
+      if (seatHeatDriver > 0) 'Driver seat heat: level $seatHeatDriver',
+      if (seatVentDriver > 0) 'Driver seat vent: level $seatVentDriver',
+      if (seatHeatPass > 0) 'Passenger seat heat: level $seatHeatPass',
+      if (seatVentPass > 0) 'Passenger seat vent: level $seatVentPass',
+      if (steeringHeat) 'Steering wheel heat: on',
+      'Tyre pressure (kPa): FL ${tyreFlPressureKpa.toStringAsFixed(0)}, FR ${tyreFrPressureKpa.toStringAsFixed(0)}, RL ${tyreRlPressureKpa.toStringAsFixed(0)}, RR ${tyreRrPressureKpa.toStringAsFixed(0)}',
+      'Tyre temperature (°C): FL ${tyreFlTempC.toStringAsFixed(0)}, FR ${tyreFrTempC.toStringAsFixed(0)}, RL ${tyreRlTempC.toStringAsFixed(0)}, RR ${tyreRrTempC.toStringAsFixed(0)}',
+      'Location: ${isParked ? 'Parked ($parkedDurationText)' : 'Moving'}${locationName.isNotEmpty ? ', near $locationName' : ''}',
+      'Data as of: $lastUpdated${isSimulated ? ' (simulated/demo data)' : ''}',
+    ];
+    return lines.join('\n- ');
+  }
+
   /// Factory creating unbound/pending telemetry when vehicle is awaiting CarLinko pairing.
   factory VehicleTelemetry.unbound({
     String label = 'Pending Car Bind',

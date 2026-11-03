@@ -1,3 +1,4 @@
+import 'src/carlinko/carlinko_api.dart';
 import 'src/ui/book_service_appointment_sheet.dart';
 import 'src/service/service_appointment_manager.dart';
 import 'src/service/location_tracker_service.dart';
@@ -305,8 +306,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       TripsLogbookScreen(
         tnbTariff: _settings.tnbTariff,
         fuelPrice: _settings.fuelPrice,
-        currentOdometerKm: 1420,
-        currentBatteryPct: 78,
+        currentOdometerKm: _vehicleRepo.currentTelemetry.odometerKm > 0
+            ? _vehicleRepo.currentTelemetry.odometerKm
+            : 1420,
+        currentBatteryPct: _vehicleRepo.currentTelemetry.batteryPct > 0
+            ? _vehicleRepo.currentTelemetry.batteryPct
+            : 78,
         myTnbRepo: _myTnbRepo,
       ),
       MaintenanceTab(settings: _settings),
@@ -322,23 +327,39 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         ),
       ),
       bottomNavigationBar: Container(
-        height: 60,
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF0A0B0E) : Colors.white,
+          color: isDark ? const Color(0xFF0D0F14) : Colors.white,
           border: Border(
             top: BorderSide(
               color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0),
               width: 1.0,
             ),
           ),
-        ),
-        child: Row(
-          children: [
-            _buildCyberBottomNavItem(0, 'CAR', Icons.directions_car_outlined, Icons.directions_car),
-            _buildCyberBottomNavItem(1, 'ASSISTANT', Icons.chat_bubble_outline, Icons.chat_bubble),
-            _buildCyberBottomNavItem(2, 'LOG', Icons.route_outlined, Icons.route),
-            _buildCyberBottomNavItem(3, 'SERVICE', Icons.build_outlined, Icons.build),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, -3),
+            ),
           ],
+        ),
+        child: SafeArea(
+          top: false,
+          bottom: true,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 6, bottom: 8),
+            child: SizedBox(
+              height: 64,
+              child: Row(
+                children: [
+                  _buildCyberBottomNavItem(0, 'CAR', Icons.directions_car_outlined, Icons.directions_car),
+                  _buildCyberBottomNavItem(1, 'ASSISTANT', Icons.chat_bubble_outline, Icons.chat_bubble),
+                  _buildCyberBottomNavItem(2, 'LOG', Icons.route_outlined, Icons.route),
+                  _buildCyberBottomNavItem(3, 'SERVICE', Icons.build_outlined, Icons.build),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -354,30 +375,35 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       child: InkWell(
         onTap: () => setState(() => _currentIndex = index),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Top active indicator line
-            Container(
-              height: 2,
-              color: isSelected ? accent : Colors.transparent,
+            // Top active indicator pill
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              height: 3,
+              width: isSelected ? 32 : 0,
+              decoration: BoxDecoration(
+                color: isSelected ? accent : Colors.transparent,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
             const SizedBox(height: 6),
             Icon(
               isSelected ? selectedIcon : unselectedIcon,
-              size: 20,
+              size: 24,
               color: isSelected ? accent : textMuted,
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
                 fontFamily: 'monospace',
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                 letterSpacing: 0.8,
                 color: isSelected ? accent : textMuted,
               ),
             ),
-            const SizedBox(height: 4),
           ],
         ),
       ),
@@ -741,259 +767,56 @@ class AssistantTab extends StatefulWidget {
   State<AssistantTab> createState() => _AssistantTabState();
 }
 
-class _AssistantTabState extends State<AssistantTab> {
+class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMixin {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final List<Map<String, dynamic>> _messages = [
-    {
-      "role": "assistant",
-      "content": "Hello! I am your AI assistant for the **Chery Tiggo 7 PHEV CSH** in Malaysia.\n\nI can explain hybrid driving modes (AUTO, EV, HEV), assist with your upcoming 1,000 km CarLinko inspection, calculate TNB charging costs, or guide you on highway battery preservation.",
-      "citations": []
-    }
-  ];
+  final List<Map<String, dynamic>> _messages = [];
   bool _loading = false;
   bool _isListening = false;
+  TripRecord? _lastTrip;
+  DateTime? _lastServiceDate;
+  StreamSubscription? _telemetrySub;
 
-  Future<void> _listenVoice() async {
-    HapticFeedback.mediumImpact();
-    setState(() => _isListening = true);
+  late final AnimationController _listenPulseCtrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  )..repeat();
 
-    try {
-      final recognized = await VoiceRecognitionService.startListening();
-      if (!mounted) return;
-      setState(() => _isListening = false);
+  late final AnimationController _thinkingDotsCtrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat();
 
-      if (recognized != null && recognized.trim().isNotEmpty) {
-        _controller.text = recognized;
-        _sendMessage(recognized);
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isListening = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Voice Command: $e'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-    }
+  @override
+  void initState() {
+    super.initState();
+    _loadInitialData();
   }
 
-  final List<String> _suggestions = [
-    "Why hasn't my petrol engine started in AUTO mode?",
-    "When is my 1,000 km CarLinko inspection due?",
-    "How much is my 20,000 km & 40,000 km service?",
-    "When do I replace 3DHT transmission oil & spark plugs?",
-    "Calculate 100 km charging cost vs petrol"
-  ];
-
-  Future<void> _sendMessage(String text) async {
-    if (text.trim().isEmpty) return;
-    _controller.clear();
-
-    setState(() {
-      _messages.add({"role": "user", "content": text});
-      _loading = true;
+  void _loadInitialData() {
+    loadLatestSavedTrip().then((t) {
+      if (mounted) setState(() => _lastTrip = t);
     });
-    _scrollToBottom();
 
-    // 1. Direct Cloud AI call if API key is provided
-    if (widget.settings.aiApiKey.trim().isNotEmpty) {
-      final config = AiConfigResolver.resolve(
-        apiKey: widget.settings.aiApiKey,
-        provider: widget.settings.aiProvider,
-        modelInput: widget.settings.aiModel,
-        customHost: widget.settings.aiHost,
-      );
-
-      try {
-        final client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
-        final request = await client.postUrl(Uri.parse(config.endpoint));
-        config.headers.forEach((k, v) => request.headers.set(k, v));
-
-        final systemPrompt = "You are TiggoMate AI, personal vehicle assistant for the Chery Tiggo 7 PHEV CSH in Malaysia.\n"
-            "Owner: ${widget.settings.ownerName}, Vehicle Plate: ${widget.settings.carPlateNumber}, Nickname: ${widget.settings.vehicleNickname}.\n"
-            "Vehicle Specs: 1.5L Turbo + 3-speed Dedicated Hybrid Transmission (3DHT) + Dual Electric Motors, 240 kW (326 PS) / 545 Nm system torque.\n"
-            "Tyres & Wheels: 225/55 R19 99V tyres, 19-inch Aero Alloy Wheels (5x108 PCD). Cold Tyre Pressure: 230 kPa (2.3 bar / 33.4 psi) on all 4 tyres. Spare tyre: tyre repair sealant kit + 12V air compressor under boot luggage floor.\n"
-            "19.27 kWh LFP battery pack (80-100 km EV range), 51L petrol tank (~1,000-1,200 km combined range). Type 2 AC charging (6.6 kW, ~2.8 hours 0-100%). AUTO mode prioritizes EV until battery drops below ~20-25% SOC or hard acceleration.\n"
-            "Engine Oil: Fully Synthetic C5 0W-20 (4.7L, RM 270.00). Spark plugs: replaced every 30,000 km (RM 308.40). Major powertrain fluids: 40,000 km (3DHT transmission oil RM 399.20, coolant RM 141.80, brake fluid RM 100.00).\n"
-            "Official Service Milestones (27 Aug 2026): 1k km (FOC), 10k km (RM 407.50), 20k km (RM 444.60, FOC labour), 30k km (RM 715.90), "
-            "40k km (RM 1,085.60, FOC labour), 60k km (RM 753.00, FOC labour), 120k km (RM 1,644.00 major overhaul). Free labour at 1k, 20k, 40k, 60k, 80k, 100k km. TNB: RM ${widget.settings.tnbTariff}/kWh, RON95: RM ${widget.settings.fuelPrice}/L.\n"
-            "Warranty: 7 Years / 150,000 km vehicle warranty, 8 Years / 160,000 km battery & hybrid system warranty (1-to-1 replacement if SOH < 70%).\n"
-            "Always be helpful, concise, format answers in markdown with bolding and bullet lists, and answer directly based on Chery Tiggo 7 PHEV Malaysian specs.";
-
-        // Notice: _messages already contains the user message from line 1259, so we pass _messages directly!
-        final conversation = [
-          {"role": "system", "content": systemPrompt},
-          ..._messages.map((m) => {"role": m["role"], "content": m["content"]}),
-        ];
-
-        final payload = jsonEncode({
-          "model": config.model,
-          "messages": conversation,
-          "temperature": 0.5,
-          "max_tokens": 1024,
-        });
-
-        final utf8Payload = utf8.encode(payload);
-        request.headers.contentLength = utf8Payload.length;
-        request.add(utf8Payload);
-        final res = await request.close();
-        final rawBody = await res.transform(utf8.decoder).join();
-
-        if (res.statusCode == 200) {
-          final data = jsonDecode(rawBody);
-          final replyContent = data["choices"]?[0]?["message"]?["content"];
-          if (replyContent != null && replyContent.toString().trim().isNotEmpty) {
-            setState(() {
-              _messages.add({
-                "role": "assistant",
-                "content": replyContent.toString().trim(),
-                "citations": [
-                  {"document": "${config.providerName} (${config.model})", "section": "Live Cloud AI", "page": 1}
-                ],
-              });
-              _loading = false;
-            });
-            _scrollToBottom();
-            return;
-          }
-        } else {
-          // Parse exact error from provider
-          String errorDesc = "HTTP ${res.statusCode}";
-          try {
-            final data = jsonDecode(rawBody);
-            if (data is Map && data.containsKey("error")) {
-              final errObj = data["error"];
-              if (errObj is Map && errObj.containsKey("message")) {
-                errorDesc = errObj["message"].toString();
-              } else {
-                errorDesc = errObj.toString();
-              }
-            } else if (data is Map && data.containsKey("message")) {
-              errorDesc = data["message"].toString();
-            }
-          } catch (_) {}
-
-          setState(() {
-            _messages.add({
-              "role": "assistant",
-              "content": "⚠️ **Live Cloud AI Failed (${config.providerName})**\n\n"
-                  "**Error (${res.statusCode}):** $errorDesc\n\n"
-                  "💡 *Tip:* Test your key in **Settings ➔ AI Configuration ➔ Test AI Connection**.\n\n"
-                  "---\n"
-                  "*(Local Vehicle Handbook Response Below)*",
-              "citations": [
-                {"document": "${config.providerName} Error", "section": "API Diagnostic", "page": 1}
-              ],
-            });
-          });
-        }
-      } catch (e) {
-        setState(() {
-          _messages.add({
-            "role": "assistant",
-            "content": "⚠️ **Cloud Connection Error (${config.providerName})**\n\n"
-                "**Details:** $e\n\n"
-                "---\n"
-                "*(Local Vehicle Handbook Response Below)*",
-            "citations": [
-              {"document": "Network Diagnostics", "section": "Connection Error", "page": 1}
-            ],
-          });
-        });
+    _telemetrySub = AppVehicleRepository.instance.telemetryStream.listen((_) {
+      if (mounted) setState(() {});
+    });
+    SharedPreferences.getInstance().then((prefs) {
+      final str = prefs.getString('tm_last_service_date');
+      if (str != null && str.isNotEmpty && mounted) {
+        setState(() => _lastServiceDate = DateTime.tryParse(str));
       }
-    }
-
-    // 2. Local grounded fallback with comprehensive Chery Tiggo 7 PHEV specifications
-    await Future.delayed(const Duration(milliseconds: 400));
-    String answer = "";
-    List<dynamic> citations = [];
-
-    String q = text.toLowerCase();
-    if (q.contains("tyre") || q.contains("tire") || q.contains("pressure") || q.contains("wheel") || q.contains("rim") || q.contains("tpms") || q.contains("tayar")) {
-      answer = "### Chery Tiggo 7 PHEV CSH — Tyre & Wheel Specifications\n\n"
-          "- **Standard Tyre Size:** **225/55 R19 99V**\n"
-          "- **Wheel Rim:** **19-inch Multi-Spoke Aero Alloy Wheels** (PCD: **5x108**)\n"
-          "- **Recommended Cold Tyre Pressure:** **230 kPa (2.3 bar / 33.4 psi)** on all 4 wheels\n"
-          "- **High-Speed / Heavy Load (>160 km/h):** **250 kPa (2.5 bar / 36.3 psi)**\n"
-          "- **TPMS Type:** Direct Real-Time Sensor Telemetry (reads live individual tyre kPa & temperature on cluster and in TiggoMate app)\n"
-          "- **Spare Tyre:** Temporary Tyre Repair Sealant Kit with 12V High-Output Compressor located beneath the boot floor\n\n"
-          "> **Manual Citation:** *Chery Tiggo 7 PHEV Malaysian Market Guide & Owner's Handbook*, Section: *Wheels & Tyres*, Page 184.";
-      citations = [{"document": "Chery Tiggo 7 PHEV Malaysian Market Guide", "section": "Wheels & Tyres", "page": 184}];
-    } else if (q.contains("battery") || q.contains("kwh") || q.contains("capacity") || q.contains("range") || (q.contains("charge") && !q.contains("cost"))) {
-      answer = "### Chery Tiggo 7 PHEV CSH — Battery & Electric Driving Range\n\n"
-          "- **Traction Battery:** **19.27 kWh LFP (Lithium Iron Phosphate)** High-Safety Blade Cells\n"
-          "- **Pure Electric Driving Range:** **80 – 100 km (NEDC)** / **~90 km (WLTP)**\n"
-          "- **Total Combined Hybrid Range:** **~1,200 km** (51L fuel tank + 19.27 kWh battery)\n"
-          "- **AC Charging Port:** **Type 2 Mennekes** (supports 6.6 kW AC and 40 kW DC fast charging)\n"
-          "- **Recommended Charging Habit:** Daily AC charging at home (TNB off-peak 10:00 PM – 08:00 AM @ RM 0.28/kWh = ~RM 4.20 full top-up)\n"
-          "- **Battery Warranty:** **8 Years / 160,000 km** with 1-to-1 replacement if State of Health (SOH) drops below 70%\n\n"
-          "> **Manual Citation:** *Chery Tiggo 7 PHEV Malaysian Market Guide*, Section: *High Voltage Hybrid System*, Page 42.";
-      citations = [{"document": "Chery Tiggo 7 PHEV Malaysian Market Guide", "section": "High Voltage Battery", "page": 42}];
-    } else if (q.contains("warranty") || q.contains("guarantee") || q.contains("jaminan")) {
-      answer = "### Chery Malaysia Official Warranty Coverage\n\n"
-          "- **General Vehicle Warranty:** **7 Years or 150,000 km** (bumper-to-bumper manufacturer warranty)\n"
-          "- **Hybrid Battery & Power Electronics:** **8 Years or 160,000 km** (1-to-1 replacement if SOH drops below 70%)\n"
-          "- **Free Labour Vouchers:** Applicable at 1k, 20k, 40k, 60k, 80k, and 100k km scheduled service intervals\n"
-          "- **24/7 Chery Roadside Assistance:** Toll-Free **1800-88-2868** throughout Peninsular & East Malaysia\n\n"
-          "> **Manual Citation:** *Chery Malaysia Warranty Booklet & Service Terms*, 2026 Edition.";
-      citations = [{"document": "Chery Malaysia Warranty Terms", "section": "Warranty Coverage", "page": 1}];
-    } else if (q.contains("oil") && !q.contains("trans") && !q.contains("3dht") && !q.contains("gearbox")) {
-      answer = "### Chery Tiggo 7 PHEV Engine Oil Specification\n\n"
-          "- **Specification:** Fully Synthetic **C5 0W-20** (Low SAPS for high-efficiency turbocharged hybrid engines)\n"
-          "- **Capacity:** **4.7 Litres** with oil filter replacement\n"
-          "- **Official Service Cost:** **RM 270.00** (Engine Oil C5 0W-20 4.7L) + RM 34.00 (Filter) + RM 3.50 (Washer) = **RM 307.50**\n"
-          "- **Replacement Interval:** Every **10,000 km or 6 Months**\n\n"
-          "> **Manual Citation:** *Chery Tiggo 7 PHEV CSH Service Schedule & Pricing Guide*, 27 August 2026.";
-      citations = [{"document": "Chery Tiggo 7 PHEV CSH Service Schedule", "section": "Engine Lubrication", "page": 1}];
-    } else if (q.contains("power") || q.contains("torque") || q.contains("hp") || q.contains("ps") || q.contains("dht") || q.contains("spec") || q.contains("speed")) {
-      answer = "### Chery Tiggo 7 PHEV CSH — Powertrain & Performance Specs\n\n"
-          "- **Engine:** 1.5L Turbocharged 4-cylinder Hybrid Petrol Engine (156 PS / 230 Nm)\n"
-          "- **Electric Drive:** Dual Electric Motors integrated with **3-speed DHT (Dedicated Hybrid Transmission)**\n"
-          "- **Combined System Output:** **240 kW (326 PS) / 545 Nm Torque**\n"
-          "- **0-100 km/h Acceleration:** **~7.5 seconds**\n"
-          "- **Fuel Tank:** 60 Litres (RON 95 minimum)\n"
-          "- **Driving Modes:** EV Mode (Pure Electric), HEV Mode (Series/Parallel Hybrid), AUTO Mode (Intelligent Energy Management)\n\n"
-          "> **Manual Citation:** *Chery Tiggo 7 PHEV Malaysian Market Guide*, Section: *Technical Specifications*, Page 12.";
-      citations = [{"document": "Chery Tiggo 7 PHEV Malaysian Market Guide", "section": "Technical Specifications", "page": 12}];
-    } else if (q.contains("engine") || q.contains("start") || q.contains("auto")) {
-      answer = "### Why the Petrol Engine Has Not Started\n\nIn your **Chery Tiggo 7 PHEV CSH**, the default driving mode is **AUTO Mode**. In AUTO mode, the 1.5L turbocharged petrol engine does **not** start immediately when driving off or cruising.\n\n- **Current Battery SOC:** 78%\n- **Engine Trigger Threshold:** The vehicle preserves fuel and drives purely on electric motors until battery SOC drops below ~20-25%, or sudden heavy acceleration (kickdown) is demanded.\n\n> **Manual Citation:** *Chery Tiggo 7 PHEV Malaysian Market Guide & Owner's Handbook*, Section: *Driving Modes*, Page 28.";
-      citations = [{"document": "Chery Tiggo 7 PHEV Malaysian Market Guide", "section": "Driving Modes", "page": 28}];
-    } else if (q.contains("1000") || q.contains("1,000") || (q.contains("inspection") && !q.contains("40") && !q.contains("20"))) {
-      answer = "### 1,000 km Free Inspection & CarLinko Activation\n\nYour CarLinko telematics service is **pending activation** at your **1,000 km / 1-Month First Free Inspection**.\n\n- **Due at:** 1,000 km (160 km remaining)\n- **Cost:** **FOC (Free of Charge)**\n- **Dealer Tasks:** DMS pairing with VIN, 3DHT & BMS hybrid diagnostic scan, high-voltage orange harness torque check, factory tyre pressure check.\n\n> **Manual Citation:** *Chery Tiggo 7 PHEV CSH Service Schedule & Pricing Guide*, 27 August 2026.";
-      citations = [{"document": "Chery Tiggo 7 PHEV CSH Service Schedule", "section": "1,000 km Milestone", "page": 1}];
-    } else if (q.contains("20000") || q.contains("20,000") || q.contains("20k")) {
-      answer = "### 20,000 km / Month 12 Service Pricing\n\nFor your 20,000 km milestone, the compulsory service fee is **RM 444.60**:\n\n- **Labour Fee:** **FREE (FOC Voucher)**\n- **Engine Oil C5 0W-20 (4.7L):** RM 270.00\n- **Engine Oil Filter:** RM 34.00\n- **Engine Oil Washer:** RM 3.50\n- **Element Air Filter:** RM 137.10\n- **Compulsory Total:** **RM 444.60**\n- **Recommended Addition:** Wiper Blades (R & L) at RM 178.30 (Total: **RM 622.90**)\n\n> **Manual Citation:** *Chery Tiggo 7 PHEV CSH Service Schedule & Pricing Guide*, 27 August 2026.";
-      citations = [{"document": "Chery Tiggo 7 PHEV CSH Service Schedule", "section": "20,000 km Milestone", "page": 1}];
-    } else if (q.contains("40000") || q.contains("40,000") || q.contains("40k")) {
-      answer = "### 40,000 km / Month 24 Major Hybrid Service Pricing\n\nYour 40,000 km milestone is a **Major Service** with **FREE Labour (FOC)**:\n\n- **Labour Fee:** **FREE (FOC Voucher)**\n- **Engine Oil C5 0W-20 (4.7L):** RM 270.00\n- **Engine Oil Filter & Washer:** RM 37.50\n- **Element Air Filter:** RM 137.10\n- **Transmission Oil (3.5L):** RM 399.20\n- **Coolant (4L):** RM 141.80\n- **Brake Fluid (0.85L):** RM 100.00\n- **Compulsory Total:** **RM 1,085.60**\n- **Recommended Additions:** Transmission Filter (RM 68.60) + Wiper Blades (RM 178.30) = **RM 1,332.50**\n\n> **Manual Citation:** *Chery Tiggo 7 PHEV CSH Service Schedule & Pricing Guide*, 27 August 2026.";
-      citations = [{"document": "Chery Tiggo 7 PHEV CSH Service Schedule", "section": "40,000 km Milestone", "page": 1}];
-    } else if (q.contains("spark") || q.contains("plug")) {
-      answer = "### Spark Plug Replacement Interval & Cost\n\nIn your **Chery Tiggo 7 PHEV CSH**, spark plugs are replaced every **30,000 km**:\n\n- **Replacement Milestones:** 30k, 60k, 90k, 120k, and 150k km\n- **Part Cost:** **RM 308.40** per set\n- **Compulsory Service Totals:**\n  - 30,000 km: **RM 715.90** (includes oil + plugs + RM 100 labour)\n  - 60,000 km: **RM 753.00** (FOC Labour! includes oil + air filter + plugs)\n  - 120,000 km: **RM 1,644.00** (Full major overhaul)\n\n> **Manual Citation:** *Chery Tiggo 7 PHEV CSH Service Schedule & Pricing Guide*, 27 August 2026.";
-      citations = [{"document": "Chery Tiggo 7 PHEV CSH Service Schedule", "section": "Spark Plugs", "page": 1}];
-    } else if (q.contains("transmission") || q.contains("3dht") || q.contains("gearbox") || q.contains("coolant") || q.contains("brake fluid")) {
-      answer = "### Transmission Oil, Coolant & Brake Fluid Schedule\n\nUnder Chery Malaysia's official PHEV schedule, major powertrain fluids are replaced every **40,000 km / 24 Months**:\n\n- **Transmission Oil (3.5L):** **RM 399.20** (for 3-speed Dedicated Hybrid Transmission)\n- **Engine Coolant (4L):** **RM 141.80**\n- **Brake Fluid (0.85L):** **RM 100.00**\n- **Optional Transmission Filter:** **RM 68.60**\n- **Due at:** 40,000 km, 80,000 km, and 120,000 km\n\n> **Manual Citation:** *Chery Tiggo 7 PHEV CSH Service Schedule & Pricing Guide*, 27 August 2026.";
-      citations = [{"document": "Chery Tiggo 7 PHEV CSH Service Schedule", "section": "Fluid Replacement Intervals", "page": 1}];
-    } else if (q.contains("service") || q.contains("schedule") || q.contains("price") || q.contains("pricing") || q.contains("maintenance")) {
-      answer = "### Chery Tiggo 7 PHEV CSH Service Schedule Overview\n\nKey points from the official 27 August 2026 schedule:\n\n- **1,000 km:** 1st Inspection — **FOC**\n- **10,000 km:** Oil Service — **RM 407.50**\n- **20,000 km:** Oil + Air Filter — **RM 444.60 (Free Labour)**\n- **30,000 km:** Oil + Spark Plugs — **RM 715.90**\n- **40,000 km:** Major Service (Trans Oil, Coolant, Brake Fluid) — **RM 1,085.60 (Free Labour)**\n- **60,000 km:** Major Service (Air Filter + Plugs) — **RM 753.00 (Free Labour)**\n- **Free Labour Milestones:** 1k, 20k, 40k, 60k, 80k, and 100k km!\n\n> **Manual Citation:** *Chery Tiggo 7 PHEV CSH Service Schedule & Pricing Guide*, 27 August 2026.";
-      citations = [{"document": "Chery Tiggo 7 PHEV CSH Service Schedule", "section": "Overview", "page": 1}];
-    } else if (q.contains("cost") || q.contains("petrol") || q.contains("saving")) {
-      answer = "### Tiggo 7 PHEV Energy & Running Cost Breakdown (100 km Baseline)\n\n- **Home AC Electricity:** 12.25 kWh @ RM 0.57/kWh (TNB) = **RM 6.98**\n- **Petrol:** 1.56 L @ RM 2.05/L = **RM 3.20**\n- **Total PHEV Cost:** **RM 10.18 / 100 km** (RM 0.102 / km)\n- **Pure Petrol SUV Benchmark:** 7.8 L/100km = **RM 15.99**\n\n🎉 **Savings:** You save **RM 5.81 per 100 km (~36.3% savings)**!";
-      citations = [{"document": "TNB Residential Tariff Schedule & KPDN RON95 Gazette", "section": "Energy Economics", "page": 1}];
-    } else {
-      answer = "In your **Chery Tiggo 7 PHEV CSH**, power is delivered through the **3-speed DHT** paired with a 1.5T turbocharged engine and dual electric motors (240 kW / 545 Nm system output). Ask me about tyre size (225/55 R19), AUTO/EV/HEV modes, 1,000 km inspection, warranty, service schedules, or charging!";
-    }
-
-    setState(() {
-      _messages.add({
-        "role": "assistant",
-        "content": answer,
-        "citations": citations,
-      });
-      _loading = false;
     });
-    _scrollToBottom();
+  }
+
+  @override
+  void dispose() {
+    _listenPulseCtrl.dispose();
+    _thinkingDotsCtrl.dispose();
+    _telemetrySub?.cancel();
+    _controller.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   void _scrollToBottom() {
@@ -1008,260 +831,1246 @@ class _AssistantTabState extends State<AssistantTab> {
     });
   }
 
+  Future<void> _listenVoice() async {
+    HapticFeedback.mediumImpact();
+    setState(() => _isListening = true);
+
+    try {
+      final recognized = await VoiceRecognitionService.startListening();
+      if (!mounted) return;
+      setState(() => _isListening = false);
+
+      if (recognized != null && recognized.trim().isNotEmpty) {
+        _controller.text = recognized;
+        HapticFeedback.lightImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.mic, color: Color(0xFFD2F835), size: 18),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Heard: "$recognized"')),
+              ],
+            ),
+            duration: const Duration(seconds: 2),
+            backgroundColor: const Color(0xFF131922),
+          ),
+        );
+        _sendMessage(recognized);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No speech recognized. Tap mic to try again or type below.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isListening = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Voice Recognition: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
+  Map<String, dynamic>? _matchActionFromPrompt(String text) {
+    final lower = text.toLowerCase();
+    if (lower.contains('open') && (lower.contains('window') || lower.contains('tingkap'))) {
+      return {
+        'id': 'windows_open',
+        'title': 'Open All Windows',
+        'desc': 'Lowers all 4 power windows for cabin heat escape',
+        'icon': Icons.window_outlined,
+      };
+    } else if (lower.contains('close') && (lower.contains('window') || lower.contains('tingkap'))) {
+      return {
+        'id': 'windows_close',
+        'title': 'Close All Windows',
+        'desc': 'Fully closes and seals all 4 windows with anti-pinch protection',
+        'icon': Icons.window_rounded,
+      };
+    } else if (lower.contains('aircond') || lower.contains('ac') || lower.contains('cool') || lower.contains('climate')) {
+      if (lower.contains('off') || lower.contains('stop') || lower.contains('tutup')) {
+        return {
+          'id': 'climate_off',
+          'title': 'Turn Off A/C & Climate',
+          'desc': 'Shuts down compressor and ventilation fans',
+          'icon': Icons.power_settings_new_rounded,
+        };
+      } else {
+        return {
+          'id': 'climate_on',
+          'title': 'Pre-cool Cabin (22°C)',
+          'desc': 'Activates high-voltage A/C compressor and cabin pre-conditioning',
+          'icon': Icons.ac_unit_rounded,
+        };
+      }
+    } else if (lower.contains('engine') || lower.contains('enjin')) {
+      if (lower.contains('stop') || lower.contains('off') || lower.contains('mati')) {
+        return {
+          'id': 'engine_stop',
+          'title': 'Remote Engine Stop',
+          'desc': 'Stops the 1.5T hybrid engine safely',
+          'icon': Icons.power_settings_new_rounded,
+        };
+      } else {
+        return {
+          'id': 'engine_start',
+          'title': 'Remote Engine Pre-Warm',
+          'desc': 'Starts 1.5T engine for 10-minute powertrain pre-warming',
+          'icon': Icons.key_rounded,
+        };
+      }
+    } else if (lower.contains('lock') || lower.contains('kunci')) {
+      if (lower.contains('unlock') || lower.contains('buka')) {
+        return {
+          'id': 'unlock',
+          'title': 'Unlock Doors',
+          'desc': 'Unlocks central locking system',
+          'icon': Icons.lock_open_rounded,
+        };
+      } else {
+        return {
+          'id': 'lock',
+          'title': 'Lock Vehicle Doors',
+          'desc': 'Secures all doors and arms alarm system',
+          'icon': Icons.lock_outline_rounded,
+        };
+      }
+    }
+    return null;
+  }
+
+  IconData _getIconForAction(String actionId) {
+    switch (actionId) {
+      case 'windows_open':
+      case 'windows_vent':
+        return Icons.window_outlined;
+      case 'windows_close':
+        return Icons.window_rounded;
+      case 'climate_on':
+        return Icons.ac_unit_rounded;
+      case 'climate_off':
+        return Icons.power_settings_new_rounded;
+      case 'door_lock':
+      case 'lock':
+        return Icons.lock_outline_rounded;
+      case 'door_unlock':
+      case 'unlock':
+        return Icons.lock_open_rounded;
+      case 'sunroof_open':
+      case 'sunroof_close':
+        return Icons.roofing_rounded;
+      case 'trunk_open':
+        return Icons.sensor_door_outlined;
+      case 'engine_start':
+        return Icons.key_rounded;
+      case 'engine_stop':
+        return Icons.power_settings_new_rounded;
+      case 'schedule_charging':
+        return Icons.ev_station_rounded;
+      case 'check_tnb':
+        return Icons.bolt_rounded;
+      default:
+        return Icons.bolt_rounded;
+    }
+  }
+
+  Future<void> _sendMessage(String text) async {
+    if (text.trim().isEmpty) return;
+    _controller.clear();
+
+    setState(() {
+      _messages.add({"role": "user", "content": text});
+      _loading = true;
+    });
+    _scrollToBottom();
+
+    final telemetry = AppVehicleRepository.instance.currentTelemetry;
+    final currentKm = AppVehicleRepository.instance.isVehicleBound && telemetry.odometerKm > 0
+        ? telemetry.odometerKm
+        : 2197;
+    final kmLeft = (10000 - currentKm).clamp(0, 10000);
+    final daysLeft = _lastServiceDate != null
+        ? (180 - DateTime.now().difference(_lastServiceDate!).inDays).clamp(1, 365)
+        : (kmLeft / 52.7).round().clamp(1, 365);
+    final nextServiceInfo = 'Next Scheduled Service: Minor Service (10k) in $kmLeft km / ~$daysLeft days';
+
+    final liveStatus = [
+      'Doors: ${telemetry.doorsOpen ? "OPEN / AJAR" : "All Doors Closed & Secured"}',
+      '12V Auxiliary Battery: ${telemetry.volt12 > 0 ? "${telemetry.volt12.toStringAsFixed(2)}V" : "12.82V (Healthy)"}',
+      'Traction Battery SoC: ${telemetry.batteryPct}% (~${(telemetry.batteryPct * 0.85).round()} km EV range)',
+      'Fuel Remaining: ${telemetry.fuelCapacityPct}% (~${telemetry.fuelRangeKm > 0 ? telemetry.fuelRangeKm : 740} km petrol range, ${telemetry.fuelConsumptionL100km > 0 ? "${telemetry.fuelConsumptionL100km.toStringAsFixed(1)} L/100km" : "6.1 L/100km"})',
+      'Tyre Pressures (Cold Target 230 kPa): FL ${telemetry.tyreFlPressureKpa.round()} kPa, FR ${telemetry.tyreFrPressureKpa.round()} kPa, RL ${telemetry.tyreRlPressureKpa.round()} kPa, RR ${telemetry.tyreRrPressureKpa.round()} kPa',
+      'Cabin Climate / AC: ${telemetry.acOn ? "ON (${telemetry.acTemp}°C)" : "OFF"}',
+      'Windows: ${telemetry.windowsOpen ? "Open" : "Closed"}',
+      'Sunroof: ${telemetry.sunroofOpen ? "Open" : "Closed"}',
+      'Transmission State: ${telemetry.isParked ? "Parked (P)" : "Drive / Moving"}',
+      if (telemetry.locationName.isNotEmpty && telemetry.locationName != 'Pending Car Bind')
+        'Current Location: ${telemetry.locationName} (${telemetry.latitude != 0.0 ? "${telemetry.latitude.toStringAsFixed(5)}, ${telemetry.longitude.toStringAsFixed(5)}" : ""})',
+    ].join('\n- ');
+
+    // 1. Direct Cloud AI Call with FULL Live Telematics Grounding
+    if (widget.settings.aiApiKey.trim().isNotEmpty) {
+      try {
+        final history = <Map<String, String>>[];
+        for (final m in _messages.reversed.take(6).toList().reversed) {
+          if (m['role'] == 'user' && m['content'] != null) {
+            history.add({'role': 'user', 'content': m['content'] as String});
+          } else if (m['role'] == 'assistant' && m['content'] != null) {
+            history.add({'role': 'assistant', 'content': m['content'] as String});
+          }
+        }
+        if (history.isNotEmpty && history.last['content'] == text) {
+          history.removeLast();
+        }
+
+        final aiReply = await AiConfigResolver.queryAi(
+          prompt: text,
+          apiKey: widget.settings.aiApiKey,
+          provider: widget.settings.aiProvider,
+          modelInput: widget.settings.aiModel,
+          customHost: widget.settings.aiHost,
+          batteryPct: telemetry.batteryPct > 0 ? telemetry.batteryPct : 78,
+          carPlate: widget.settings.carPlateNumber,
+          odometerKm: currentKm,
+          nextServiceInfo: nextServiceInfo,
+          liveStatusBlock: liveStatus,
+          history: history,
+        );
+
+        if (!mounted) return;
+
+        Map<String, dynamic>? action;
+        String cleanText = aiReply;
+
+        final actionRegex = RegExp(r'\[ACTION:\s*([a-zA-Z0-9_]+)\s*\|\s*([^|]+)\s*\|\s*([^\]]+)\]');
+        final match = actionRegex.firstMatch(aiReply);
+        if (match != null) {
+          final actId = match.group(1)!.trim();
+          action = {
+            'id': actId,
+            'title': match.group(2)!.trim(),
+            'desc': match.group(3)!.trim(),
+            'icon': _getIconForAction(actId),
+          };
+          cleanText = aiReply.replaceFirst(match.group(0)!, '').trim();
+        } else {
+          action = _matchActionFromPrompt(text);
+        }
+
+        setState(() {
+          _messages.add({
+            'role': 'assistant',
+            'content': cleanText,
+            'citations': [
+              {"document": "Live AI (${widget.settings.aiModel.isNotEmpty ? widget.settings.aiModel : 'Claude'})", "section": "Live Telematics Grounded", "page": 1}
+            ],
+            'action': action,
+          });
+          _loading = false;
+        });
+        _scrollToBottom();
+        return;
+      } catch (e) {
+        debugPrint('Direct AI Engine Call failed, falling back to Grounded Offline Telematics: $e');
+      }
+    }
+
+    // 2. Offline Grounded Telematics & Knowledge Base Fallback
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+
+    final q = text.toLowerCase();
+    String answer;
+    List<Map<String, dynamic>> citations = [];
+    Map<String, dynamic>? action = _matchActionFromPrompt(text);
+
+    if (q.contains("battery") || q.contains("soc") || q.contains("charge") || q.contains("range") || q.contains("bateri")) {
+      answer = "### Vehicle Battery & Range Telematics\n\n"
+          "- **Traction Battery SoC:** **${telemetry.batteryPct}%** (~${(telemetry.batteryPct * 0.85).round()} km EV range)\n"
+          "- **Fuel Tank:** **${telemetry.fuelCapacityPct}%** (~${telemetry.fuelRangeKm > 0 ? telemetry.fuelRangeKm : 740} km petrol range)\n"
+          "- **12V Auxiliary Battery:** **${telemetry.volt12 > 0 ? "${telemetry.volt12.toStringAsFixed(2)}V" : "12.82V (Healthy)"}**\n\n"
+          "Your 18.3 kWh LFP pack supports 6.6 kW AC charging (~2.8 hrs 0-100%).";
+      citations = [{"document": "Vehicle BMS Telematics", "section": "High-Voltage System", "page": 1}];
+    } else if (q.contains("tyre") || q.contains("tire") || q.contains("pressure") || q.contains("tpms") || q.contains("tayar")) {
+      answer = "### Direct TPMS Tyre Pressure Telematics\n\n"
+          "Target cold pressure: **230 kPa (2.3 bar / 33.4 psi)**\n\n"
+          "- **Front Left (FL):** **${telemetry.tyreFlPressureKpa.round()} kPa** (${telemetry.tyreFlPressureKpa >= 220 && telemetry.tyreFlPressureKpa <= 245 ? 'Optimal ✓' : 'Inspect'})\n"
+          "- **Front Right (FR):** **${telemetry.tyreFrPressureKpa.round()} kPa** (${telemetry.tyreFrPressureKpa >= 220 && telemetry.tyreFrPressureKpa <= 245 ? 'Optimal ✓' : 'Inspect'})\n"
+          "- **Rear Left (RL):** **${telemetry.tyreRlPressureKpa.round()} kPa** (${telemetry.tyreRlPressureKpa >= 220 && telemetry.tyreRlPressureKpa <= 245 ? 'Optimal ✓' : 'Inspect'})\n"
+          "- **Rear Right (RR):** **${telemetry.tyreRrPressureKpa.round()} kPa** (${telemetry.tyreRrPressureKpa >= 220 && telemetry.tyreRrPressureKpa <= 245 ? 'Optimal ✓' : 'Inspect'})";
+      citations = [{"document": "Direct TPMS Sensors", "section": "Chassis Telematics", "page": 1}];
+    } else if (q.contains("odometer") || q.contains("mileage") || q.contains("distance") || q.contains("batu")) {
+      answer = "### Current Vehicle Mileage\n\n"
+          "- **Current Odometer:** **$currentKm km**\n"
+          "- **Next Service:** **Minor Service (10k)** in **$kmLeft km** (~**$daysLeft days**)\n"
+          "- **Total Lifetime Fuel Avg:** **${telemetry.fuelConsumptionL100km > 0 ? "${telemetry.fuelConsumptionL100km.toStringAsFixed(1)} L/100km" : "6.10 L/100km"}**";
+      citations = [{"document": "Instrument Cluster Telematics", "section": "Odometer & Trip", "page": 1}];
+    } else if (q.contains("door") || q.contains("pintu") || q.contains("lock") || q.contains("window") || q.contains("status") || q.contains("ajar")) {
+      answer = "### Body & Security Status\n\n"
+          "- **Doors:** ${telemetry.doorsOpen ? '**DOOR AJAR ⚠️**' : '**All Doors Closed & Locked ✓**'}\n"
+          "- **Windows:** ${telemetry.windowsOpen ? '**Open**' : '**Closed & Sealed ✓**'}\n"
+          "- **Sunroof:** ${telemetry.sunroofOpen ? '**Open**' : '**Closed ✓**'}\n"
+          "- **Parking State:** ${telemetry.isParked ? '**Parked (P)**' : '**In Motion**'}"
+          "${telemetry.locationName.isNotEmpty ? '\n- **Location:** ${telemetry.locationName}' : ''}";
+      citations = [{"document": "BCM Security Telematics", "section": "Perimeter Monitoring", "page": 1}];
+    } else if (q.contains("12v") || q.contains("voltage") || q.contains("voltan")) {
+      answer = "### 12V Auxiliary Battery Telematics\n\n"
+          "- **Current Voltage:** **${telemetry.volt12 > 0 ? "${telemetry.volt12.toStringAsFixed(2)}V" : "12.82V"}**\n"
+          "- **Threshold:** Alerts trigger below **12.00V**.\n"
+          "- **Health Status:** ${telemetry.volt12 >= 12.2 ? '**Healthy & Fully Operational ✓**' : '**Charge Advised (take a short drive)**'}";
+      citations = [{"document": "Vehicle Power Management", "section": "12V Low Voltage Rail", "page": 1}];
+    } else if (q.contains("location") || q.contains("where is") || q.contains("lokasi") || q.contains("find car") || q.contains("kedudukan")) {
+      final locText = telemetry.locationName.isNotEmpty && telemetry.locationName != 'Pending Car Bind'
+          ? telemetry.locationName
+          : (telemetry.latitude != 0.0 ? '${telemetry.latitude.toStringAsFixed(5)}, ${telemetry.longitude.toStringAsFixed(5)}' : 'Locating via GPS...');
+      answer = "### Vehicle Location & GPS Telematics\n\n"
+          "- **Address:** **$locText**\n"
+          "${telemetry.latitude != 0.0 ? '- **Coordinates:** **${telemetry.latitude.toStringAsFixed(5)}, ${telemetry.longitude.toStringAsFixed(5)}**\n' : ''}"
+          "- **Status:** ${telemetry.isParked ? 'Parked safely' : 'Vehicle is in transit'}\n\n"
+          "> **Radar:** Tap **Radar** from the Car dashboard to view live distance, compass bearing, and nearby DC fast chargers.";
+      citations = [{"document": "Vehicle GPS & Telematics", "section": "Navigation & Positioning", "page": 1}];
+    } else if (q.contains("auto") || q.contains("engine start") || q.contains("petrol engine") || q.contains("ev mode") || q.contains("hev")) {
+      answer = "### Understanding AUTO Mode & Hybrid Logic\n\nIn **AUTO Mode**, your Tiggo 7 PHEV acts primarily as a pure electric vehicle in city traffic:\n\n- **Electric First:** The dual electric motors drive the wheels silently using the 18.3 kWh battery.\n- **Engine Engagement:** The 1.5L Turbo engine only starts when:\n  1. Battery SOC drops below ~20-25%.\n  2. You apply heavy throttle for swift overtaking (kickdown).\n  3. Highway cruising speeds (>85 km/h) where direct engine drive via the 3-speed DHT 3rd gear is most efficient.\n\n> **Tip:** If your battery is well charged and you drive moderately, it is completely normal for the petrol engine to stay silent for weeks in city commutes!";
+      citations = [{"document": "Chery Tiggo 7 PHEV Owner's Manual", "section": "Powertrain & Drive Modes", "page": 142}];
+    } else if (q.contains("service") || q.contains("schedule") || q.contains("price") || q.contains("pricing") || q.contains("maintenance")) {
+      answer = "### Chery Tiggo 7 PHEV CSH Service Schedule Overview\n\nKey points from the official 27 August 2026 schedule:\n\n- **1,000 km:** 1st Inspection — **FOC**\n- **10,000 km:** Oil Service — **RM 407.50** (Due in **$kmLeft km** / **~$daysLeft days**)\n- **20,000 km:** Oil + Air Filter — **RM 444.60 (Free Labour)**\n- **30,000 km:** Oil + Spark Plugs — **RM 715.90**\n- **40,000 km:** Major Service (Trans Oil, Coolant, Brake Fluid) — **RM 1,085.60 (Free Labour)**\n- **60,000 km:** Major Service (Air Filter + Plugs) — **RM 753.00 (Free Labour)**\n- **Free Labour Milestones:** 1k, 20k, 40k, 60k, 80k, and 100k km!\n\n> **Manual Citation:** *Chery Tiggo 7 PHEV CSH Service Schedule & Pricing Guide*, 27 August 2026.";
+      citations = [{"document": "Chery Tiggo 7 PHEV CSH Service Schedule", "section": "Overview", "page": 1}];
+    } else if (q.contains("last trip") || q.contains("latest trip")) {
+      final lastTrip = await loadLatestSavedTrip();
+      if (!mounted) return;
+      if (lastTrip == null) {
+        answer = 'You have no trips logged yet. Record a drive or add a trip from the **Log** tab and I can break down its cost.';
+      } else {
+        final energy = [
+          if (lastTrip.electricKwh > 0) '${lastTrip.electricKwh.toStringAsFixed(1)} kWh',
+          if (lastTrip.petrolLitres > 0) '${lastTrip.petrolLitres.toStringAsFixed(1)} L of petrol',
+        ].join(' and ');
+        answer = 'Last trip was **${lastTrip.title} (${lastTrip.distanceKm.toStringAsFixed(1)} km)**. '
+            'Driven ${lastTrip.evRatio.round()}% on EV${energy.isEmpty ? '' : ' using $energy'}. '
+            'Total cost: **RM ${lastTrip.costRm.toStringAsFixed(2)}**.';
+      }
+      citations = [{"document": "Trips Logbook", "section": "Recent Drives", "page": 1}];
+    } else if (q.contains("cost") || q.contains("petrol") || q.contains("saving")) {
+      answer = "### Tiggo 7 PHEV Energy & Running Cost Breakdown (100 km Baseline)\n\n- **Home AC Electricity:** 12.25 kWh @ RM ${widget.settings.tnbTariff.toStringAsFixed(2)}/kWh (TNB) = **RM ${(12.25 * widget.settings.tnbTariff).toStringAsFixed(2)}**\n- **Petrol:** 1.56 L @ RM ${widget.settings.fuelPrice.toStringAsFixed(2)}/L = **RM ${(1.56 * widget.settings.fuelPrice).toStringAsFixed(2)}**\n- **Total PHEV Cost:** **RM ${(12.25 * widget.settings.tnbTariff + 1.56 * widget.settings.fuelPrice).toStringAsFixed(2)} / 100 km**\n- **Pure Petrol SUV Benchmark:** 7.8 L/100km = **RM ${(7.8 * widget.settings.fuelPrice).toStringAsFixed(2)}**\n\n🎉 **Savings:** You save **~36.3%** on fuel & electricity costs!";
+      citations = [{"document": "TNB Residential Tariff Schedule & KPDN RON95 Gazette", "section": "Energy Economics", "page": 1}];
+    } else if (q.contains("highway") || q.contains("plus") || q.contains("battery preservation")) {
+      answer = "### Highway Battery Management Strategy (e.g. PLUS Highway)\n\nWhen embarking on a long interstate journey:\n\n1. **Switch to HEV or AUTO at On-Ramp:** Avoid running pure EV at 110–120 km/h, which depletes the battery rapidly due to aerodynamic drag.\n2. **Hold SOC for City Driving:** Direct engine drive in 3DHT 3rd gear is thermally optimal on highways. Save battery power for dense traffic in Kuala Lumpur, Penang, or Johor Bahru.\n3. **Reserve Charge:** Keep battery above 30% to guarantee instant dual-motor torque for high-speed overtaking.";
+      citations = [{"document": "Chery Tiggo 7 PHEV Owner's Manual", "section": "CSH Hybrid Strategy", "page": 156}];
+    } else if (q.contains("window") || q.contains("tingkap")) {
+      answer = action != null && action['id'] == 'windows_open'
+          ? "I have prepared the command to lower all 4 power windows to release cabin heat. Tap execute below."
+          : "I have prepared the command to close and seal all 4 windows. Tap execute below.";
+      citations = [{"document": "CarLinko Telematics System", "section": "Body Control", "page": 1}];
+    } else if (q.contains("aircond") || q.contains("climate") || q.contains("cool")) {
+      answer = "Prepared climate command for your Tiggo 7 PHEV (${widget.settings.carPlateNumber}). The high-voltage compressor will cool the cabin before you board.";
+      citations = [{"document": "CarLinko Telematics System", "section": "Thermal Comfort", "page": 1}];
+    } else {
+      answer = "I understand you are asking about: \"$text\".\n\nYour Chery Tiggo 7 PHEV CSH is equipped with an intelligent dedicated hybrid system (3DHT, 240 kW / 545 Nm, 18.3 kWh battery).\n\n"
+          "- **Current Odometer:** **$currentKm km**\n"
+          "- **Battery SoC:** **${telemetry.batteryPct}%**\n"
+          "- **Tyres:** **FL ${telemetry.tyreFlPressureKpa.round()} kPa | FR ${telemetry.tyreFrPressureKpa.round()} kPa**\n"
+          "- **Doors:** ${telemetry.doorsOpen ? 'Door Ajar ⚠️' : 'Closed & Secured ✓'}\n"
+          "- **Next Service:** $nextServiceInfo";
+      citations = [{"document": "Chery Tiggo 7 PHEV Telematics", "section": "Vehicle Live State", "page": 1}];
+    }
+
+    setState(() {
+      _messages.add({
+        "role": "assistant",
+        "content": answer,
+        "citations": citations,
+        "action": action,
+      });
+      _loading = false;
+    });
+    _scrollToBottom();
+  }
+
+
+  void _showHabitsDetail(BuildContext context, bool isDark) {
+    final bgCol = isDark ? const Color(0xFF131922) : Colors.white;
+    final textPrimary = isDark ? Colors.white : const Color(0xFF0A0B0E);
+    final textMuted = isDark ? const Color(0xFF717684) : const Color(0xFF64748B);
+    final accent = context.tokens.accent;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: bgCol,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.trending_up_rounded, color: accent, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'Driving Habits & Efficiency',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Your Chery Tiggo 7 PHEV driving telemetry across logged trips in Malaysia.',
+              style: TextStyle(fontSize: 13, color: textMuted),
+            ),
+            const SizedBox(height: 16),
+            if (_lastTrip != null) ...[
+              Text(
+                'Latest Trip: ${_lastTrip!.title}',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textPrimary),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Distance: ${_lastTrip!.distanceKm.toStringAsFixed(1)} km · EV Ratio: ${_lastTrip!.evRatio.toStringAsFixed(0)}%',
+                style: TextStyle(fontSize: 12.5, color: textMuted),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Cost: RM ${_lastTrip!.costRm.toStringAsFixed(2)}',
+                style: TextStyle(fontSize: 12.5, color: accent, fontWeight: FontWeight.bold),
+              ),
+            ] else ...[
+              Text(
+                'No trips recorded yet. Log your drives from the LOG tab to calculate your PHEV electric vs petrol savings.',
+                style: TextStyle(fontSize: 13, color: textMuted),
+              ),
+            ],
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInsightCard({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String value,
+    required Color cardCol,
+    required Color borderCol,
+    required Color textPrimary,
+    required Color textMuted,
+    VoidCallback? onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: cardCol,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderCol, width: 1.0),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, size: 14, color: iconColor),
+                  const SizedBox(width: 6),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.2,
+                      color: textMuted,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                value,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: textPrimary,
+                  height: 1.25,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInstructionChip({
+    required String label,
+    required VoidCallback onTap,
+    required bool isDark,
+    required Color cardCol,
+    required Color borderCol,
+    required Color textPrimary,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: cardCol,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: borderCol, width: 1.0),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: textPrimary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgCol = isDark ? const Color(0xFF0A0B0E) : const Color(0xFFF6F8FA);
+    final cardCol = isDark ? const Color(0xFF131922) : Colors.white;
+    final borderCol = isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0);
+    final textMuted = isDark ? const Color(0xFF717684) : const Color(0xFF64748B);
+    final textPrimary = isDark ? Colors.white : const Color(0xFF0A0B0E);
     final accent = context.tokens.accent;
-    final onAccent = context.tokens.onAccent;
 
-    return Column(
-      children: [
-        // Chat Header
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF131922) : Colors.white,
-            border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB))),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.auto_awesome, color: accent, size: 18),
-                  const SizedBox(width: 8),
-                  const Text('TiggoMate AI Assistant', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                ],
+    final telemetry = AppVehicleRepository.instance.currentTelemetry;
+
+    final String lastTripText = _lastTrip != null && _lastTrip!.distanceKm > 0
+        ? '${_lastTrip!.title} (${_lastTrip!.distanceKm.toStringAsFixed(1)} km)'
+        : 'No trips logged yet';
+
+    final String conditionText;
+    if (telemetry.doorsOpen) {
+      conditionText = 'Door Ajar';
+    } else if (telemetry.volt12 > 0 && telemetry.volt12 < 12.0) {
+      conditionText = 'Low 12V (${telemetry.volt12.toStringAsFixed(1)}V)';
+    } else if (telemetry.isParked) {
+      conditionText = 'Parked & Secure';
+    } else {
+      conditionText = 'All Systems Normal';
+    }
+
+    final currentKm = AppVehicleRepository.instance.isVehicleBound && telemetry.odometerKm > 0
+        ? telemetry.odometerKm
+        : 2197;
+    final kmLeft = (10000 - currentKm).clamp(0, 10000);
+    final daysLeft = _lastServiceDate != null
+        ? (180 - DateTime.now().difference(_lastServiceDate!).inDays).clamp(1, 365)
+        : (kmLeft / 52.7).round().clamp(1, 365);
+    final reminderText = 'Minor Service (10k) in $kmLeft km / ~$daysLeft days';
+
+    final String habitsText = _lastTrip != null && _lastTrip!.distanceKm > 0
+        ? '${_lastTrip!.evRatio.round()}% EV Driving'
+        : 'No trips logged yet';
+
+    return Scaffold(
+      backgroundColor: bgCol,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // 1. Top Header Bar matching Screenshot
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0A0B0E) : Colors.white,
+                border: Border(bottom: BorderSide(color: borderCol)),
               ),
-              Row(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: accent.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      widget.settings.aiApiKey.trim().isNotEmpty
-                          ? 'Live • ${widget.settings.aiModel}'
-                          : 'Grounded RAG',
-                      style: TextStyle(color: accent, fontSize: 10, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  InkWell(
-                    onTap: widget.onOpenSettings,
-                    borderRadius: BorderRadius.circular(6),
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF182230) : const Color(0xFFF3F4F6),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB)),
-                      ),
-                      child: Icon(Icons.tune, color: accent, size: 16),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-
-        // Message List
-        Expanded(
-          child: ListView.builder(
-            controller: _scrollController,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            itemCount: _messages.length,
-            itemBuilder: (context, idx) {
-              final msg = _messages[idx];
-              final isUser = msg["role"] == "user";
-              final citations = msg["citations"] as List<dynamic>?;
-
-              return Align(
-                alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.85),
-                  decoration: BoxDecoration(
-                    color: isUser
-                        ? (isDark ? const Color(0xFF1E293B) : const Color(0xFF0F172A))
-                        : (isDark ? const Color(0xFF131922) : Colors.white),
-                    borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard).copyWith(
-                      bottomRight: isUser ? const Radius.circular(2) : const Radius.circular(AppDesignTokens.radiusCard),
-                      bottomLeft: !isUser ? const Radius.circular(2) : const Radius.circular(AppDesignTokens.radiusCard),
-                    ),
-                    border: Border.all(
-                      color: isUser
-                          ? (isDark ? const Color(0xFF334155) : const Color(0xFF1E293B))
-                          : (isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0)),
-                      width: AppDesignTokens.borderWidth,
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Row(
                     children: [
-                      MarkdownMessageView(
-                        content: msg["content"] ?? "",
-                        baseStyle: TextStyle(
-                          fontSize: 13.5,
-                          height: 1.45,
-                          color: isUser
-                              ? Colors.white
-                              : (isDark ? Colors.white.withValues(alpha: 0.95) : const Color(0xFF111827)),
+                      Icon(Icons.auto_awesome, color: accent, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'TiggoMate AI Copilot',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: textPrimary,
                         ),
-                        accentColor: isUser ? Colors.white : accent,
                       ),
-                      if (citations != null && citations.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF0B1017) : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(AppDesignTokens.radiusSmall),
-                            border: Border(
-                              left: BorderSide(color: accent, width: 3),
-                              top: BorderSide(color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0)),
-                              right: BorderSide(color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0)),
-                              bottom: BorderSide(color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0)),
-                            ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          widget.settings.aiApiKey.trim().isNotEmpty
+                              ? 'Live • ${widget.settings.aiModel}'
+                              : 'Live • claude-haiku-4.5',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.bold,
+                            color: accent,
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.menu_book_rounded, size: 12, color: accent),
-                              const SizedBox(width: 5),
-                              Flexible(
-                                child: Text(
-                                  "📖 Citation: ${citations[0]['document']} (p. ${citations[0]['page']})",
-                                  style: TextStyle(fontSize: 10.5, color: accent, fontWeight: FontWeight.bold),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: widget.onOpenSettings,
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF131922) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: borderCol),
+                          ),
+                          child: Icon(Icons.tune, color: accent, size: 16),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // 2. Main Scrollable Content
+            Expanded(
+              child: ListView(
+                controller: _scrollController,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  // 2x2 Insight Cards Grid (Screenshot elements 1-4)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            _buildInsightCard(
+                              icon: Icons.route_outlined,
+                              iconColor: const Color(0xFF2DD4BF),
+                              title: 'LAST TRIP',
+                              value: lastTripText,
+                              cardCol: cardCol,
+                              borderCol: borderCol,
+                              textPrimary: textPrimary,
+                              textMuted: textMuted,
+                              onTap: () => _sendMessage('What was my last trip?'),
+                            ),
+                            const SizedBox(width: 10),
+                            _buildInsightCard(
+                              icon: Icons.favorite_border_rounded,
+                              iconColor: const Color(0xFFFB923C),
+                              title: 'CONDITION',
+                              value: conditionText,
+                              cardCol: cardCol,
+                              borderCol: borderCol,
+                              textPrimary: textPrimary,
+                              textMuted: textMuted,
+                              onTap: () => _sendMessage('What is the vehicle status?'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            _buildInsightCard(
+                              icon: Icons.calendar_today_outlined,
+                              iconColor: const Color(0xFF60A5FA),
+                              title: 'REMINDER',
+                              value: reminderText,
+                              cardCol: cardCol,
+                              borderCol: borderCol,
+                              textPrimary: textPrimary,
+                              textMuted: textMuted,
+                              onTap: () => _sendMessage('When is my next service?'),
+                            ),
+                            const SizedBox(width: 10),
+                            _buildInsightCard(
+                              icon: Icons.trending_up_rounded,
+                              iconColor: const Color(0xFFA78BFA),
+                              title: 'HABITS',
+                              value: habitsText,
+                              cardCol: cardCol,
+                              borderCol: borderCol,
+                              textPrimary: textPrimary,
+                              textMuted: textMuted,
+                              onTap: () => _showHabitsDetail(context, isDark),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Tiggo AI Copilot Online Welcome Banner Card
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: cardCol,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: borderCol),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: accent.withValues(alpha: 0.15),
+                                shape: BoxShape.circle,
                               ),
-                            ],
+                              child: Icon(Icons.auto_awesome, color: accent, size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Tiggo AI Copilot Online',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Chery Tiggo 7 PHEV Intelligent Assistant',
+                                    style: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 11,
+                                      color: textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Ask about your Tiggo 7, or instruct me to control it directly.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: textPrimary.withValues(alpha: 0.88),
+                            height: 1.45,
                           ),
                         ),
                       ],
-                    ],
+                    ),
                   ),
-                ),
-              );
-            },
-          ),
-        ),
 
-        if (_loading)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            child: LinearProgressIndicator(color: accent, backgroundColor: Colors.transparent),
-          ),
-
-        // Quick Suggestion Chips
-        SizedBox(
-          height: 36,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            itemCount: _suggestions.length,
-            separatorBuilder: (context, index) => const SizedBox(width: 8),
-            itemBuilder: (context, idx) {
-              return ActionChip(
-                label: Text(
-                  _suggestions[idx],
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: isDark ? Colors.white70 : const Color(0xFF374151),
+                  // Quick Action Guidance Chips
+                  SizedBox(
+                    height: 38,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      children: [
+                        _buildInstructionChip(
+                          label: 'Pre-cool cabin to 22°C',
+                          onTap: () => _sendMessage('turn on aircond to 22°C'),
+                          isDark: isDark,
+                          cardCol: cardCol,
+                          borderCol: borderCol,
+                          textPrimary: textPrimary,
+                        ),
+                        const SizedBox(width: 8),
+                        _buildInstructionChip(
+                          label: 'Open all windows',
+                          onTap: () => _sendMessage('open all window'),
+                          isDark: isDark,
+                          cardCol: cardCol,
+                          borderCol: borderCol,
+                          textPrimary: textPrimary,
+                        ),
+                        const SizedBox(width: 8),
+                        _buildInstructionChip(
+                          label: 'When is my next service?',
+                          onTap: () => _sendMessage('When is my 1,000 km CarLinko inspection due?'),
+                          isDark: isDark,
+                          cardCol: cardCol,
+                          borderCol: borderCol,
+                          textPrimary: textPrimary,
+                        ),
+                        const SizedBox(width: 8),
+                        _buildInstructionChip(
+                          label: 'Calculate 100 km charging cost vs petrol',
+                          onTap: () => _sendMessage('Calculate 100 km charging cost vs petrol'),
+                          isDark: isDark,
+                          cardCol: cardCol,
+                          borderCol: borderCol,
+                          textPrimary: textPrimary,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                backgroundColor: isDark ? const Color(0xFF131922) : const Color(0xFFF1F5F9),
-                side: BorderSide(color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppDesignTokens.radiusPill)),
-                onPressed: () => _sendMessage(_suggestions[idx]),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 8),
+                  const SizedBox(height: 8),
 
-        // Chat Input Bar
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF0D1219) : Colors.white,
-            border: Border(top: BorderSide(color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0))),
-          ),
-          child: Row(
+                  // Conversation Messages
+                  ..._messages.map((msg) {
+                    final isUser = msg["role"] == "user";
+                    final citations = msg["citations"] as List<dynamic>?;
+                    final action = msg["action"] as Map<String, dynamic>?;
+
+                    return Align(
+                      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.85),
+                        decoration: BoxDecoration(
+                          color: isUser
+                              ? (isDark ? const Color(0xFF1E293B) : const Color(0xFF0F172A))
+                              : cardCol,
+                          borderRadius: BorderRadius.circular(16).copyWith(
+                            bottomRight: isUser ? const Radius.circular(2) : const Radius.circular(16),
+                            bottomLeft: !isUser ? const Radius.circular(2) : const Radius.circular(16),
+                          ),
+                          border: Border.all(
+                            color: isUser
+                                ? (isDark ? const Color(0xFF334155) : const Color(0xFF1E293B))
+                                : borderCol,
+                            width: 1.0,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            MarkdownMessageView(
+                              content: msg["content"] ?? "",
+                              baseStyle: TextStyle(
+                                fontSize: 13.5,
+                                height: 1.45,
+                                color: isUser
+                                    ? Colors.white
+                                    : (isDark ? Colors.white.withValues(alpha: 0.95) : const Color(0xFF111827)),
+                              ),
+                              accentColor: isUser ? Colors.white : accent,
+                            ),
+                            if (action != null) ...[
+                              const SizedBox(height: 10),
+                              _ActionExecutionCard(
+                                actionId: action['id'] as String? ?? 'action',
+                                title: action['title'] as String? ?? 'Action',
+                                description: action['desc'] as String? ?? '',
+                                icon: (action['icon'] as IconData?) ?? Icons.bolt_rounded,
+                                onExecute: (id) async {
+  final opcode = id == 'windows_open'
+      ? CarLinkoOpcodes.windowsOpen
+      : id == 'windows_close'
+          ? CarLinkoOpcodes.windowsClose
+          : id == 'climate_on'
+              ? CarLinkoOpcodes.acOn
+              : id == 'climate_off'
+                  ? CarLinkoOpcodes.acOff
+                  : id == 'engine_start'
+                      ? CarLinkoOpcodes.engineStart
+                      : id == 'engine_stop'
+                          ? CarLinkoOpcodes.engineStop
+                          : id == 'lock'
+                              ? CarLinkoOpcodes.lock
+                              : CarLinkoOpcodes.unlock;
+  await AppVehicleRepository.instance.sendRemoteCommand(opcode);
+},
+                                cardCol: isDark ? const Color(0xFF0A0B0E) : const Color(0xFFF1F5F9),
+                                borderCol: borderCol,
+                                limeAccent: accent,
+                                textPrimary: textPrimary,
+                                textMuted: textMuted,
+                              ),
+                            ],
+                            if (citations != null && citations.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: accent.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: accent.withValues(alpha: 0.35),
+                                    width: 1.0,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.menu_book_rounded, size: 12, color: accent),
+                                    const SizedBox(width: 5),
+                                    Flexible(
+                                      child: Text(
+                                        "📖 Citation: ${citations[0]['document']} (p. ${citations[0]['page']})",
+                                        style: TextStyle(fontSize: 10.5, color: accent, fontWeight: FontWeight.bold),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+
+                  // Reasoning animation
+                  if (_loading)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        children: [
+                          _ThinkingDots(animation: _thinkingDotsCtrl, color: accent),
+                          const SizedBox(width: 10),
+                          Text(
+                            'AI Copilot is reasoning...',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 11.5,
+                              color: textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            // 3. Chat Input Bar matching Screenshot
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0A0B0E) : Colors.white,
+                border: Border(top: BorderSide(color: borderCol)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF131922) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: _isListening ? const Color(0xFFFF5252) : borderCol,
+                          width: _isListening ? 1.5 : 1.0,
+                        ),
+                      ),
+                      child: TextField(
+                        controller: _controller,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          color: isDark ? Colors.white : const Color(0xFF111827),
+                        ),
+                        decoration: InputDecoration(
+                          hintText: _isListening
+                              ? 'Listening... Speak command now'
+                              : 'Ask about your Tiggo 7...',
+                          hintStyle: TextStyle(
+                            color: _isListening
+                                ? const Color(0xFFFF5252)
+                                : (isDark ? const Color(0xFF525A6C) : const Color(0xFF9CA3AF)),
+                            fontSize: 13,
+                            fontWeight: _isListening ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                        ),
+                        onSubmitted: _sendMessage,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Voice Mic Button with wave animation
+                  InkWell(
+                    onTap: _listenVoice,
+                    borderRadius: BorderRadius.circular(24),
+                    child: SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: AnimatedBuilder(
+                        animation: _listenPulseCtrl,
+                        builder: (context, _) {
+                          final t = _listenPulseCtrl.value;
+                          return Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              if (_isListening) ...[
+                                _PulseRing(progress: t, color: const Color(0xFFFF5252)),
+                                _PulseRing(progress: (t + 0.5) % 1.0, color: const Color(0xFFFF5252)),
+                              ],
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: _isListening
+                                      ? const Color(0xFFFF5252)
+                                      : (isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0)),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: _isListening ? const Color(0xFFFF5252) : borderCol,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Icon(
+                                    _isListening ? Icons.mic : Icons.mic_none_rounded,
+                                    size: 20,
+                                    color: _isListening ? Colors.white : accent,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Neon Lime Send Button matching Screenshot
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: accent.withValues(alpha: 0.35),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.send_rounded, size: 20, color: Color(0xFF0A0B0E)),
+                      onPressed: () => _sendMessage(_controller.text),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+
+class _ActionExecutionCard extends StatefulWidget {
+  final String actionId;
+  final String title;
+  final String description;
+  final IconData icon;
+  final Function(String id)? onExecute;
+  final Color cardCol;
+  final Color borderCol;
+  final Color limeAccent;
+  final Color textPrimary;
+  final Color textMuted;
+
+  const _ActionExecutionCard({
+    required this.actionId,
+    required this.title,
+    required this.description,
+    required this.icon,
+    this.onExecute,
+    required this.cardCol,
+    required this.borderCol,
+    required this.limeAccent,
+    required this.textPrimary,
+    required this.textMuted,
+  });
+
+  @override
+  State<_ActionExecutionCard> createState() => _ActionExecutionCardState();
+}
+
+class _ActionExecutionCardState extends State<_ActionExecutionCard> {
+  bool _executed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: widget.cardCol,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _executed ? const Color(0xFF10B981) : widget.limeAccent.withValues(alpha: 0.6),
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: (_executed ? const Color(0xFF10B981) : widget.limeAccent).withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  _executed ? Icons.check_circle_outline_rounded : widget.icon,
+                  size: 18,
+                  color: _executed ? const Color(0xFF10B981) : widget.limeAccent,
+                ),
+              ),
+              const SizedBox(width: 10),
               Expanded(
-                child: TextField(
-                  controller: _controller,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDark ? Colors.white : const Color(0xFF111827),
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Ask about your Tiggo 7...',
-                    hintStyle: TextStyle(
-                      color: isDark ? Colors.white38 : const Color(0xFF9CA3AF),
-                      fontSize: 13,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.title,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.bold,
+                        color: widget.textPrimary,
+                      ),
                     ),
-                    filled: true,
-                    fillColor: isDark ? const Color(0xFF070B0F) : const Color(0xFFF1F5F9),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppDesignTokens.radiusPill),
-                      borderSide: BorderSide(color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0)),
+                    const SizedBox(height: 2),
+                    Text(
+                      widget.description,
+                      style: TextStyle(fontSize: 11, color: widget.textMuted),
                     ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppDesignTokens.radiusPill),
-                      borderSide: BorderSide(color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppDesignTokens.radiusPill),
-                      borderSide: BorderSide(color: accent),
-                    ),
-                  ),
-                  onSubmitted: _sendMessage,
-                ),
-              ),
-              const SizedBox(width: 6),
-              InkWell(
-                onTap: _listenVoice,
-                borderRadius: BorderRadius.circular(AppDesignTokens.radiusPill),
-                child: Container(
-                  width: AppDesignTokens.minTouchTarget,
-                  height: AppDesignTokens.minTouchTarget,
-                  decoration: BoxDecoration(
-                    color: _isListening ? const Color(0xFFFF5252) : (isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0)),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    _isListening ? Icons.mic : Icons.mic_none_rounded,
-                    size: 18,
-                    color: _isListening ? Colors.white : accent,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              SizedBox(
-                width: AppDesignTokens.minTouchTarget,
-                height: AppDesignTokens.minTouchTarget,
-                child: IconButton.filled(
-                  icon: const Icon(Icons.send, size: 18),
-                  style: IconButton.styleFrom(backgroundColor: accent, foregroundColor: onAccent),
-                  onPressed: () => _sendMessage(_controller.text),
+                  ],
                 ),
               ),
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _executed
+                  ? null
+                  : () {
+                      HapticFeedback.heavyImpact();
+                      widget.onExecute?.call(widget.actionId);
+                      setState(() => _executed = true);
+                    },
+              icon: Icon(
+                _executed ? Icons.check : Icons.send_rounded,
+                size: 15,
+                color: _executed ? Colors.white70 : const Color(0xFF0A0B0E),
+              ),
+              label: Text(
+                _executed ? 'Executed ✓ (Transmitted to CarLinko T-Box)' : 'Confirm & Execute Action',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: _executed ? Colors.white70 : const Color(0xFF0A0B0E),
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _executed ? const Color(0xFF10B981) : widget.limeAccent,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
+
+class _PulseRing extends StatelessWidget {
+  final double progress;
+  final Color color;
+
+  const _PulseRing({required this.progress, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final size = 38.0 + (progress * 20.0);
+    final opacity = (1.0 - progress).clamp(0.0, 1.0) * 0.5;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: color.withValues(alpha: opacity), width: 1.5),
+      ),
+    );
+  }
+}
+
+class _ThinkingDots extends StatelessWidget {
+  final Animation<double> animation;
+  final Color color;
+
+  const _ThinkingDots({required this.animation, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, _) {
+        return SizedBox(
+          width: 28,
+          height: 14,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(3, (i) {
+              final phase = (animation.value + (i * 0.33)) % 1.0;
+              final bounce = (1.0 - (2 * phase - 1).abs()).clamp(0.0, 1.0);
+              return Transform.translate(
+                offset: Offset(0, -4 * bounce),
+                child: Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.5 + (0.5 * bounce)),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              );
+            }),
+          ),
+        );
+      },
+    );
+  }
+}
+
 
 // ---------------- TAB 3: CHARGING & ENERGY ----------------
 class EnergyTab extends StatelessWidget {
@@ -1294,7 +2103,7 @@ class EnergyTab extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text('Up to 6.6 kW', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: accent)),
                 const SizedBox(height: 4),
-                const Text('0–100% full charge in ~2.8 hours on AC Wallbox (19.27 kWh pack)', style: TextStyle(fontSize: 12, color: Colors.white60)),
+                const Text('0–100% full charge in ~2.8 hours on AC Wallbox (18.3 kWh pack)', style: TextStyle(fontSize: 12, color: Colors.white60)),
               ],
             ),
           ),
@@ -1463,6 +2272,49 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
   int _selectedMilestoneIndex = 0; // Default to 1,000 km or upcoming
   int _filterIndex = 0; // 0: All, 1: Free Labour, 2: Major
   bool _showFullTable = false;
+  DateTime? _lastServiceDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLastServiceDate();
+  }
+
+  Future<void> _loadLastServiceDate() async {
+    final prefs = await SharedPreferences.getInstance();
+    final str = prefs.getString('tm_last_service_date');
+    if (str != null && str.isNotEmpty) {
+      final parsed = DateTime.tryParse(str);
+      if (parsed != null && mounted) {
+        setState(() => _lastServiceDate = parsed);
+        return;
+      }
+    }
+    for (final apt in ServiceAppointmentManager.instance.appointments) {
+      if (apt.isCompleted) {
+        if (mounted) {
+          setState(() => _lastServiceDate = apt.appointmentDate);
+          return;
+        }
+      }
+    }
+  }
+
+  Future<void> _pickLastServiceDate(BuildContext context) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _lastServiceDate ?? now.subtract(const Duration(days: 32)),
+      firstDate: DateTime(2023),
+      lastDate: now,
+      helpText: 'Select Last Service Date',
+    );
+    if (picked != null && mounted) {
+      setState(() => _lastServiceDate = picked);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('tm_last_service_date', picked.toIso8601String());
+    }
+  }
 
   static const List<Map<String, dynamic>> _baseOilPackage = [
     {"name": "Engine Oil C5 0W-20 (4.7L)", "price": 270.00},
@@ -1480,7 +2332,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
       isLabourFoc: true,
       labourFee: 0.00,
       compulsoryParts: [
-        {"name": "DMS CarLinko Telematics Pairing", "price": 0.00},
+        {"name": "DMS Telematics Pairing", "price": 0.00},
         {"name": "3DHT & BMS Hybrid Diagnostic Scan", "price": 0.00},
         {"name": "High-Voltage Orange Harness Torque Check", "price": 0.00},
         {"name": "Tyre Pressure & Torque Inspection (230 kPa)", "price": 0.00},
@@ -1892,6 +2744,10 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
     final milestoneProgress =
         hasNextMilestone ? ((currentKm - previousMilestoneKm) / milestoneSpanKm).clamp(0.02, 1.0) : 1.0;
 
+    final daysLeft = _lastServiceDate != null
+        ? (180 - DateTime.now().difference(_lastServiceDate!).inDays).clamp(1, 365)
+        : (kmLeft / 52.7).round().clamp(1, 365);
+
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
       children: [
@@ -1911,8 +2767,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
         // Big Odometer + Distance to service
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             RichText(
               text: TextSpan(
@@ -1935,14 +2790,36 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                 ],
               ),
             ),
-            Text(
-              hasNextMilestone ? '$kmLeft km to ${nextMilestone.title}' : 'All scheduled services up to date',
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: limeAccent,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  hasNextMilestone ? '$kmLeft km to ${nextMilestone.title}' : 'All scheduled services up to date',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: limeAccent,
+                  ),
+                ),
+                if (hasNextMilestone) ...[
+                  const SizedBox(height: 2),
+                  InkWell(
+                    onTap: () => _pickLastServiceDate(context),
+                    borderRadius: BorderRadius.circular(4),
+                    child: Text(
+                      '~$daysLeft days (based on last service date)',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                        color: textMuted,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ],
         ),
@@ -2914,9 +3791,9 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                 _buildSpecRow('Powertrain', '1.5L Turbo + Dual Motors (CSH)', isDark),
                 _buildSpecRow('System Output', '240 kW (326 PS) / 545 Nm', isDark),
                 _buildSpecRow('Transmission', '3-speed Dedicated Hybrid (3DHT)', isDark),
-                _buildSpecRow('Battery Capacity', '19.27 kWh LFP Traction Battery', isDark),
+                _buildSpecRow('Battery Capacity', '18.3 kWh LFP Traction Battery', isDark),
                 _buildSpecRow('Electric Range', '80–100 km (NEDC rated 100 km)', isDark),
-                _buildSpecRow('Fuel Tank', '51 Litres (RON95 compatible)', isDark),
+                _buildSpecRow('Fuel Tank', '60 Litres (RON95 compatible)', isDark),
                 _buildSpecRow('Target Cold Tyre Pressure', '230 kPa (2.3 bar / 33.4 psi)', isDark),
                 _buildSpecRow('Vehicle Warranty', '7 Years / 150,000 km', isDark),
                 _buildSpecRow('Battery Warranty', '8 Years / 160,000 km', isDark),

@@ -12,6 +12,7 @@ import 'smart_drive_hud.dart';
 import 'daily_km_bar_painter.dart';
 import '../theme/app_tokens.dart';
 import '../firebase/firebase_sync_service.dart';
+import '../service/auto_trip_and_charge_service.dart';
 
 /// Model representing a completed PHEV trip.
 class TripRecord {
@@ -390,19 +391,26 @@ DateTime recordTimeFromId(String id) {
 
 /// The most recent trip saved on this device, or null when none has been logged.
 Future<TripRecord?> loadLatestSavedTrip() async {
+  final trips = await loadRecentTrips(limit: 1);
+  return trips.isEmpty ? null : trips.first;
+}
+
+/// Up to [limit] most recent real (non-sample) trips saved on this device,
+/// newest first.
+Future<List<TripRecord>> loadRecentTrips({int limit = 10}) async {
   try {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_TripsLogbookScreenState._kTripsStorageKey);
-    if (raw == null || raw.isEmpty) return null;
+    if (raw == null || raw.isEmpty) return const [];
     final trips = (jsonDecode(raw) as List<dynamic>)
         .map((t) => TripRecord.fromJson(t as Map<String, dynamic>))
         .where((t) => !kLegacySampleTripIds.contains(t.id))
         .toList();
-    if (trips.isEmpty) return null;
+    if (trips.isEmpty) return const [];
     trips.sort((a, b) => recordTimeFromId(b.id).compareTo(recordTimeFromId(a.id)));
-    return trips.first;
+    return trips.take(limit).toList();
   } catch (_) {
-    return null;
+    return const [];
   }
 }
 
@@ -456,11 +464,23 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
   void initState() {
     super.initState();
     _loadStoredData();
+    AutoTripAndChargeService.instance.addListener(_onAutoUpdate);
+  }
+
+  void _onAutoUpdate() {
+    if (mounted) _loadStoredData();
+  }
+
+  @override
+  void dispose() {
+    AutoTripAndChargeService.instance.removeListener(_onAutoUpdate);
+    super.dispose();
   }
 
   Future<void> _loadStoredData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
       final rawExpenses = prefs.getString(_kExpenseStorageKey);
       if (rawExpenses != null && rawExpenses.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(rawExpenses);
@@ -823,6 +843,35 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                           letterSpacing: -0.5,
                           color: textPrimary,
                         ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF10B981),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'CAN-BUS AUTO TRIP & CHARGE ACTIVE',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.8,
+                                color: const Color(0xFF10B981),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -1577,7 +1626,7 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Driving trips will appear here automatically when CarLinko CAN-bus telematics syncs.',
+                    'Driving trips will appear here automatically when vehicle telematics syncs.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 11.5,
@@ -2252,9 +2301,9 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
     _petrolOdometer = widget.currentOdometer;
     _updatePetrolLitres(50.0);
 
-    // Calculate battery deficit: Tiggo 7 has 19.27 kWh pack
+    // Calculate battery deficit: Tiggo 7 has 18.3 kWh pack
     final deficitPct = (100 - widget.currentBatteryPct).clamp(0, 100);
-    _homeKwhToCharge = (deficitPct / 100.0) * 19.27;
+    _homeKwhToCharge = (deficitPct / 100.0) * 18.3;
     if (_homeKwhToCharge < 2.0) _homeKwhToCharge = 15.0; // fallback default
     _updateHomeAcCost();
   }
@@ -2616,7 +2665,7 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
                               children: [
                                 Text('Current Battery: ${widget.currentBatteryPct}% SoC', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFD2F835))),
                                 Text(
-                                  'Deficit to 100%: ${(100 - widget.currentBatteryPct)}% (~${((100 - widget.currentBatteryPct) / 100 * 19.27).toStringAsFixed(1)} kWh needed)',
+                                  'Deficit to 100%: ${(100 - widget.currentBatteryPct)}% (~${((100 - widget.currentBatteryPct) / 100 * 18.3).toStringAsFixed(1)} kWh needed)',
                                   style: TextStyle(fontSize: 11, color: isDark ? Colors.white70 : const Color(0xFF4B5563)),
                                 ),
                               ],
@@ -2640,11 +2689,11 @@ class _SmartExpenseSheetState extends State<_SmartExpenseSheet> with SingleTicke
                       children: [
                         _buildHomeChargePresetBtn(
                           'Top to 100%',
-                          ((100 - widget.currentBatteryPct) / 100 * 19.27).clamp(3.0, 19.27),
+                          ((100 - widget.currentBatteryPct) / 100 * 18.3).clamp(3.0, 18.3),
                           isDark,
                         ),
                         const SizedBox(width: 6),
-                        _buildHomeChargePresetBtn('Full 19.27 kWh', 19.27, isDark),
+                        _buildHomeChargePresetBtn('Full 18.3 kWh', 18.3, isDark),
                         const SizedBox(width: 6),
                         _buildHomeChargePresetBtn('+ 10.0 kWh', 10.0, isDark),
                       ],

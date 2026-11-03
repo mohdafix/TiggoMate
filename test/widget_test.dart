@@ -10,7 +10,7 @@ import 'package:tiggomate_app/src/carlinko/vehicle_skin.dart';
 import 'package:tiggomate_app/src/carlinko/vehicle_telemetry.dart';
 import 'package:tiggomate_app/src/mytnb/mytnb_api.dart';
 import 'package:tiggomate_app/src/theme/app_theme.dart';
-import 'package:tiggomate_app/src/ui/ask_assistant_sheet.dart';
+// ask_assistant_sheet merged into AssistantTab
 import 'package:tiggomate_app/src/ui/energy_screen.dart';
 import 'package:tiggomate_app/src/ui/neo_dashboard.dart';
 import 'package:tiggomate_app/src/ui/trips_logbook_screen.dart';
@@ -218,7 +218,7 @@ void main() {
     await tester.tap(find.text('DOORS'));
     await tester.pump();
     expect(find.text('Unlocked'), findsOneWidget);
-    expect(find.textContaining('CarLinko: Doors Unlocked'), findsOneWidget);
+    expect(find.textContaining('Doors Unlocked'), findsOneWidget);
     AppNotification.dismiss();
     await tester.pump(const Duration(seconds: 4));
 
@@ -575,7 +575,12 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.darkTheme,
-          home: const Scaffold(body: AskAssistantSheet()),
+          home: Scaffold(
+            body: AssistantTab(
+              settings: const AppSettings(),
+              onOpenSettings: () {},
+            ),
+          ),
         ),
       );
       await tester.pump();

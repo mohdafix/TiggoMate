@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -23,11 +24,13 @@ const Set<String> carLinkoStaleTokenCodes = {'9997', '40001', '40003', '401', '1
 class CarLinkoOpcodes {
   CarLinkoOpcodes._();
 
+  static const String init0x23 = '2301'; // Handshake 0x23 from GodrezJr2/j5-ev-dashboard
   static const String init = '77'; // sent once before any other opcode, mirrors the app
   static const String lock = '740100';
   static const String unlock = '740200';
   static const String acOn = '741001';
-  static const String acOff = '741000';
+  static const String acOff = '741002'; // J5-EV-Dashboard confirmed A/C off
+  static const String acOffAlt = '741000'; // Alternative A/C off
   static const String stopCharging = '742701';
   static const String windowsClose = '740500';
   static const String windowsOpen = '740600';
@@ -41,9 +44,8 @@ class CarLinkoOpcodes {
   static const String defogOn = '741201';
   static const String defogOff = '741200';
   static const String quickCool = '742001';
-  // No confirmed opcode exists for engine start/stop in the reference this
-  // was ported from — deliberately not guessed. Treat as unsupported until
-  // a real one is found.
+  static const String engineStart = '740700'; // Jump table decode (assembledSendData): Engine on
+  static const String engineStop = '740800';  // Jump table decode (assembledSendData): Engine off
 }
 
 class CarLinkoException implements Exception {
@@ -98,17 +100,10 @@ class CarLinkoClient {
   /// base64(HMAC-SHA256(SIGN_KEY, jsonEncode(sortByKeyAsc({**params, timestamp}))))
   static String sign(Map<String, dynamic> params, String timestamp) {
     final merged = <String, dynamic>{...params, 'timestamp': timestamp};
-    // Normalize values: null -> "", others -> toString()
-    final normalized = <String, String>{};
-    for (final entry in merged.entries) {
-      normalized[entry.key] = entry.value == null ? '' : entry.value.toString();
-    }
-
-    // Sort keys alphabetically ascending
-    final sortedKeys = normalized.keys.toList()..sort();
-    final sortedMap = <String, String>{};
+    final sortedKeys = merged.keys.toList()..sort();
+    final sortedMap = <String, dynamic>{};
     for (final k in sortedKeys) {
-      sortedMap[k] = normalized[k]!;
+      sortedMap[k] = merged[k] ?? '';
     }
 
     final message = json.encode(sortedMap);
@@ -273,10 +268,24 @@ class CarLinkoClient {
   /// are confirmed always zero on a real car — CarLinko's own app instead
   /// gets location from this separate endpoint, confirmed against
   /// ha-carlinko's reference client. Returns an empty map on no fix.
-  Future<Map<String, dynamic>> locateDevice(String deviceSn) async {
-    final body = {'sn': deviceSn, 'showAddress': 1};
-    final result = await _request('POST', '/maps/deviceLocate', body: body, signParams: body);
-    if (result is Map<String, dynamic>) return result;
+  Future<Map<String, dynamic>> locateDevice(String deviceSn, {String? vehicleId}) async {
+    final body = {
+      'sn': deviceSn,
+      'deviceSn': deviceSn,
+      if (vehicleId != null && vehicleId.isNotEmpty) 'vehicleId': vehicleId,
+      'showAddress': 1,
+    };
+    try {
+      final result = await _request('POST', '/maps/deviceLocate', body: body, signParams: body);
+      if (result is Map<String, dynamic>) {
+        if (result['data'] is Map<String, dynamic>) {
+          return result['data'] as Map<String, dynamic>;
+        }
+        return result;
+      }
+    } catch (e) {
+      debugPrint('locateDevice POST /maps/deviceLocate failed: $e');
+    }
     return {};
   }
 
@@ -327,9 +336,13 @@ class CarLinkoClient {
     required String deviceSn,
     required String opcode,
   }) async {
-    if (opcode != CarLinkoOpcodes.init) {
+    if (opcode != CarLinkoOpcodes.init && opcode != CarLinkoOpcodes.init0x23) {
       try {
+        await sendRemoteControl(vehicleId: vehicleId, deviceSn: deviceSn, opcode: CarLinkoOpcodes.init0x23);
+        await Future.delayed(const Duration(milliseconds: 250));
         await sendRemoteControl(vehicleId: vehicleId, deviceSn: deviceSn, opcode: CarLinkoOpcodes.init);
+        // 500ms wake-up settling window for vehicle T-Box CAN-bus
+        await Future.delayed(const Duration(milliseconds: 500));
       } catch (_) {}
     }
 
@@ -378,7 +391,8 @@ class CarLinkoClient {
       }
 
       if (body != null) {
-        body['timestamp'] = ts;
+        // Do NOT mutate body by adding body['timestamp'] = ts.
+        // CarLinko expects timestamp in headers, not in the JSON body.
         final utf8Body = utf8.encode(json.encode(body));
         request.headers.contentLength = utf8Body.length;
         request.add(utf8Body);

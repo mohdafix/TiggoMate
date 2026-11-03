@@ -1,9 +1,12 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart' hide Path;
 import 'package:url_launcher/url_launcher.dart';
 import '../carlinko/vehicle_telemetry.dart';
+import '../service/phone_parking_location.dart';
 import '../theme/app_theme.dart';
 import 'app_notification.dart';
 
@@ -83,6 +86,12 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
   late AnimationController _radarController;
   bool _isFlashing = false;
   int _activeRadarTab = 0; // 0: Radar Map, 1: Nearby Chargers
+  PhoneParkedLocation? _phoneFallback;
+
+  bool get _usingPhoneFallback => !widget.telemetry.hasLocation && _phoneFallback != null;
+  bool get _hasAnyLocation => widget.telemetry.hasLocation || _phoneFallback != null;
+  double get _effectiveLat => _usingPhoneFallback ? _phoneFallback!.latitude : widget.telemetry.latitude;
+  double get _effectiveLon => _usingPhoneFallback ? _phoneFallback!.longitude : widget.telemetry.longitude;
 
   @override
   void initState() {
@@ -91,12 +100,65 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
       vsync: this,
       duration: const Duration(seconds: 4),
     )..repeat();
+
+    if (!widget.telemetry.hasLocation) {
+      PhoneParkingLocationService.loadLast().then((loc) {
+        if (mounted && loc != null) setState(() => _phoneFallback = loc);
+      });
+    }
+  }
+
+  String _relativeTime(DateTime t) {
+    final diff = DateTime.now().difference(t);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
   }
 
   @override
   void dispose() {
     _radarController.dispose();
     super.dispose();
+  }
+
+  /// Real dark-tile map centered on the car (or the phone-parked fallback),
+  /// locked and non-interactive so it reads as a radar/minimap rather than
+  /// a pannable map -- the scanning overlay from _CircularRadarMapPainter
+  /// draws on top of this. Falls back to a plain placeholder when there's
+  /// no coordinate at all to center on.
+  Widget _buildRadarMapLayer(double lat, double lon, bool hasAnyLocation) {
+    if (!hasAnyLocation) {
+      return Container(
+        color: const Color(0xFF1E2632),
+        alignment: Alignment.center,
+        child: const Icon(Icons.location_off_outlined, color: Color(0xFF4B5563), size: 32),
+      );
+    }
+    // CARTO's free basemap tiles now require an API key, so this uses
+    // standard OpenStreetMap tiles (genuinely free, no signup) with a
+    // color inversion to approximate the dark map style instead.
+    return ColorFiltered(
+      colorFilter: const ColorFilter.matrix([
+        -1, 0, 0, 0, 255,
+        0, -1, 0, 0, 255,
+        0, 0, -1, 0, 255,
+        0, 0, 0, 1, 0,
+      ]),
+      child: FlutterMap(
+        options: MapOptions(
+          initialCenter: LatLng(lat, lon),
+          initialZoom: 17,
+          interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+        ),
+        children: [
+          TileLayer(
+            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            userAgentPackageName: 'com.tiggomate.tiggomate_app',
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _launchWaze(double lat, double lon) async {
@@ -139,8 +201,8 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
 
   double _distanceToCarMetres(_SavedCharger charger) {
     return Geolocator.distanceBetween(
-      widget.telemetry.latitude,
-      widget.telemetry.longitude,
+      _effectiveLat,
+      _effectiveLon,
       charger.lat,
       charger.lon,
     );
@@ -155,7 +217,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
   /// Saved chargers, nearest to the car first when its position is known.
   List<_SavedCharger> get _chargersByDistance {
     final chargers = List<_SavedCharger>.of(_savedChargers);
-    if (widget.telemetry.hasLocation) {
+    if (_hasAnyLocation) {
       chargers.sort((a, b) => _distanceToCarMetres(a).compareTo(_distanceToCarMetres(b)));
     }
     return chargers;
@@ -167,11 +229,11 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
   }
 
   void _copyGps() {
-    if (!widget.telemetry.hasLocation) {
+    if (!_hasAnyLocation) {
       _showToast('Car location unavailable');
       return;
     }
-    final coords = '${widget.telemetry.latitude.toStringAsFixed(5)}, ${widget.telemetry.longitude.toStringAsFixed(5)}';
+    final coords = '${_effectiveLat.toStringAsFixed(5)}, ${_effectiveLon.toStringAsFixed(5)}';
     Clipboard.setData(ClipboardData(text: coords));
     _showToast('GPS coordinates copied to clipboard: $coords');
   }
@@ -179,7 +241,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
   void _triggerHornFlash() {
     setState(() => _isFlashing = true);
     widget.onHornFlash();
-    _showToast('📢 CarLinko: Sounding horn & flashing headlights...');
+    _showToast('📢 Sounding horn & flashing headlights...');
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) setState(() => _isFlashing = false);
     });
@@ -198,8 +260,9 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
   Widget build(BuildContext context) {
     final colors = AppColors(context);
     final isDark = colors.isDark;
-    final lat = widget.telemetry.latitude;
-    final lon = widget.telemetry.longitude;
+    final usingPhoneFallback = !widget.telemetry.hasLocation && _phoneFallback != null;
+    final lat = usingPhoneFallback ? _phoneFallback!.latitude : widget.telemetry.latitude;
+    final lon = usingPhoneFallback ? _phoneFallback!.longitude : widget.telemetry.longitude;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.88,
@@ -256,7 +319,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                             ),
                           ),
                           Text(
-                            'Live GPS Tracking • CarLinko Telematics',
+                            'Live GPS Tracking • Vehicle Telematics',
                             style: TextStyle(fontSize: 11, color: colors.textMuted),
                           ),
                         ],
@@ -425,23 +488,28 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                         ),
                       ),
 
-                      // Vector Map Canvas inside Circular Radar Viewport
+                      // Real Map + Radar HUD Overlay inside Circular Viewport
                       ClipOval(
                         child: SizedBox(
                           width: 236,
                           height: 236,
-                          child: AnimatedBuilder(
-                            animation: _radarController,
-                            builder: (context, child) {
-                              return CustomPaint(
-                                painter: _CircularRadarMapPainter(
-                                  isDark: isDark,
-                                  radarAngle: _radarController.value * 2 * math.pi,
-                                  headingAngle: widget.telemetry.headingDegrees * (math.pi / 180),
-                                  isFlashing: _isFlashing,
-                                ),
-                              );
-                            },
+                          child: Stack(
+                            children: [
+                              _buildRadarMapLayer(lat, lon, usingPhoneFallback || widget.telemetry.hasLocation),
+                              AnimatedBuilder(
+                                animation: _radarController,
+                                builder: (context, child) {
+                                  return CustomPaint(
+                                    painter: _CircularRadarMapPainter(
+                                      isDark: isDark,
+                                      radarAngle: _radarController.value * 2 * math.pi,
+                                      headingAngle: widget.telemetry.headingDegrees * (math.pi / 180),
+                                      isFlashing: _isFlashing,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -484,7 +552,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                               ),
                               const SizedBox(width: 5),
                               Text(
-                                'GPS Locked • Range 200m',
+                                usingPhoneFallback ? 'Last known (phone)' : 'GPS Locked • Range 200m',
                                 style: TextStyle(
                                   fontSize: 9.5,
                                   fontWeight: FontWeight.bold,
@@ -521,7 +589,9 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
-                                    widget.telemetry.locationName,
+                                    usingPhoneFallback
+                                        ? (_phoneFallback!.address ?? 'Phone location (approx.)')
+                                        : widget.telemetry.locationName,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
@@ -536,10 +606,35 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                           ),
                         ],
                       ),
+                      if (usingPhoneFallback) ...[
+                        const SizedBox(height: 4),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: colors.evTeal.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.smartphone, size: 11, color: colors.evTeal),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  'From phone · ${_relativeTime(_phoneFallback!.timestamp)}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: colors.evTeal),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 6),
                       Text(
-                        widget.telemetry.hasLocation
-                            ? 'Coordinates: ${lat.toStringAsFixed(4)}° N, ${lon.toStringAsFixed(4)}° E • Bearing: ${widget.telemetry.headingDegrees.toStringAsFixed(0)}° ${_compassPoint(widget.telemetry.headingDegrees)}'
+                        widget.telemetry.hasLocation || usingPhoneFallback
+                            ? 'Coordinates: ${lat.toStringAsFixed(4)}° N, ${lon.toStringAsFixed(4)}° E${usingPhoneFallback ? '' : ' • Bearing: ${widget.telemetry.headingDegrees.toStringAsFixed(0)}° ${_compassPoint(widget.telemetry.headingDegrees)}'}'
                             : 'Coordinates unavailable',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -650,10 +745,10 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: widget.telemetry.hasLocation ? () => _launchChargerSearch(lat, lon) : null,
+                    onPressed: (widget.telemetry.hasLocation || usingPhoneFallback) ? () => _launchChargerSearch(lat, lon) : null,
                     icon: const Icon(Icons.ev_station, size: 16),
                     label: Text(
-                      widget.telemetry.hasLocation ? 'Find Chargers Near Car' : 'Car location unavailable',
+                      (widget.telemetry.hasLocation || usingPhoneFallback) ? 'Find Chargers Near Car' : 'Car location unavailable',
                       style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -665,7 +760,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  widget.telemetry.hasLocation
+                  (widget.telemetry.hasLocation || usingPhoneFallback)
                       ? 'Distance from your car. Check availability and prices in Maps.'
                       : 'Check availability and prices in Maps.',
                   style: TextStyle(fontSize: 11, color: colors.textMuted),
@@ -674,7 +769,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                 for (final charger in _chargersByDistance) ...[
                   _buildChargerTile(
                     name: charger.name,
-                    distance: widget.telemetry.hasLocation ? _formatDistance(_distanceToCarMetres(charger)) : '--',
+                    distance: (widget.telemetry.hasLocation || usingPhoneFallback) ? _formatDistance(_distanceToCarMetres(charger)) : '--',
                     plugs: charger.plugs,
                     lat: charger.lat,
                     lon: charger.lon,
@@ -778,122 +873,9 @@ class _CircularRadarMapPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
 
-    // 1. Base Terrain Background (Urban Grey)
-    final bgPaint = Paint()
-      ..color = isDark ? const Color(0xFF1E2632) : const Color(0xFFE2E4E8);
-    canvas.drawCircle(center, radius, bgPaint);
-
-    // 2. Green Park Zones (Matching user reference layout)
-    final parkPaint = Paint()
-      ..color = isDark ? const Color(0xFF283F30) : const Color(0xFF8FA876)
-      ..style = PaintingStyle.fill;
-
-    // Top-right green parcel
-    final parkPath1 = Path()
-      ..moveTo(size.width * 0.55, size.height * 0.12)
-      ..lineTo(size.width * 0.95, size.height * 0.18)
-      ..lineTo(size.width * 0.88, size.height * 0.35)
-      ..lineTo(size.width * 0.72, size.height * 0.32)
-      ..close();
-    canvas.drawPath(parkPath1, parkPaint);
-
-    // Far-right green reserve
-    final parkPath2 = Path()
-      ..moveTo(size.width * 0.78, size.height * 0.48)
-      ..lineTo(size.width * 0.98, size.height * 0.48)
-      ..lineTo(size.width * 0.92, size.height * 0.82)
-      ..lineTo(size.width * 0.72, size.height * 0.78)
-      ..close();
-    canvas.drawPath(parkPath2, parkPaint);
-
-    // Top-left small green zone
-    final parkPath3 = Path()
-      ..moveTo(size.width * 0.18, size.height * 0.28)
-      ..lineTo(size.width * 0.32, size.height * 0.26)
-      ..lineTo(size.width * 0.34, size.height * 0.38)
-      ..lineTo(size.width * 0.19, size.height * 0.39)
-      ..close();
-    canvas.drawPath(parkPath3, parkPaint);
-
-    // Center-left green parcel
-    final parkPath4 = Path()
-      ..moveTo(size.width * 0.38, size.height * 0.40)
-      ..lineTo(size.width * 0.48, size.height * 0.41)
-      ..lineTo(size.width * 0.47, size.height * 0.53)
-      ..lineTo(size.width * 0.36, size.height * 0.48)
-      ..close();
-    canvas.drawPath(parkPath4, parkPaint);
-
-    // 3. Blue River / Canal Curve (Matching user reference screenshot)
-    final riverPaint = Paint()
-      ..color = isDark ? const Color(0xFF2F81F7) : const Color(0xFF4A90E2)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.5
-      ..strokeCap = StrokeCap.round;
-
-    final riverPath = Path()
-      ..moveTo(size.width * 0.72, size.height * 0.18)
-      ..cubicTo(
-        size.width * 0.69, size.height * 0.35,
-        size.width * 0.63, size.height * 0.55,
-        size.width * 0.73, size.height * 0.88,
-      );
-    canvas.drawPath(riverPath, riverPaint);
-
-    // 4. Building Footprints (Geometric Grey Blocks)
-    final bldgPaint = Paint()
-      ..color = isDark ? const Color(0xFF283546) : const Color(0xFFAEB4BE)
-      ..style = PaintingStyle.fill;
-
-    final buildings = [
-      Rect.fromLTWH(size.width * 0.38, size.height * 0.20, size.width * 0.08, size.height * 0.04),
-      Rect.fromLTWH(size.width * 0.53, size.height * 0.29, size.width * 0.09, size.height * 0.035),
-      Rect.fromLTWH(size.width * 0.54, size.height * 0.36, size.width * 0.04, size.height * 0.09),
-      Rect.fromLTWH(size.width * 0.35, size.height * 0.52, size.width * 0.12, size.height * 0.055),
-      Rect.fromLTWH(size.width * 0.26, size.height * 0.68, size.width * 0.15, size.height * 0.06),
-      Rect.fromLTWH(size.width * 0.20, size.height * 0.61, size.width * 0.09, size.height * 0.05),
-      Rect.fromLTWH(size.width * 0.55, size.height * 0.76, size.width * 0.08, size.height * 0.07),
-    ];
-    for (final b in buildings) {
-      canvas.drawRRect(RRect.fromRectAndRadius(b, const Radius.circular(2)), bldgPaint);
-    }
-
-    // 5. White City Roads & Streets Network
-    final roadPaint = Paint()
-      ..color = isDark ? const Color(0xFF38475C) : Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 6.5
-      ..strokeCap = StrokeCap.square;
-
-    // Main Vertical Spine Road (Through center where car is)
-    final mainRoad = Path()
-      ..moveTo(size.width * 0.51, 0)
-      ..lineTo(size.width * 0.50, size.height * 0.48)
-      ..lineTo(size.width * 0.60, size.height);
-    canvas.drawPath(mainRoad, roadPaint);
-
-    // Top horizontal cross road
-    final road2 = Path()
-      ..moveTo(0, size.height * 0.24)
-      ..lineTo(size.width, size.height * 0.31);
-    canvas.drawPath(road2, roadPaint);
-
-    // Left diagonal avenue
-    final road3 = Path()
-      ..moveTo(size.width * 0.12, size.height * 0.43)
-      ..lineTo(size.width * 0.50, size.height * 0.48);
-    canvas.drawPath(road3, roadPaint);
-
-    final road4 = Path()
-      ..moveTo(size.width * 0.24, size.height * 0.82)
-      ..lineTo(size.width * 0.37, size.height * 0.46);
-    canvas.drawPath(road4, roadPaint);
-
-    // Right curved alley
-    final road5 = Path()
-      ..moveTo(size.width * 0.52, size.height * 0.61)
-      ..lineTo(size.width * 0.78, size.height * 0.58);
-    canvas.drawPath(road5, roadPaint);
+    // Radar-HUD overlay only -- the base layer underneath is now a real
+    // map (see _buildRadarMapLayer), so this just draws the scanning
+    // rings/sweep/vehicle-arrow chrome on top of it.
 
     // 6. Subtle Concentric Radar Grid Rings (50m, 100m, 180m)
     final ringPaint = Paint()
