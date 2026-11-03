@@ -503,6 +503,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                                     painter: _CircularRadarMapPainter(
                                       isDark: isDark,
                                       radarAngle: _radarController.value * 2 * math.pi,
+                                      animValue: _radarController.value,
                                       headingAngle: widget.telemetry.headingDegrees * (math.pi / 180),
                                       isFlashing: _isFlashing,
                                     ),
@@ -854,16 +855,18 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
   }
 }
 
-/// Custom Vector Painter recreating the circular radar map from user reference screenshot.
+/// Custom Vector Painter recreating an authentic tactical circular radar HUD.
 class _CircularRadarMapPainter extends CustomPainter {
   final bool isDark;
   final double radarAngle;
+  final double animValue;
   final double headingAngle;
   final bool isFlashing;
 
   _CircularRadarMapPainter({
     required this.isDark,
     required this.radarAngle,
+    required this.animValue,
     required this.headingAngle,
     required this.isFlashing,
   });
@@ -873,48 +876,144 @@ class _CircularRadarMapPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
 
-    // Radar-HUD overlay only -- the base layer underneath is now a real
-    // map (see _buildRadarMapLayer), so this just draws the scanning
-    // rings/sweep/vehicle-arrow chrome on top of it.
-
-    // 6. Subtle Concentric Radar Grid Rings (50m, 100m, 180m)
-    final ringPaint = Paint()
-      ..color = (isDark ? const Color(0xFFD2F835) : const Color(0xFF65A30D)).withValues(alpha: 0.16)
+    // 1. Concentric Distance Grid Rings (50m, 100m, 180m)
+    final gridPaint = Paint()
+      ..color = (isDark ? const Color(0xFF00E5FF) : const Color(0xFF00838F)).withValues(alpha: 0.16)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
-    canvas.drawCircle(center, radius * 0.35, ringPaint);
-    canvas.drawCircle(center, radius * 0.65, ringPaint);
-    canvas.drawCircle(center, radius * 0.92, ringPaint);
+    canvas.drawCircle(center, radius * 0.35, gridPaint);
+    canvas.drawCircle(center, radius * 0.65, gridPaint);
+    canvas.drawCircle(center, radius * 0.92, gridPaint);
 
-    // 7. Rotating Radar Sweep Beam (Sonar / Scanner Effect)
-    final sweepPaint = Paint()
-      ..shader = SweepGradient(
-        center: Alignment.center,
-        startAngle: 0.0,
-        endAngle: math.pi / 2,
-        colors: [
-          (isDark ? const Color(0xFFD2F835) : const Color(0xFF65A30D)).withValues(alpha: 0.28),
-          Colors.transparent,
-        ],
-        transform: GradientRotation(radarAngle),
-      ).createShader(Rect.fromCircle(center: center, radius: radius));
-    canvas.drawCircle(center, radius, sweepPaint);
+    // Crosshair axes (subtle tactical radar azimuth markers)
+    final axisPaint = Paint()
+      ..color = (isDark ? const Color(0xFF00E5FF) : const Color(0xFF00838F)).withValues(alpha: 0.12)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.8;
+    canvas.drawLine(Offset(center.dx, center.dy - radius * 0.92), Offset(center.dx, center.dy + radius * 0.92), axisPaint);
+    canvas.drawLine(Offset(center.dx - radius * 0.92, center.dy), Offset(center.dx + radius * 0.92, center.dy), axisPaint);
 
-    // 8. Vehicle Position Cursor (Exact Orange Arrow from Reference Screenshot)
-    final carPoint = Offset(size.width * 0.495, size.height * 0.49);
-
-    // Flash wave pulse if horn/flash triggered
-    if (isFlashing) {
-      final pulsePaint = Paint()
-        ..color = Colors.amberAccent.withValues(alpha: 0.4)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 4;
-      canvas.drawCircle(carPoint, 36, pulsePaint);
+    // 2. Continuous Expanding Sonar Pulse Waves (radiating outward across the map)
+    for (int i = 0; i < 2; i++) {
+      final waveProgress = (animValue + (i * 0.5)) % 1.0;
+      final waveRadius = waveProgress * radius * 0.92;
+      final waveAlpha = (1.0 - waveProgress).clamp(0.0, 1.0) * (isDark ? 0.35 : 0.22);
+      if (waveRadius > 10) {
+        canvas.drawCircle(
+          center,
+          waveRadius,
+          Paint()
+            ..color = (isDark ? const Color(0xFF39FF14) : const Color(0xFF43A047)).withValues(alpha: waveAlpha)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.2,
+        );
+      }
     }
 
-    // Vehicle Compass Arrow Pointer
+    // 3. Rotating Radar Sweep Beam (Trailing Phosphor Wedge)
+    final fanAngle = math.pi / 3.0; // 60 degrees trailing cone
+    final sweepPath = Path()
+      ..moveTo(center.dx, center.dy)
+      ..arcTo(
+        Rect.fromCircle(center: center, radius: radius),
+        radarAngle - fanAngle,
+        fanAngle,
+        false,
+      )
+      ..close();
+
+    final sweepShader = SweepGradient(
+      center: Alignment.center,
+      startAngle: radarAngle - fanAngle,
+      endAngle: radarAngle,
+      colors: [
+        Colors.transparent,
+        (isDark ? const Color(0xFF00E5FF) : const Color(0xFF00ACC1)).withValues(alpha: 0.06),
+        (isDark ? const Color(0xFF39FF14) : const Color(0xFF43A047)).withValues(alpha: 0.32),
+      ],
+      stops: const [0.0, 0.45, 1.0],
+    ).createShader(Rect.fromCircle(center: center, radius: radius));
+    canvas.drawPath(sweepPath, Paint()..shader = sweepShader);
+
+    // 4. Sharp Glowing Radar Scanner Leading Edge (Rotating Needle)
+    final lineEnd = center + Offset(math.cos(radarAngle) * radius, math.sin(radarAngle) * radius);
+
+    // Outer soft glow
+    canvas.drawLine(
+      center,
+      lineEnd,
+      Paint()
+        ..color = (isDark ? const Color(0xFF39FF14) : const Color(0xFF2E7D32)).withValues(alpha: 0.45)
+        ..strokeWidth = 3.5
+        ..strokeCap = StrokeCap.round
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
+    );
+
+    // Crisp high-contrast scan line
+    canvas.drawLine(
+      center,
+      lineEnd,
+      Paint()
+        ..color = isDark ? const Color(0xFFE8FFD8) : const Color(0xFF1B5E20)
+        ..strokeWidth = 1.6
+        ..strokeCap = StrokeCap.round,
+    );
+
+    // 5. Flash wave pulse if horn/flash triggered
+    if (isFlashing) {
+      final pulsePaint = Paint()
+        ..color = Colors.amberAccent.withValues(alpha: 0.5)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4;
+      canvas.drawCircle(center, 40, pulsePaint);
+    }
+
+    // 6. ANIMATED RADAR DOT IN THE MIDDLE (Vehicle / Transponder Blip)
+    // Dynamic pulsing ripples originating from the center dot
+    for (int i = 0; i < 2; i++) {
+      final dotPulseProgress = ((animValue * 2.0) + (i * 0.5)) % 1.0;
+      final dotPulseRadius = 4.0 + (dotPulseProgress * 16.0);
+      final dotPulseAlpha = (1.0 - dotPulseProgress).clamp(0.0, 1.0) * 0.65;
+      canvas.drawCircle(
+        center,
+        dotPulseRadius,
+        Paint()
+          ..color = (isDark ? const Color(0xFF00E5FF) : const Color(0xFF00838F)).withValues(alpha: dotPulseAlpha)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.6,
+      );
+    }
+
+    // Center glow halo
+    canvas.drawCircle(
+      center,
+      8.0,
+      Paint()
+        ..color = (isDark ? const Color(0xFF00E5FF) : const Color(0xFF00838F)).withValues(alpha: 0.4)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+    );
+
+    // Center solid radar blip core dot
+    canvas.drawCircle(
+      center,
+      5.0,
+      Paint()
+        ..color = isDark ? const Color(0xFF00E5FF) : const Color(0xFF00838F)
+        ..style = PaintingStyle.fill,
+    );
+
+    // Specular highlight on center dot
+    canvas.drawCircle(
+      center + const Offset(-1.2, -1.2),
+      1.5,
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.95)
+        ..style = PaintingStyle.fill,
+    );
+
+    // 7. Tactical Vehicle Compass Arrow Pointer (Rotated around the center dot)
     canvas.save();
-    canvas.translate(carPoint.dx, carPoint.dy);
+    canvas.translate(center.dx, center.dy);
     canvas.rotate(headingAngle);
 
     // Contact drop shadow under pointer
@@ -931,7 +1030,7 @@ class _CircularRadarMapPainter extends CustomPainter {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
     );
 
-    // Amber vehicle pointer matching screenshot
+    // Amber vehicle pointer matching Chery reference styling
     final arrowPaint = Paint()
       ..color = const Color(0xFFFFA000)
       ..style = PaintingStyle.fill;
@@ -949,6 +1048,7 @@ class _CircularRadarMapPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _CircularRadarMapPainter oldDelegate) {
     return oldDelegate.radarAngle != radarAngle ||
+        oldDelegate.animValue != animValue ||
         oldDelegate.headingAngle != headingAngle ||
         oldDelegate.isFlashing != isFlashing ||
         oldDelegate.isDark != isDark;

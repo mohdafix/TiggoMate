@@ -201,6 +201,33 @@ class ServiceAppointmentManager extends ChangeNotifier {
     return active.first;
   }
 
+  /// Returns the most recent completed service appointment, or null if none
+  ServiceAppointment? get lastCompletedAppointment {
+    final completed = _appointments.where((a) => a.isCompleted && !a.isCancelled).toList();
+    if (completed.isEmpty) return null;
+    completed.sort((a, b) => b.appointmentDate.compareTo(a.appointmentDate));
+    return completed.first;
+  }
+
+  /// Returns the date of the last completed service
+  DateTime? get lastServiceDate {
+    return lastCompletedAppointment?.appointmentDate;
+  }
+
+  /// Formatted summary for AI Copilot context injection
+  String getServiceSummaryForAi() {
+    final last = lastCompletedAppointment;
+    final next = upcomingAppointment;
+    final parts = <String>[];
+    if (last != null) {
+      parts.add('Last Service Completed: ${last.formattedDate} (${last.serviceType} at ${last.centreName})');
+    }
+    if (next != null) {
+      parts.add('Upcoming Scheduled Service: ${next.formattedDate} (${next.timeSlot}) at ${next.centreName} [${next.serviceType}]');
+    }
+    return parts.join('\n  ');
+  }
+
   /// Initialize and load saved appointments
   Future<void> load() async {
     if (_isLoaded) return;
@@ -210,6 +237,11 @@ class ServiceAppointmentManager extends ChangeNotifier {
       if (raw != null && raw.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(raw);
         _appointments = decoded.map((e) => ServiceAppointment.fromJson(e as Map<String, dynamic>)).toList();
+        if (!prefs.containsKey('tm_last_service_date') && lastCompletedAppointment != null) {
+          await prefs.setString('tm_last_service_date', lastCompletedAppointment!.appointmentDate.toIso8601String());
+          await prefs.setString('tm_last_service_type', lastCompletedAppointment!.serviceType);
+          await prefs.setString('tm_last_service_centre', lastCompletedAppointment!.centreName);
+        }
       }
       _isLoaded = true;
       notifyListeners();
@@ -295,6 +327,12 @@ class ServiceAppointmentManager extends ChangeNotifier {
     if (idx != -1) {
       final old = _appointments[idx];
       _appointments[idx] = old.copyWith(isCompleted: true);
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('tm_last_service_date', old.appointmentDate.toIso8601String());
+        await prefs.setString('tm_last_service_type', old.serviceType);
+        await prefs.setString('tm_last_service_centre', old.centreName);
+      } catch (_) {}
       await _persist();
       unawaited(FirebaseSyncService.instance.syncAppointment(_appointments[idx]));
 

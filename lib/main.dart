@@ -1041,6 +1041,7 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
           carPlate: widget.settings.carPlateNumber,
           odometerKm: currentKm,
           nextServiceInfo: nextServiceInfo,
+          lastServiceInfo: ServiceAppointmentManager.instance.getServiceSummaryForAi(),
           liveStatusBlock: liveStatus,
           history: history,
         );
@@ -2235,6 +2236,9 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
             onPressed: () {
               Navigator.pop(ctx);
               ServiceAppointmentManager.instance.completeAppointment(apt.id);
+              if (mounted) {
+                setState(() => _lastServiceDate = apt.appointmentDate);
+              }
             },
             style: ElevatedButton.styleFrom(backgroundColor: context.tokens.accent, foregroundColor: const Color(0xFF0A0B0E)),
             child: const Text('Mark Done'),

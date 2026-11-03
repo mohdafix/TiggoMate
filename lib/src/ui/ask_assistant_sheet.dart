@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../ai/ai_service.dart';
+import '../carlinko/vehicle_repository.dart';
+import '../service/service_appointment_manager.dart';
 import '../theme/app_tokens.dart';
 import 'trips_logbook_screen.dart';
 
@@ -314,6 +316,9 @@ class _AskAssistantSheetState extends State<AskAssistantSheet> with TickerProvid
           customHost: _host ?? '',
           batteryPct: widget.batteryPct,
           carPlate: widget.carPlate,
+          odometerKm: AppVehicleRepository.instance.isVehicleBound && AppVehicleRepository.instance.currentTelemetry.odometerKm > 0 ? AppVehicleRepository.instance.currentTelemetry.odometerKm : 2197,
+          nextServiceInfo: 'Next Scheduled Service: Minor Service (10k)',
+          lastServiceInfo: ServiceAppointmentManager.instance.getServiceSummaryForAi(),
           history: history,
         );
 
@@ -406,10 +411,21 @@ class _AskAssistantSheetState extends State<AskAssistantSheet> with TickerProvid
             'Total cost: **RM ${lastTrip.costRm.toStringAsFixed(2)}**.';
       }
       citation = 'Trips Logbook';
-    } else if (lower.contains('service') || lower.contains('1,000')) {
+    } else if (lower.contains('service') || lower.contains('servis') || lower.contains('1,000') || lower.contains('last service')) {
       replyText =
-          'Your **1,000 km 1st Inspection** is complimentary (FOC labour & parts). Includes CarLinko telematics pairing, 3DHT & BMS scan, and HV harness torque inspection.';
-      citation = 'Official Service Gazette';
+          (() {
+        final lastApt = ServiceAppointmentManager.instance.lastCompletedAppointment;
+        final upcomingApt = ServiceAppointmentManager.instance.upcomingAppointment;
+        final last = lastApt != null ? lastApt.formattedDate : null;
+        if (last != null) {
+          final up = upcomingApt != null ? '\n\nUpcoming appointment: **${upcomingApt.formattedDate} (${upcomingApt.timeSlot})** at **${upcomingApt.centreName}**.' : '';
+          return 'Your last service was completed on **$last** (${lastApt!.serviceType} at ${lastApt.centreName}).$up';
+        } else if (upcomingApt != null) {
+          return 'No completed service recorded yet in your logbook.\n\nYour upcoming service is confirmed for **${upcomingApt.formattedDate} (${upcomingApt.timeSlot})** at **${upcomingApt.centreName}** (${upcomingApt.serviceType}).';
+        }
+        return 'No completed service recorded yet in your logbook. Once you visit Chery and tap **Mark Done** on your booking in the Service tab, the exact date is logged here.\n\nYour **1,000 km 1st Inspection** is complimentary (FOC labour & parts).';
+      })();
+      citation = 'Official Chery Service Records';
     } else {
       final tip = hasApiKey
           ? ''

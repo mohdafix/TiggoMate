@@ -285,6 +285,42 @@ void main() {
       // Test cancellation
       await manager.cancelAppointment(appointment.id);
       expect(manager.upcomingAppointment, isNull);
+
+    });
+
+    test('Marking appointment complete records last service date and updates AI summary', () async {
+      final manager = ServiceAppointmentManager.instance;
+      final serviceDate = DateTime(2026, 10, 20);
+
+      final appointment = ServiceAppointment(
+        id: 'test_apt_done_10k',
+        centreId: 'sel_glenmarie',
+        centreName: 'Chery Glenmarie 3S',
+        centreAddress: 'Shah Alam, Selangor',
+        centrePhone: '03-55691234',
+        serviceType: '10,000 km Minor Service',
+        appointmentDate: serviceDate,
+        timeSlot: '09:30 AM',
+        createdAt: DateTime.now(),
+      );
+
+      await manager.setAppointment(appointment);
+      await manager.completeAppointment(appointment.id);
+
+      expect(manager.lastCompletedAppointment, isNotNull);
+      expect(manager.lastCompletedAppointment!.serviceType, '10,000 km Minor Service');
+      expect(manager.lastServiceDate, serviceDate);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('tm_last_service_date'), serviceDate.toIso8601String());
+      expect(prefs.getString('tm_last_service_type'), '10,000 km Minor Service');
+      expect(prefs.getString('tm_last_service_centre'), 'Chery Glenmarie 3S');
+
+      final summary = manager.getServiceSummaryForAi();
+      expect(summary, contains('Last Service Completed'));
+      expect(summary, contains('10,000 km Minor Service'));
+      expect(summary, contains('Chery Glenmarie 3S'));
+
     });
 
     testWidgets('BookServiceAppointmentSheet renders booking form with date, time, and reminder options',
