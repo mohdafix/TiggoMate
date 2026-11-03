@@ -494,21 +494,27 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                           width: 236,
                           height: 236,
                           child: Stack(
+                            fit: StackFit.expand,
                             children: [
                               _buildRadarMapLayer(lat, lon, usingPhoneFallback || widget.telemetry.hasLocation),
-                              AnimatedBuilder(
-                                animation: _radarController,
-                                builder: (context, child) {
-                                  return CustomPaint(
-                                    painter: _CircularRadarMapPainter(
-                                      isDark: isDark,
-                                      radarAngle: _radarController.value * 2 * math.pi,
-                                      animValue: _radarController.value,
-                                      headingAngle: widget.telemetry.headingDegrees * (math.pi / 180),
-                                      isFlashing: _isFlashing,
-                                    ),
-                                  );
-                                },
+                              Positioned.fill(
+                                child: IgnorePointer(
+                                  child: AnimatedBuilder(
+                                    animation: _radarController,
+                                    builder: (context, child) {
+                                      return CustomPaint(
+                                        size: const Size(236, 236),
+                                        painter: _CircularRadarMapPainter(
+                                          isDark: isDark,
+                                          radarAngle: _radarController.value * 2 * math.pi,
+                                          animValue: _radarController.value,
+                                          headingAngle: widget.telemetry.headingDegrees * (math.pi / 180),
+                                          isFlashing: _isFlashing,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
                               ),
                             ],
                           ),
@@ -873,12 +879,14 @@ class _CircularRadarMapPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
+    final double w = size.width > 10 ? size.width : 236.0;
+    final double h = size.height > 10 ? size.height : 236.0;
+    final center = Offset(w / 2, h / 2);
+    final radius = w / 2;
 
     // 1. Concentric Distance Grid Rings (50m, 100m, 180m)
     final gridPaint = Paint()
-      ..color = (isDark ? const Color(0xFF00E5FF) : const Color(0xFF00838F)).withValues(alpha: 0.16)
+      ..color = const Color(0xFF00E5FF).withValues(alpha: 0.28)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
     canvas.drawCircle(center, radius * 0.35, gridPaint);
@@ -887,7 +895,7 @@ class _CircularRadarMapPainter extends CustomPainter {
 
     // Crosshair axes (subtle tactical radar azimuth markers)
     final axisPaint = Paint()
-      ..color = (isDark ? const Color(0xFF00E5FF) : const Color(0xFF00838F)).withValues(alpha: 0.12)
+      ..color = const Color(0xFF00E5FF).withValues(alpha: 0.22)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.8;
     canvas.drawLine(Offset(center.dx, center.dy - radius * 0.92), Offset(center.dx, center.dy + radius * 0.92), axisPaint);
@@ -897,15 +905,15 @@ class _CircularRadarMapPainter extends CustomPainter {
     for (int i = 0; i < 2; i++) {
       final waveProgress = (animValue + (i * 0.5)) % 1.0;
       final waveRadius = waveProgress * radius * 0.92;
-      final waveAlpha = (1.0 - waveProgress).clamp(0.0, 1.0) * (isDark ? 0.35 : 0.22);
+      final waveAlpha = (1.0 - waveProgress).clamp(0.0, 1.0) * 0.45;
       if (waveRadius > 10) {
         canvas.drawCircle(
           center,
           waveRadius,
           Paint()
-            ..color = (isDark ? const Color(0xFF39FF14) : const Color(0xFF43A047)).withValues(alpha: waveAlpha)
+            ..color = const Color(0xFF39FF14).withValues(alpha: waveAlpha)
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.2,
+            ..strokeWidth = 1.4,
         );
       }
     }
@@ -924,29 +932,29 @@ class _CircularRadarMapPainter extends CustomPainter {
 
     final sweepShader = SweepGradient(
       center: Alignment.center,
-      startAngle: radarAngle - fanAngle,
-      endAngle: radarAngle,
-      colors: [
+      startAngle: 0.0,
+      endAngle: fanAngle,
+      colors: const [
         Colors.transparent,
-        (isDark ? const Color(0xFF00E5FF) : const Color(0xFF00ACC1)).withValues(alpha: 0.06),
-        (isDark ? const Color(0xFF39FF14) : const Color(0xFF43A047)).withValues(alpha: 0.32),
+        Color(0x3300E5FF),
+        Color(0x6639FF14),
       ],
       stops: const [0.0, 0.45, 1.0],
+      transform: GradientRotation(radarAngle - fanAngle),
     ).createShader(Rect.fromCircle(center: center, radius: radius));
     canvas.drawPath(sweepPath, Paint()..shader = sweepShader);
 
     // 4. Sharp Glowing Radar Scanner Leading Edge (Rotating Needle)
     final lineEnd = center + Offset(math.cos(radarAngle) * radius, math.sin(radarAngle) * radius);
 
-    // Outer soft glow
+    // Outer needle glow
     canvas.drawLine(
       center,
       lineEnd,
       Paint()
-        ..color = (isDark ? const Color(0xFF39FF14) : const Color(0xFF2E7D32)).withValues(alpha: 0.45)
+        ..color = const Color(0xFF39FF14).withValues(alpha: 0.70)
         ..strokeWidth = 3.5
-        ..strokeCap = StrokeCap.round
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
+        ..strokeCap = StrokeCap.round,
     );
 
     // Crisp high-contrast scan line
@@ -954,17 +962,17 @@ class _CircularRadarMapPainter extends CustomPainter {
       center,
       lineEnd,
       Paint()
-        ..color = isDark ? const Color(0xFFE8FFD8) : const Color(0xFF1B5E20)
-        ..strokeWidth = 1.6
+        ..color = const Color(0xFFE8FFD8)
+        ..strokeWidth = 1.8
         ..strokeCap = StrokeCap.round,
     );
 
     // 5. Flash wave pulse if horn/flash triggered
     if (isFlashing) {
       final pulsePaint = Paint()
-        ..color = Colors.amberAccent.withValues(alpha: 0.5)
+        ..color = Colors.amberAccent.withValues(alpha: 0.6)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 4;
+        ..strokeWidth = 4.0;
       canvas.drawCircle(center, 40, pulsePaint);
     }
 
@@ -972,42 +980,41 @@ class _CircularRadarMapPainter extends CustomPainter {
     // Dynamic pulsing ripples originating from the center dot
     for (int i = 0; i < 2; i++) {
       final dotPulseProgress = ((animValue * 2.0) + (i * 0.5)) % 1.0;
-      final dotPulseRadius = 4.0 + (dotPulseProgress * 16.0);
-      final dotPulseAlpha = (1.0 - dotPulseProgress).clamp(0.0, 1.0) * 0.65;
+      final dotPulseRadius = 4.0 + (dotPulseProgress * 20.0);
+      final dotPulseAlpha = (1.0 - dotPulseProgress).clamp(0.0, 1.0) * 0.80;
       canvas.drawCircle(
         center,
         dotPulseRadius,
         Paint()
-          ..color = (isDark ? const Color(0xFF00E5FF) : const Color(0xFF00838F)).withValues(alpha: dotPulseAlpha)
+          ..color = const Color(0xFF00E5FF).withValues(alpha: dotPulseAlpha)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.6,
+          ..strokeWidth = 1.8,
       );
     }
 
     // Center glow halo
     canvas.drawCircle(
       center,
-      8.0,
+      9.0,
       Paint()
-        ..color = (isDark ? const Color(0xFF00E5FF) : const Color(0xFF00838F)).withValues(alpha: 0.4)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+        ..color = const Color(0xFF00E5FF).withValues(alpha: 0.50),
     );
 
     // Center solid radar blip core dot
     canvas.drawCircle(
       center,
-      5.0,
+      5.5,
       Paint()
-        ..color = isDark ? const Color(0xFF00E5FF) : const Color(0xFF00838F)
+        ..color = const Color(0xFF00E5FF)
         ..style = PaintingStyle.fill,
     );
 
     // Specular highlight on center dot
     canvas.drawCircle(
       center + const Offset(-1.2, -1.2),
-      1.5,
+      2.0,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.95)
+        ..color = Colors.white
         ..style = PaintingStyle.fill,
     );
 
@@ -1016,7 +1023,6 @@ class _CircularRadarMapPainter extends CustomPainter {
     canvas.translate(center.dx, center.dy);
     canvas.rotate(headingAngle);
 
-    // Contact drop shadow under pointer
     final arrowShadow = Path()
       ..moveTo(0, -18)
       ..lineTo(11, 10)
@@ -1026,11 +1032,10 @@ class _CircularRadarMapPainter extends CustomPainter {
     canvas.drawPath(
       arrowShadow.shift(const Offset(1, 2)),
       Paint()
-        ..color = Colors.black.withValues(alpha: 0.35)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+        ..color = Colors.black.withValues(alpha: 0.50)
+        ..style = PaintingStyle.fill,
     );
 
-    // Amber vehicle pointer matching Chery reference styling
     final arrowPaint = Paint()
       ..color = const Color(0xFFFFA000)
       ..style = PaintingStyle.fill;
