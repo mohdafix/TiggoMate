@@ -3,6 +3,7 @@ import 'src/ui/book_service_appointment_sheet.dart';
 import 'src/service/service_appointment_manager.dart';
 import 'src/service/location_tracker_service.dart';
 import 'src/service/vehicle_alert_notifier.dart';
+import 'src/service/bluetooth_driving_tracker_service.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -71,6 +72,7 @@ void main() async {
   // ajar / low 12V alerts) can actually show.
   unawaited(VehicleAlertNotifier.requestPermission());
 
+  unawaited(BluetoothDrivingTrackerService.instance.init());
   runApp(const TiggoMateApp());
 }
 

@@ -428,6 +428,19 @@ class AutoTripAndChargeService extends ChangeNotifier {
     }
   }
 
+  /// Immediately finalizes any active trip (e.g. when vehicle Bluetooth disconnects).
+  Future<void> finalizeActiveTripNow({double? tnbTariff, String? destinationAddress}) async {
+    if (_currentTrip != null) {
+      if (destinationAddress != null && destinationAddress.isNotEmpty) {
+        _currentTrip!.lastLocation = destinationAddress;
+      }
+      await _finalizeTrip(_currentTrip!, tnbTariff: tnbTariff);
+      _currentTrip = null;
+      await _persistInFlight();
+      notifyListeners();
+    }
+  }
+
   void _checkTimeouts() {
     final now = DateTime.now();
 

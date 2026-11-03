@@ -15,6 +15,7 @@ import 'carlinko_connect_dialog.dart';
 import 'mytnb_connect_dialog.dart';
 import 'setup_intro_screen.dart';
 import '../firebase/firebase_sync_service.dart';
+import '../service/bluetooth_driving_tracker_service.dart';
 
 // Re-export AppSettings and SettingsService so existing callers keep working seamlessly
 class AppSettings {
@@ -552,6 +553,68 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  void _showBluetoothDevicePicker() async {
+    final devices = await BluetoothDrivingTrackerService.instance.getPairedDevices();
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: t.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        final currentCustom = BluetoothDrivingTrackerService.instance.customCarBtName;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Vehicle Bluetooth Device', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: t.ink)),
+                  const SizedBox(height: 4),
+                  Text('Select your Chery Tiggo Infotainment or CarLinko BLE device to trigger automatic tracking.', style: TextStyle(fontSize: 13, color: t.ink2)),
+                  const SizedBox(height: 12),
+                  ListTile(
+                    leading: const Icon(Icons.auto_mode_rounded),
+                    title: Text('Auto-detect (Default)', style: TextStyle(fontWeight: FontWeight.w600, color: t.ink)),
+                    subtitle: Text('Matches any Chery, Tiggo, Jaecoo, Omoda or CarLinko device', style: TextStyle(fontSize: 12, color: t.ink2)),
+                    trailing: currentCustom == null ? Icon(Icons.check, color: t.accent) : null,
+                    onTap: () async {
+                      await BluetoothDrivingTrackerService.instance.setCustomCarBtName(null);
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      setState(() {});
+                    },
+                  ),
+                  if (devices.isNotEmpty) ...[
+                    const Divider(),
+                    Text('Paired Devices', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: t.ink3)),
+                    const SizedBox(height: 4),
+                    ...devices.map((d) {
+                      final name = d['name'] ?? 'Unknown';
+                      final isSel = currentCustom != null && currentCustom.toLowerCase() == name.toLowerCase();
+                      return ListTile(
+                        leading: const Icon(Icons.bluetooth_rounded),
+                        title: Text(name, style: TextStyle(fontWeight: FontWeight.w600, color: t.ink)),
+                        subtitle: Text(d['address'] ?? '', style: TextStyle(fontSize: 12, color: t.ink2)),
+                        trailing: isSel ? Icon(Icons.check, color: t.accent) : null,
+                        onTap: () async {
+                          await BluetoothDrivingTrackerService.instance.setCustomCarBtName(name);
+                          if (ctx.mounted) Navigator.pop(ctx);
+                          setState(() {});
+                        },
+                      );
+                    }),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _showCarLinkoStatusPicker() {
     const states = [
       ['Active', 'Live Connected Vehicle', 'Real telemetry broadcast with active cloud sync'],
@@ -764,6 +827,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 );
               },
+            ),
+          ]),
+
+          // Bluetooth Auto-Drive & Parking Tracker
+          _group('Bluetooth Drive & Parking Tracker', [
+            _switchRow(
+              Icons.bluetooth_searching_rounded,
+              'Auto Drive & Parking Tracker',
+              'Auto-starts live telematics when connected; captures parking GPS & saves trip upon engine shutoff.',
+              BluetoothDrivingTrackerService.instance.isEnabled,
+              (val) async {
+                await BluetoothDrivingTrackerService.instance.setEnabled(val);
+                setState(() {});
+              },
+            ),
+            _buildSettingTile(
+              leading: Icon(
+                Icons.bluetooth_connected_rounded,
+                color: BluetoothDrivingTrackerService.instance.isCarConnected ? t.ok : t.ink2,
+                size: 22,
+              ),
+              title: 'Paired Vehicle Bluetooth Device',
+              subtitle: BluetoothDrivingTrackerService.instance.isCarConnected
+                  ? 'Connected: ${BluetoothDrivingTrackerService.instance.connectedCarName}'
+                  : (BluetoothDrivingTrackerService.instance.customCarBtName != null &&
+                          BluetoothDrivingTrackerService.instance.customCarBtName!.isNotEmpty
+                      ? 'Target: ${BluetoothDrivingTrackerService.instance.customCarBtName}'
+                      : 'Auto-detect (Chery / Tiggo / Jaecoo / Omoda / CarLinko)'),
+              trailing: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: (BluetoothDrivingTrackerService.instance.isCarConnected ? t.ok : t.ink3).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  BluetoothDrivingTrackerService.instance.isCarConnected ? 'CONNECTED' : 'AUTO',
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.bold,
+                    color: BluetoothDrivingTrackerService.instance.isCarConnected ? t.ok : t.ink2,
+                  ),
+                ),
+              ),
+              onTap: _showBluetoothDevicePicker,
             ),
           ]),
 

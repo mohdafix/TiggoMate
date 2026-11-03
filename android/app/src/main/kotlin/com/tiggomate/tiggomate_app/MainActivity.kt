@@ -31,6 +31,27 @@ class MainActivity : FlutterActivity() {
         super.onDestroy()
         speechRecognizer?.destroy()
         speechRecognizer = null
+        bluetoothChannel = null
+    }
+
+    companion object {
+        var bluetoothChannel: io.flutter.plugin.common.MethodChannel? = null
+
+        fun notifyBluetoothConnected(name: String, address: String) {
+            bluetoothChannel?.let { channel ->
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    channel.invokeMethod("onCarConnected", mapOf("name" to name, "address" to address))
+                }
+            }
+        }
+
+        fun notifyBluetoothDisconnected(name: String, address: String) {
+            bluetoothChannel?.let { channel ->
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    channel.invokeMethod("onCarDisconnected", mapOf("name" to name, "address" to address))
+                }
+            }
+        }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -89,6 +110,41 @@ class MainActivity : FlutterActivity() {
                         result.success(true)
                     } catch (e: Exception) {
                         result.success(false)
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
+
+        // 3. Bluetooth Car Driving & Tracking Channel
+        val btChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.tiggomate/bluetooth_tracker")
+        bluetoothChannel = btChannel
+        btChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "startForegroundTracking" -> {
+                    val name = call.argument<String>("vehicleName") ?: "Chery Tiggo"
+                    TiggoMateForegroundService.start(this, name)
+                    result.success(true)
+                }
+                "stopForegroundTracking" -> {
+                    TiggoMateForegroundService.stop(this)
+                    result.success(true)
+                }
+                "getPairedDevices" -> {
+                    try {
+                        val btManager = getSystemService(Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
+                        val adapter = btManager?.adapter
+                        if (adapter != null && adapter.isEnabled) {
+                            val bonded = adapter.bondedDevices ?: emptySet()
+                            val list = bonded.map { d ->
+                                mapOf("name" to (d.name ?: "Unknown"), "address" to d.address)
+                            }
+                            result.success(list)
+                        } else {
+                            result.success(emptyList<Map<String, String>>())
+                        }
+                    } catch (e: Exception) {
+                        result.success(emptyList<Map<String, String>>())
                     }
                 }
                 else -> result.notImplemented()
