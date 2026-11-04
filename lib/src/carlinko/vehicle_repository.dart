@@ -24,6 +24,31 @@ String? _extractDeviceSn(Map<String, dynamic> vehicle) =>
     vehicle['vin']?.toString() ??
     vehicle['vehicleId']?.toString();
 
+/// Detailed outcome of a remote-control CAN opcode transmission.
+class RemoteCommandResult {
+  final bool success;
+  final String opcode;
+  final String? code;
+  final String? message;
+  final dynamic rawData;
+  final int latencyMs;
+  final DateTime timestamp;
+
+  RemoteCommandResult({
+    required this.success,
+    required this.opcode,
+    this.code,
+    this.message,
+    this.rawData,
+    this.latencyMs = 0,
+    DateTime? timestamp,
+  }) : timestamp = timestamp ?? DateTime.now();
+
+  @override
+  String toString() =>
+      'RemoteCommandResult(success: $success, opcode: $opcode, code: $code, message: $message, latency: ${latencyMs}ms)';
+}
+
 abstract class VehicleRepository {
   Stream<VehicleTelemetry> get telemetryStream;
   VehicleTelemetry get currentTelemetry;
@@ -38,6 +63,11 @@ abstract class VehicleRepository {
   Future<void> disconnect();
   void toggleCharging(bool charging);
   Future<bool> sendRemoteCommand(String command, {Map<String, dynamic>? params});
+  Future<RemoteCommandResult> sendRemoteCommandWithResult(
+    String command, {
+    bool sendWakeupHandshake = true,
+    bool send0x23Init = false,
+  });
   void dispose();
 }
 
@@ -114,6 +144,21 @@ class MockVehicleRepository implements VehicleRepository {
   @override
   Future<bool> sendRemoteCommand(String command, {Map<String, dynamic>? params}) async {
     return true;
+  }
+
+  @override
+  Future<RemoteCommandResult> sendRemoteCommandWithResult(
+    String command, {
+    bool sendWakeupHandshake = true,
+    bool send0x23Init = false,
+  }) async {
+    return RemoteCommandResult(
+      success: true,
+      opcode: command,
+      code: '0000',
+      message: 'Mock command executed successfully',
+      latencyMs: 12,
+    );
   }
 
   @override
@@ -498,36 +543,82 @@ class LiveCarLinkoRepository implements VehicleRepository {
   /// real request body has no per-command extra fields.
   @override
   Future<bool> sendRemoteCommand(String command, {Map<String, dynamic>? params}) async {
+    final res = await sendRemoteCommandWithResult(command);
+    return res.success;
+  }
+
+  @override
+  Future<RemoteCommandResult> sendRemoteCommandWithResult(
+    String command, {
+    bool sendWakeupHandshake = true,
+    bool send0x23Init = false,
+  }) async {
     if (_vehicleId == null || _deviceSn == null) {
       debugPrint('CarLinko remoteControl "$command" skipped: no vehicle/deviceSn bound');
-      return false;
+      return RemoteCommandResult(
+        success: false,
+        opcode: command,
+        code: 'NO_BIND',
+        message: 'No vehicle or device serial number bound',
+      );
     }
+    final sw = Stopwatch()..start();
     try {
-      // _client.sendRemoteControl() already throws unless CarLinko's cloud
-      // reported top-level code "0000" (see CarLinkoClient._request), so
-      // reaching here at all means the command was accepted. The returned
-      // "data" payload isn't guaranteed to carry its own code/success
-      // field, so re-checking one here was the actual bug: it silently
-      // reported "failed" even on a real, accepted command.
-      await _client.sendRemoteControl(
+      final res = await _client.sendRemoteControl(
         vehicleId: _vehicleId!,
         deviceSn: _deviceSn!,
         opcode: command,
+        sendWakeupHandshake: sendWakeupHandshake,
+        send0x23Init: send0x23Init,
       );
-      return true;
-    } catch (e) {
-      debugPrint('CarLinko remoteControl "$command" failed: $e');
+      sw.stop();
+      return RemoteCommandResult(
+        success: true,
+        opcode: command,
+        code: '0000',
+        message: 'Command accepted by T-Box',
+        rawData: res,
+        latencyMs: sw.elapsedMilliseconds,
+      );
+    } on CarLinkoException catch (e) {
+      sw.stop();
+      debugPrint('CarLinko remoteControl "$command" failed: ${e.code} - ${e.message}');
       if (command == CarLinkoOpcodes.acOff) {
         try {
-          await _client.sendRemoteControl(
+          final resAlt = await _client.sendRemoteControl(
             vehicleId: _vehicleId!,
             deviceSn: _deviceSn!,
             opcode: CarLinkoOpcodes.acOffAlt,
+            sendWakeupHandshake: sendWakeupHandshake,
+            send0x23Init: send0x23Init,
           );
-          return true;
+          return RemoteCommandResult(
+            success: true,
+            opcode: CarLinkoOpcodes.acOffAlt,
+            code: '0000',
+            message: 'A/C off executed with alternative opcode',
+            rawData: resAlt,
+            latencyMs: sw.elapsedMilliseconds,
+          );
         } catch (_) {}
       }
-      return false;
+      return RemoteCommandResult(
+        success: false,
+        opcode: command,
+        code: e.code,
+        message: e.message,
+        latencyMs: sw.elapsedMilliseconds,
+      );
+    } catch (e) {
+      sw.stop();
+      debugPrint('CarLinko remoteControl "$command" error: $e');
+      return RemoteCommandResult(
+        success: false,
+        opcode: command,
+        code: 'ERROR',
+        message: e.toString(),
+        latencyMs: sw.elapsedMilliseconds,
+      );
     }
   }
 
@@ -624,6 +715,26 @@ class AppVehicleRepository implements VehicleRepository {
       return _liveRepo.sendRemoteCommand(command, params: params);
     }
     return _mockRepo.sendRemoteCommand(command, params: params);
+  }
+
+  @override
+  Future<RemoteCommandResult> sendRemoteCommandWithResult(
+    String command, {
+    bool sendWakeupHandshake = true,
+    bool send0x23Init = false,
+  }) async {
+    if (_isLiveActive) {
+      return _liveRepo.sendRemoteCommandWithResult(
+        command,
+        sendWakeupHandshake: sendWakeupHandshake,
+        send0x23Init: send0x23Init,
+      );
+    }
+    return _mockRepo.sendRemoteCommandWithResult(
+      command,
+      sendWakeupHandshake: sendWakeupHandshake,
+      send0x23Init: send0x23Init,
+    );
   }
 
   /// Restore a previously-saved CarLinko session (if any) so the app

@@ -29,8 +29,8 @@ class CarLinkoOpcodes {
   static const String lock = '740100';
   static const String unlock = '740200';
   static const String acOn = '741001';
-  static const String acOff = '741002'; // J5-EV-Dashboard confirmed A/C off
-  static const String acOffAlt = '741000'; // Alternative A/C off
+  static const String acOff = '741000'; // Chery CAN-bus confirmed A/C off
+  static const String acOffAlt = '741002'; // J5-EV alternative
   static const String stopCharging = '742701';
   static const String windowsClose = '740500';
   static const String windowsOpen = '740600';
@@ -44,8 +44,15 @@ class CarLinkoOpcodes {
   static const String defogOn = '741201';
   static const String defogOff = '741200';
   static const String quickCool = '742001';
+  static const String quickCoolOff = '742000';
+  static const String quickHeat = '741F01';
+  static const String quickHeatOff = '741F00';
   static const String engineStart = '740700'; // Jump table decode (assembledSendData): Engine on
   static const String engineStop = '740800';  // Jump table decode (assembledSendData): Engine off
+  static const String airPurifyOn = '742501';
+  static const String airPurifyOff = '742500';
+  static const String steeringHeatOn = '742401';
+  static const String steeringHeatOff = '742400';
 }
 
 class CarLinkoException implements Exception {
@@ -328,22 +335,37 @@ class CarLinkoClient {
   /// client sent were wrong guesses the real API rejected.
   ///
   /// [deviceSn] is the vehicle's device serial number (from getVehicles()),
-  /// a separate required field alongside vehicleId. Fires an init ("77")
-  /// opcode first, same as the real app, best-effort (its failure doesn't
-  /// block the actual command).
+  /// a separate required field alongside vehicleId. When [sendWakeupHandshake]
+  /// is true, fires an init ("77") opcode first (mirrors the official Chery app).
   Future<Map<String, dynamic>> sendRemoteControl({
     required String vehicleId,
     required String deviceSn,
     required String opcode,
+    bool sendWakeupHandshake = true,
+    bool send0x23Init = false,
   }) async {
-    if (opcode != CarLinkoOpcodes.init && opcode != CarLinkoOpcodes.init0x23) {
+    if (sendWakeupHandshake && opcode != CarLinkoOpcodes.init && opcode != CarLinkoOpcodes.init0x23) {
       try {
-        await sendRemoteControl(vehicleId: vehicleId, deviceSn: deviceSn, opcode: CarLinkoOpcodes.init0x23);
-        await Future.delayed(const Duration(milliseconds: 250));
-        await sendRemoteControl(vehicleId: vehicleId, deviceSn: deviceSn, opcode: CarLinkoOpcodes.init);
-        // 500ms wake-up settling window for vehicle T-Box CAN-bus
-        await Future.delayed(const Duration(milliseconds: 500));
-      } catch (_) {}
+        if (send0x23Init) {
+          await sendRemoteControl(
+            vehicleId: vehicleId,
+            deviceSn: deviceSn,
+            opcode: CarLinkoOpcodes.init0x23,
+            sendWakeupHandshake: false,
+          );
+          await Future.delayed(const Duration(milliseconds: 200));
+        }
+        await sendRemoteControl(
+          vehicleId: vehicleId,
+          deviceSn: deviceSn,
+          opcode: CarLinkoOpcodes.init,
+          sendWakeupHandshake: false,
+        );
+        // Wake-up settling window for vehicle T-Box CAN-bus
+        await Future.delayed(const Duration(milliseconds: 400));
+      } catch (_) {
+        // Init handshake is best effort
+      }
     }
 
     final body = {

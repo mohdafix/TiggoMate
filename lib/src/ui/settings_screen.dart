@@ -14,6 +14,7 @@ import 'auth_sheet.dart';
 import 'carlinko_connect_dialog.dart';
 import 'mytnb_connect_dialog.dart';
 import 'setup_intro_screen.dart';
+import 'remote_command_diagnostics_sheet.dart';
 import '../firebase/firebase_sync_service.dart';
 import '../service/bluetooth_driving_tracker_service.dart';
 
@@ -825,6 +826,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     currentAccount: savedAccount,
                     onConnected: () => setState(() => _carLinkoStatus = 'Active'),
                   ),
+                );
+              },
+            ),
+            _buildSettingTile(
+              leading: Icon(Icons.troubleshoot_rounded, color: t.accent, size: 22),
+              title: 'Remote Opcode Diagnostics',
+              subtitle: 'Test candidate CAN-bus opcodes & monitor live T-Box response codes',
+              trailing: Icon(Icons.chevron_right_rounded, color: t.ink3, size: 20),
+              onTap: () {
+                RemoteCommandDiagnosticsSheet.show(
+                  context,
+                  repository: AppVehicleRepository.instance,
                 );
               },
             ),

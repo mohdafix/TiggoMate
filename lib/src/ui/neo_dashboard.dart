@@ -24,6 +24,7 @@ import '../widgets/home_widget_service.dart';
 import 'climate_control_sheet.dart';
 import 'window_sunroof_sheet.dart';
 import 'remote_engine_sheet.dart';
+import 'remote_command_diagnostics_sheet.dart';
 import 'car_view_carousel.dart';
 import 'energy_screen.dart';
 import '../mytnb/mytnb_api.dart';
@@ -652,6 +653,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
         int? seatVentPass,
         bool? steeringHeat,
       }) {
+        final previousAc = _isAcActive;
+        final previousTelemetry = _telemetry;
         setState(() {
           _isAcActive = acOn;
           _telemetry = _telemetry.copyWith(
@@ -671,9 +674,25 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
           );
         });
         _syncWidgetTelemetry();
-        _showNotification(acOn
-            ? '❄️ Cabin Pre-cooling (${tempC.toStringAsFixed(1)}°C, ${durationMin}m)'
-            : '❄️ Climate Pre-conditioning OFF');
+
+        final opcode = acOn
+            ? ((rapidCool == true) ? CarLinkoOpcodes.quickCool : CarLinkoOpcodes.acOn)
+            : CarLinkoOpcodes.acOff;
+
+        _sendCommandAndReport(
+          opcode,
+          successMessage: acOn
+              ? '❄️ Cabin Pre-cooling (${tempC.toStringAsFixed(1)}°C, ${durationMin}m)'
+              : '❄️ Climate Pre-conditioning OFF',
+          failureMessage: '⚠️ Climate command failed',
+          onRevert: () {
+            setState(() {
+              _isAcActive = previousAc;
+              _telemetry = previousTelemetry;
+            });
+            _syncWidgetTelemetry();
+          },
+        );
       },
     );
   }
@@ -685,6 +704,9 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       initialWindowsVented: _isWindowsVented,
       initialSunroofOpen: _telemetry.sunroofOpen,
       onApply: (windowAction, sunroofAction) {
+        final previousVented = _isWindowsVented;
+        final previousTelemetry = _telemetry;
+
         setState(() {
           if (windowAction == 'vent') {
             _isWindowsVented = true;
@@ -699,7 +721,64 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             sunroofOpen: isSunroofOpen,
           );
         });
-        _showNotification('🪟 Windows: $windowAction • Sunroof: $sunroofAction');
+
+        if (windowAction == 'vent') {
+          _sendCommandAndReport(
+            CarLinkoOpcodes.windowsVent,
+            successMessage: '🪟 Windows vented (20mm)',
+            failureMessage: '⚠️ Window vent command failed',
+            onRevert: () {
+              setState(() {
+                _isWindowsVented = previousVented;
+                _telemetry = previousTelemetry;
+              });
+            },
+          );
+        } else if (windowAction == 'open') {
+          _sendCommandAndReport(
+            CarLinkoOpcodes.windowsOpen,
+            successMessage: '🪟 All 4 Windows opened',
+            failureMessage: '⚠️ Window open command failed',
+            onRevert: () {
+              setState(() {
+                _isWindowsVented = previousVented;
+                _telemetry = previousTelemetry;
+              });
+            },
+          );
+        } else if (windowAction == 'close') {
+          _sendCommandAndReport(
+            CarLinkoOpcodes.windowsClose,
+            successMessage: '🪟 All Windows closed and secured',
+            failureMessage: '⚠️ Window close command failed',
+            onRevert: () {
+              setState(() {
+                _isWindowsVented = previousVented;
+                _telemetry = previousTelemetry;
+              });
+            },
+          );
+        }
+
+        if (sunroofAction == 'open') {
+          _sendCommandAndReport(
+            CarLinkoOpcodes.sunroofOpen,
+            successMessage: '☀️ Panoramic Sunroof opened',
+            failureMessage: '⚠️ Sunroof open command failed',
+          );
+        } else if (sunroofAction == 'tilt') {
+          _sendCommandAndReport(
+            CarLinkoOpcodes.sunroofTilt,
+            successMessage: '☀️ Panoramic Sunroof tilted',
+            failureMessage: '⚠️ Sunroof tilt command failed',
+          );
+        } else if (sunroofAction == 'closed') {
+          _sendCommandAndReport(
+            CarLinkoOpcodes.sunroofClose,
+            successMessage: '☀️ Panoramic Sunroof closed',
+            failureMessage: '⚠️ Sunroof close command failed',
+          );
+        }
       },
     );
   }
@@ -710,12 +789,24 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       telemetry: _telemetry,
       initialEngineOn: _telemetry.engineOn,
       onApply: (startEngine, runtimeMinutes) {
+        final previousEngine = _telemetry.engineOn;
         setState(() {
           _telemetry = _telemetry.copyWith(engineOn: startEngine);
         });
-        _showNotification(startEngine
-            ? '⚡ 1.5T Hybrid Engine started (${runtimeMinutes}m pre-warm)'
-            : '⚡ 1.5T Hybrid Engine stopped');
+
+        final opcode = startEngine ? CarLinkoOpcodes.engineStart : CarLinkoOpcodes.engineStop;
+        _sendCommandAndReport(
+          opcode,
+          successMessage: startEngine
+              ? '⚡ 1.5T Hybrid Engine started (${runtimeMinutes}m pre-warm)'
+              : '⚡ 1.5T Hybrid Engine stopped',
+          failureMessage: '⚠️ Engine command failed',
+          onRevert: () {
+            setState(() {
+              _telemetry = _telemetry.copyWith(engineOn: previousEngine);
+            });
+          },
+        );
       },
     );
   }
@@ -729,13 +820,16 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     required String failureMessage,
     VoidCallback? onRevert,
   }) async {
-    final ok = await widget.repository.sendRemoteCommand(command);
+    final result = await widget.repository.sendRemoteCommandWithResult(command);
     if (!mounted) return;
-    if (ok) {
+    if (result.success) {
       _showNotification(successMessage);
     } else {
       onRevert?.call();
-      _showNotification(failureMessage, type: NotificationType.error);
+      final errDetail = (result.code != null && result.code!.isNotEmpty)
+          ? ' [${result.code}: ${result.message ?? "Error"}]'
+          : (result.message != null ? ' (${result.message})' : '');
+      _showNotification('$failureMessage$errDetail', type: NotificationType.error);
     }
   }
 
@@ -2881,6 +2975,37 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 8),
+                InkWell(
+                  onTap: () {
+                    RemoteCommandDiagnosticsSheet.show(
+                      context,
+                      repository: widget.repository,
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.troubleshoot_rounded, size: 13, color: colors.evTeal),
+                        const SizedBox(width: 5),
+                        Text(
+                          'CAN-bus Opcode Diagnostics & Tester',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: colors.evTeal,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                        const SizedBox(width: 3),
+                        Icon(Icons.chevron_right_rounded, size: 14, color: colors.evTeal),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
