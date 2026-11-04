@@ -1031,6 +1031,8 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
           history.removeLast();
         }
 
+        final tripSummary = await getTripSummaryForAi();
+
         final aiReply = await AiConfigResolver.queryAi(
           prompt: text,
           apiKey: widget.settings.aiApiKey,
@@ -1042,6 +1044,7 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
           odometerKm: currentKm,
           nextServiceInfo: nextServiceInfo,
           lastServiceInfo: ServiceAppointmentManager.instance.getServiceSummaryForAi(),
+          tripInfo: tripSummary,
           liveStatusBlock: liveStatus,
           history: history,
         );
@@ -1144,18 +1147,20 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
     } else if (q.contains("service") || q.contains("schedule") || q.contains("price") || q.contains("pricing") || q.contains("maintenance")) {
       answer = "### Chery Tiggo 7 PHEV CSH Service Schedule Overview\n\nKey points from the official 27 August 2026 schedule:\n\n- **1,000 km:** 1st Inspection — **FOC**\n- **10,000 km:** Oil Service — **RM 407.50** (Due in **$kmLeft km** / **~$daysLeft days**)\n- **20,000 km:** Oil + Air Filter — **RM 444.60 (Free Labour)**\n- **30,000 km:** Oil + Spark Plugs — **RM 715.90**\n- **40,000 km:** Major Service (Trans Oil, Coolant, Brake Fluid) — **RM 1,085.60 (Free Labour)**\n- **60,000 km:** Major Service (Air Filter + Plugs) — **RM 753.00 (Free Labour)**\n- **Free Labour Milestones:** 1k, 20k, 40k, 60k, 80k, and 100k km!\n\n> **Manual Citation:** *Chery Tiggo 7 PHEV CSH Service Schedule & Pricing Guide*, 27 August 2026.";
       citations = [{"document": "Chery Tiggo 7 PHEV CSH Service Schedule", "section": "Overview", "page": 1}];
-    } else if (q.contains("last trip") || q.contains("latest trip")) {
-      final lastTrip = await loadLatestSavedTrip();
+    } else if (q.contains("last trip") || q.contains("latest trip") || q.contains("trip") || q.contains("perjalanan") || q.contains("drive") || q.contains("logbook")) {
+      final trips = await loadRecentTrips(limit: 5);
       if (!mounted) return;
-      if (lastTrip == null) {
-        answer = 'You have no trips logged yet. Record a drive or add a trip from the **Log** tab and I can break down its cost.';
+      if (trips.isEmpty) {
+        answer = 'You have no trips logged yet. Record a drive, let Auto-Trip detect when connected, or tap **+ Add Trip** in the **LOG** tab.';
       } else {
+        final lastTrip = trips.first;
         final energy = [
-          if (lastTrip.electricKwh > 0) '${lastTrip.electricKwh.toStringAsFixed(1)} kWh',
+          if (lastTrip.electricKwh > 0) '${lastTrip.electricKwh.toStringAsFixed(1)} kWh EV',
           if (lastTrip.petrolLitres > 0) '${lastTrip.petrolLitres.toStringAsFixed(1)} L of petrol',
         ].join(' and ');
         answer = 'Last trip was **${lastTrip.title} (${lastTrip.distanceKm.toStringAsFixed(1)} km)**. '
             'Driven ${lastTrip.evRatio.round()}% on EV${energy.isEmpty ? '' : ' using $energy'}. '
+            'Duration: ${lastTrip.durationMinutes} min (Avg ${lastTrip.avgSpeedKmh.toStringAsFixed(0)} km/h). '
             'Total cost: **RM ${lastTrip.costRm.toStringAsFixed(2)}**.';
       }
       citations = [{"document": "Trips Logbook", "section": "Recent Drives", "page": 1}];

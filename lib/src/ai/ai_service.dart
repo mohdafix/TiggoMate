@@ -199,6 +199,7 @@ class AiConfigResolver {
     int odometerKm = 0,
     String? nextServiceInfo,
     String? lastServiceInfo,
+    String? tripInfo,
     String? liveStatusBlock,
     List<Map<String, String>> history = const [],
   }) async {
@@ -221,7 +222,7 @@ Vehicle Telematics & Specs:
 - Powertrain: 1.5T Dedicated Hybrid Engine (156 PS) + Dual Electric Motors + 3DHT (Total: 326 PS / 545 Nm)
 - Battery: 18.3 kWh LFP (CATL cells), 350V
 - Current Battery SoC: $batteryPct%
-- Current Odometer: $odometerKm km${lastServiceInfo != null && lastServiceInfo.isNotEmpty ? '\n- Service History & Records:\n  $lastServiceInfo' : ''}${nextServiceInfo != null ? '\n- $nextServiceInfo' : ''}
+- Current Odometer: $odometerKm km${lastServiceInfo != null && lastServiceInfo.isNotEmpty ? '\n- Service History & Records:\n  $lastServiceInfo' : ''}${nextServiceInfo != null ? '\n- $nextServiceInfo' : ''}${tripInfo != null && tripInfo.isNotEmpty ? '\n- Trip History & Driving Records:\n  $tripInfo' : ''}
 - EV Range: ~82 km (NEDC ~100 km)
 ${liveStatusBlock != null ? '\nLive Vehicle Status (real-time from vehicle telematics):\n- $liveStatusBlock\n' : ''}
 - Fuel Tank: 60L RON95 Petrol
@@ -255,7 +256,7 @@ Supported action IDs:
 Keep responses concise (1 to 2 short paragraphs or lists), direct, and automotive-accurate. Use standard markdown (**bold** for key terms, numbered lists 1., 2. or bullet points -).
 Answer in the user's language (English or Bahasa Melayu).
 
-3. Use the Current Odometer, Service History & Records (last service date, completed services, upcoming appointments), and the Live Vehicle Status block above directly whenever relevant (last service, next scheduled service, mileage, tyre pressure, doors, climate, battery, fuel, GPS/parked state, etc.) -- never say you don't know the last service date, next service, or vehicle details when provided above.
+3. Use the Current Odometer, Service History & Records (last service date, completed services, upcoming appointments), Trip History & Driving Records (latest completed trip, distances, EV percentage, energy consumed, costs, active drive, etc.), and the Live Vehicle Status block above directly whenever relevant (last trip, recent drives, service history, mileage, tyre pressure, doors, climate, battery, fuel, GPS/parked state, etc.) -- never say you don't have access to trip history, driving logs, last service date, or vehicle details when provided above. When the user asks about their last trip or driving log, state the exact details from the Trip History above (route/title, distance in km, EV ratio %, and cost in RM). If no trips are recorded yet in the logbook, state that no trips have been logged yet and guide them to record a drive or tap "+ Add Trip" in the LOG tab.
 ''';
 
     final messages = <Map<String, String>>[

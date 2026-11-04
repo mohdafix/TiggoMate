@@ -308,6 +308,22 @@ class _AskAssistantSheetState extends State<AskAssistantSheet> with TickerProvid
           history.removeLast();
         }
 
+        final tripSummary = await getTripSummaryForAi();
+        final telemetry = AppVehicleRepository.instance.currentTelemetry;
+        final liveStatus = [
+          'Doors: ${telemetry.doorsOpen ? "OPEN / AJAR" : "All Doors Closed & Secured"}',
+          '12V Auxiliary Battery: ${telemetry.volt12 > 0 ? "${telemetry.volt12.toStringAsFixed(2)}V" : "12.82V (Healthy)"}',
+          'Traction Battery SoC: ${telemetry.batteryPct}% (~${(telemetry.batteryPct * 0.85).round()} km EV range)',
+          'Fuel Remaining: ${telemetry.fuelCapacityPct}% (~${telemetry.fuelRangeKm > 0 ? telemetry.fuelRangeKm : 740} km petrol range, ${telemetry.fuelConsumptionL100km > 0 ? "${telemetry.fuelConsumptionL100km.toStringAsFixed(1)} L/100km" : "6.1 L/100km"})',
+          'Tyre Pressures (Cold Target 230 kPa): FL ${telemetry.tyreFlPressureKpa.round()} kPa, FR ${telemetry.tyreFrPressureKpa.round()} kPa, RL ${telemetry.tyreRlPressureKpa.round()} kPa, RR ${telemetry.tyreRrPressureKpa.round()} kPa',
+          'Cabin Climate / AC: ${telemetry.acOn ? "ON (${telemetry.acTemp}°C)" : "OFF"}',
+          'Windows: ${telemetry.windowsOpen ? "Open" : "Closed"}',
+          'Sunroof: ${telemetry.sunroofOpen ? "Open" : "Closed"}',
+          'Transmission State: ${telemetry.isParked ? "Parked (P)" : "Drive / Moving"}',
+          if (telemetry.locationName.isNotEmpty && telemetry.locationName != 'Pending Car Bind')
+            'Current Location: ${telemetry.locationName} (${telemetry.latitude != 0.0 ? "${telemetry.latitude.toStringAsFixed(5)}, ${telemetry.longitude.toStringAsFixed(5)}" : ""})',
+        ].join('\n- ');
+
         final aiReply = await AiConfigResolver.queryAi(
           prompt: text,
           apiKey: _apiKey!,
@@ -319,6 +335,8 @@ class _AskAssistantSheetState extends State<AskAssistantSheet> with TickerProvid
           odometerKm: AppVehicleRepository.instance.isVehicleBound && AppVehicleRepository.instance.currentTelemetry.odometerKm > 0 ? AppVehicleRepository.instance.currentTelemetry.odometerKm : 2197,
           nextServiceInfo: 'Next Scheduled Service: Minor Service (10k)',
           lastServiceInfo: ServiceAppointmentManager.instance.getServiceSummaryForAi(),
+          tripInfo: tripSummary,
+          liveStatusBlock: liveStatus,
           history: history,
         );
 
@@ -396,18 +414,20 @@ class _AskAssistantSheetState extends State<AskAssistantSheet> with TickerProvid
         replyText = 'Action prepared for **${widget.vehicleModel}** (${widget.carPlate}). Tap confirm below to transmit to vehicle.';
         citation = 'T-Box Remote Dispatch';
       }
-    } else if (lower.contains('cost') || lower.contains('last trip')) {
-      final lastTrip = await loadLatestSavedTrip();
+    } else if (lower.contains('cost') || lower.contains('last trip') || lower.contains('trip') || lower.contains('drive') || lower.contains('perjalanan') || lower.contains('logbook')) {
+      final trips = await loadRecentTrips(limit: 5);
       if (!mounted) return;
-      if (lastTrip == null) {
-        replyText = 'You have no trips logged yet. Record a drive or add a trip from the **Log** tab and I can break down its cost.';
+      if (trips.isEmpty) {
+        replyText = 'You have no trips logged yet. Record a drive, let Auto-Trip detect when connected, or tap **+ Add Trip** in the **LOG** tab.';
       } else {
+        final lastTrip = trips.first;
         final energy = [
-          if (lastTrip.electricKwh > 0) '${lastTrip.electricKwh.toStringAsFixed(1)} kWh',
+          if (lastTrip.electricKwh > 0) '${lastTrip.electricKwh.toStringAsFixed(1)} kWh EV',
           if (lastTrip.petrolLitres > 0) '${lastTrip.petrolLitres.toStringAsFixed(1)} L of petrol',
         ].join(' and ');
         replyText = 'Last trip was **${lastTrip.title} (${lastTrip.distanceKm.toStringAsFixed(1)} km)**. '
             'Driven ${lastTrip.evRatio.round()}% on EV${energy.isEmpty ? '' : ' using $energy'}. '
+            'Duration: ${lastTrip.durationMinutes} min (Avg ${lastTrip.avgSpeedKmh.toStringAsFixed(0)} km/h). '
             'Total cost: **RM ${lastTrip.costRm.toStringAsFixed(2)}**.';
       }
       citation = 'Trips Logbook';

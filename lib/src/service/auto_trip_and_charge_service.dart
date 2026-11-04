@@ -121,6 +121,10 @@ class AutoTripAndChargeService extends ChangeNotifier {
   static const String _kExpenseStorageKey = 'tm_logged_expenses_v2';
   static const String _kInFlightTripKey = 'tm_inflight_trip_v1';
   static const String _kInFlightChargeKey = 'tm_inflight_charge_v1';
+  static const String _kLastKnownOdoKey = 'tm_last_known_odo';
+  static const String _kLastKnownSocKey = 'tm_last_known_soc';
+  static const String _kLastKnownLocKey = 'tm_last_known_loc';
+  static const String _kLastKnownTsKey = 'tm_last_known_ts';
 
   // Constants grounded in Chery Super Hybrid / Jaecoo platform specifications
   static const double batteryCapacityKwh = 18.3; // Tiggo 7 Pro PHEV battery pack
@@ -139,6 +143,10 @@ class AutoTripAndChargeService extends ChangeNotifier {
   DateTime? _lastTelemetryTs;
   int? _lastOdo;
   int? _lastSoc;
+  int? _savedOdo;
+  int? _savedSoc;
+  String? _savedLoc;
+  DateTime? _savedTs;
   Timer? _ticker;
   bool _initialized = false;
 
@@ -156,6 +164,10 @@ class AutoTripAndChargeService extends ChangeNotifier {
     _lastTelemetryTs = null;
     _lastOdo = null;
     _lastSoc = null;
+    _savedOdo = null;
+    _savedSoc = null;
+    _savedLoc = null;
+    _savedTs = null;
   }
 
   Future<void> _initService() async {
@@ -178,6 +190,13 @@ class AutoTripAndChargeService extends ChangeNotifier {
       final chargeJson = prefs.getString(_kInFlightChargeKey);
       if (chargeJson != null && chargeJson.isNotEmpty) {
         _currentCharge = InFlightCharge.fromJson(jsonDecode(chargeJson) as Map<String, dynamic>);
+      }
+      _savedOdo = prefs.getInt(_kLastKnownOdoKey);
+      _savedSoc = prefs.getInt(_kLastKnownSocKey);
+      _savedLoc = prefs.getString(_kLastKnownLocKey);
+      final tsStr = prefs.getString(_kLastKnownTsKey);
+      if (tsStr != null && tsStr.isNotEmpty) {
+        _savedTs = DateTime.tryParse(tsStr);
       }
       notifyListeners();
     } catch (e) {
@@ -224,9 +243,59 @@ class AutoTripAndChargeService extends ChangeNotifier {
 
     // First frame initialization
     if (_lastTelemetryTs == null || _lastOdo == null || _lastSoc == null) {
+      // Offline/background drive detection: Check if vehicle odometer advanced while app was closed
+      if (_savedOdo != null && _savedOdo! > 0 && _currentTrip == null) {
+        final offOdo = odo - _savedOdo!;
+        if (offOdo >= minTripDistanceKm && offOdo < 500) {
+          final startLocation = _savedLoc;
+          final endLocation = loc;
+          final rawTimeGapMin = _savedTs != null ? now.difference(_savedTs!).inMinutes : 0;
+          final realisticDurationMin = rawTimeGapMin > 0 && rawTimeGapMin <= 360
+              ? rawTimeGapMin
+              : (offOdo / 0.7).round().clamp(5, 180);
+          final startTs = now.subtract(Duration(minutes: realisticDurationMin));
+
+          if (speed <= 1.0) {
+            // Vehicle is parked! Trip was completed while app was closed or parked.
+            final offTrip = InFlightTrip(
+              startTs: startTs,
+              startOdo: _savedOdo!,
+              startSoc: _savedSoc ?? soc,
+              startLocation: startLocation,
+              lastMoveTs: now,
+              lastOdo: odo,
+              lastSoc: soc,
+              lastLocation: endLocation,
+              evPoints: 4,
+            );
+            _finalizeTrip(offTrip, tnbTariff: tnbTariff);
+          } else {
+            // Vehicle is currently moving! Open active in-flight trip from last known parked reading
+            _currentTrip = InFlightTrip(
+              startTs: startTs,
+              startOdo: _savedOdo!,
+              startSoc: _savedSoc ?? soc,
+              startLocation: startLocation,
+              lastMoveTs: now,
+              lastOdo: odo,
+              lastSoc: soc,
+              lastLocation: endLocation,
+              evPoints: 1,
+            );
+            _persistInFlight();
+          }
+        }
+      }
+
       _lastTelemetryTs = now;
       _lastOdo = odo;
       _lastSoc = soc;
+      _savedOdo = odo;
+      _savedSoc = soc;
+      if (loc != null) _savedLoc = loc;
+      _savedTs = now;
+      _persistLastKnown(odo, soc, loc, now);
+
       if (hwCharging) {
         _currentCharge = InFlightCharge(
           startTs: now,
@@ -273,6 +342,23 @@ class AutoTripAndChargeService extends ChangeNotifier {
     _lastTelemetryTs = now;
     _lastOdo = odo;
     _lastSoc = soc;
+    _savedOdo = odo;
+    _savedSoc = soc;
+    if (loc != null) _savedLoc = loc;
+    _savedTs = now;
+    _persistLastKnown(odo, soc, loc, now);
+  }
+
+  Future<void> _persistLastKnown(int odo, int soc, String? loc, DateTime now) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_kLastKnownOdoKey, odo);
+      await prefs.setInt(_kLastKnownSocKey, soc);
+      if (loc != null && loc.isNotEmpty) {
+        await prefs.setString(_kLastKnownLocKey, loc);
+      }
+      await prefs.setString(_kLastKnownTsKey, now.toIso8601String());
+    } catch (_) {}
   }
 
   void _processTripFrame({

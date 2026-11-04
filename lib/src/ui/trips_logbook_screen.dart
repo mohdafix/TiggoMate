@@ -414,6 +414,53 @@ Future<List<TripRecord>> loadRecentTrips({int limit = 10}) async {
   }
 }
 
+/// Formatted summary of recent driving trips & active trip for AI Copilot context injection.
+Future<String> getTripSummaryForAi({int limit = 5}) async {
+  final parts = <String>[];
+
+  // 1. Check in-flight active trip from AutoTripAndChargeService
+  try {
+    final active = AutoTripAndChargeService.instance.activeTrip;
+    if (active != null) {
+      final elapsedMin = DateTime.now().difference(active.startTs).inMinutes;
+      final startLoc = (active.startLocation != null && active.startLocation!.isNotEmpty)
+          ? active.startLocation!
+          : 'Origin';
+      final currentDist = (active.lastOdo - active.startOdo).clamp(0, 9999);
+      parts.add('Active Drive in Progress: Started at ${active.startTs.hour.toString().padLeft(2, '0')}:${active.startTs.minute.toString().padLeft(2, '0')} '
+          'from $startLoc (~$elapsedMin min ago, distance so far: ~$currentDist km, start battery: ${active.startSoc}%).');
+    }
+  } catch (_) {}
+
+  // 2. Load recent saved trips
+  final trips = await loadRecentTrips(limit: limit);
+  if (trips.isNotEmpty) {
+    final last = trips.first;
+    final energy = [
+      if (last.electricKwh > 0) '${last.electricKwh.toStringAsFixed(1)} kWh EV',
+      if (last.petrolLitres > 0) '${last.petrolLitres.toStringAsFixed(1)}L petrol',
+    ].join(', ');
+    parts.add('Latest Completed Trip: "${last.title}" (${last.timestamp})'
+        '\n    - Distance: ${last.distanceKm.toStringAsFixed(1)} km'
+        '\n    - Duration: ${last.durationMinutes} min (Avg speed: ${last.avgSpeedKmh.toStringAsFixed(0)} km/h)'
+        '\n    - Powertrain Split: ${last.evRatio.round()}% EV (${last.evDistanceKm.toStringAsFixed(1)} km EV${last.hevDistanceKm > 0 ? ", ${last.hevDistanceKm.toStringAsFixed(1)} km HEV" : ""})'
+        '${energy.isNotEmpty ? "\n    - Energy Consumed: $energy" : ""}'
+        '\n    - Cost: RM ${last.costRm.toStringAsFixed(2)}'
+        '${last.highwayNote.isNotEmpty ? "\n    - Notes: ${last.highwayNote}" : ""}');
+
+    if (trips.length > 1) {
+      parts.add('Previous Logged Trips:');
+      for (final t in trips.skip(1)) {
+        parts.add('- "${t.title}" (${t.timestamp}): ${t.distanceKm.toStringAsFixed(1)} km, ${t.evRatio.round()}% EV, RM ${t.costRm.toStringAsFixed(2)}');
+      }
+    }
+  } else {
+    parts.add('No completed trips recorded yet in the logbook (user can tap "+ Add Trip" in the LOG tab or let Auto-Trip detect drives when connected).');
+  }
+
+  return parts.join('\n  ');
+}
+
 /// One row of the logbook's ENTRIES list: a trip or an expense.
 class _LogEntry {
   final DateTime when;
