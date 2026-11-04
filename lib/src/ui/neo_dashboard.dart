@@ -22,6 +22,8 @@ import 'location_history_sheet.dart';
 import 'widgets_shortcuts_sheet.dart';
 import '../widgets/home_widget_service.dart';
 import 'climate_control_sheet.dart';
+import 'windows_control_sheet.dart';
+import 'sunroof_control_sheet.dart';
 import 'window_sunroof_sheet.dart';
 import 'remote_engine_sheet.dart';
 import 'remote_command_diagnostics_sheet.dart';
@@ -697,90 +699,39 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     );
   }
 
-  void _openWindowSunroofSheet() {
-    WindowSunroofSheet.show(
+  void _openWindowsControlSheet() {
+    WindowsControlSheet.show(
       context,
+      repository: widget.repository,
       telemetry: _telemetry,
       initialWindowsVented: _isWindowsVented,
-      initialSunroofOpen: _telemetry.sunroofOpen,
-      onApply: (windowAction, sunroofAction) {
-        final previousVented = _isWindowsVented;
-        final previousTelemetry = _telemetry;
-
+      onWindowsChanged: (vented) {
         setState(() {
-          if (windowAction == 'vent') {
-            _isWindowsVented = true;
-          } else if (windowAction == 'open') {
-            _isWindowsVented = true;
-          } else {
-            _isWindowsVented = false;
-          }
-          final bool isSunroofOpen = sunroofAction != 'closed';
-          _telemetry = _telemetry.copyWith(
-            windowsOpen: _isWindowsVented,
-            sunroofOpen: isSunroofOpen,
-          );
+          _isWindowsVented = vented;
+          _telemetry = _telemetry.copyWith(windowsOpen: vented);
         });
-
-        if (windowAction == 'vent') {
-          _sendCommandAndReport(
-            CarLinkoOpcodes.windowsVent,
-            successMessage: '🪟 Windows vented (20mm)',
-            failureMessage: '⚠️ Window vent command failed',
-            onRevert: () {
-              setState(() {
-                _isWindowsVented = previousVented;
-                _telemetry = previousTelemetry;
-              });
-            },
-          );
-        } else if (windowAction == 'open') {
-          _sendCommandAndReport(
-            CarLinkoOpcodes.windowsOpen,
-            successMessage: '🪟 All 4 Windows opened',
-            failureMessage: '⚠️ Window open command failed',
-            onRevert: () {
-              setState(() {
-                _isWindowsVented = previousVented;
-                _telemetry = previousTelemetry;
-              });
-            },
-          );
-        } else if (windowAction == 'close') {
-          _sendCommandAndReport(
-            CarLinkoOpcodes.windowsClose,
-            successMessage: '🪟 All Windows closed and secured',
-            failureMessage: '⚠️ Window close command failed',
-            onRevert: () {
-              setState(() {
-                _isWindowsVented = previousVented;
-                _telemetry = previousTelemetry;
-              });
-            },
-          );
-        }
-
-        if (sunroofAction == 'open') {
-          _sendCommandAndReport(
-            CarLinkoOpcodes.sunroofOpen,
-            successMessage: '☀️ Panoramic Sunroof opened',
-            failureMessage: '⚠️ Sunroof open command failed',
-          );
-        } else if (sunroofAction == 'tilt') {
-          _sendCommandAndReport(
-            CarLinkoOpcodes.sunroofTilt,
-            successMessage: '☀️ Panoramic Sunroof tilted',
-            failureMessage: '⚠️ Sunroof tilt command failed',
-          );
-        } else if (sunroofAction == 'closed') {
-          _sendCommandAndReport(
-            CarLinkoOpcodes.sunroofClose,
-            successMessage: '☀️ Panoramic Sunroof closed',
-            failureMessage: '⚠️ Sunroof close command failed',
-          );
-        }
+        _syncWidgetTelemetry();
       },
     );
+  }
+
+  void _openSunroofControlSheet() {
+    SunroofControlSheet.show(
+      context,
+      repository: widget.repository,
+      telemetry: _telemetry,
+      initialSunroofOpen: _telemetry.sunroofOpen,
+      onSunroofChanged: (isOpen) {
+        setState(() {
+          _telemetry = _telemetry.copyWith(sunroofOpen: isOpen);
+        });
+        _syncWidgetTelemetry();
+      },
+    );
+  }
+
+  void _openWindowSunroofSheet() {
+    _openWindowsControlSheet();
   }
 
   void _openRemoteEngineSheet() {
@@ -2843,8 +2794,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       sublabel: 'Windows',
                       isActive: _isWindowsVented,
                       activeColor: Colors.tealAccent,
-                      onTap: () => _handleRemoteCommand('windows'),
-                      onLongPress: _openWindowSunroofSheet,
+                      onTap: _openWindowsControlSheet,
+                      onLongPress: _openWindowsControlSheet,
                     ),
                     _buildCircularRemoteButton(
                       icon: Icons.luggage_outlined,
@@ -2907,15 +2858,15 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     const SizedBox(width: 6),
                     Expanded(
                       child: InkWell(
-                        onTap: _openWindowSunroofSheet,
+                        onTap: _openWindowsControlSheet,
                         borderRadius: BorderRadius.circular(10),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
                           decoration: BoxDecoration(
-                            color: _telemetry.sunroofOpen ? Colors.tealAccent.withValues(alpha: 0.15) : colors.tileBg,
+                            color: _isWindowsVented ? const Color(0xFF00E5FF).withValues(alpha: 0.15) : colors.tileBg,
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: _telemetry.sunroofOpen ? Colors.tealAccent.withValues(alpha: 0.5) : colors.border,
+                              color: _isWindowsVented ? const Color(0xFF00E5FF).withValues(alpha: 0.5) : colors.border,
                             ),
                           ),
                           child: FittedBox(
@@ -2923,14 +2874,49 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.window_outlined, size: 12, color: _telemetry.sunroofOpen ? Colors.tealAccent : colors.textMuted),
-                                const SizedBox(width: 4),
+                                Icon(Icons.sensor_window_rounded, size: 12, color: _isWindowsVented ? const Color(0xFF00E5FF) : colors.textMuted),
+                                const SizedBox(width: 3),
                                 Text(
-                                  _telemetry.sunroofOpen ? 'Sunroof Open' : 'Glazing & Roof',
+                                  _isWindowsVented ? 'Windows Vent' : 'Windows',
                                   style: TextStyle(
-                                    fontSize: 10.5,
+                                    fontSize: 10,
                                     fontWeight: FontWeight.bold,
-                                    color: _telemetry.sunroofOpen ? Colors.tealAccent : colors.textSecondary,
+                                    color: _isWindowsVented ? const Color(0xFF00E5FF) : colors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: InkWell(
+                        onTap: _openSunroofControlSheet,
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: _telemetry.sunroofOpen ? Colors.amber.withValues(alpha: 0.15) : colors.tileBg,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: _telemetry.sunroofOpen ? Colors.amber.withValues(alpha: 0.5) : colors.border,
+                            ),
+                          ),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.wb_sunny_rounded, size: 12, color: _telemetry.sunroofOpen ? Colors.amber : colors.textMuted),
+                                const SizedBox(width: 3),
+                                Text(
+                                  _telemetry.sunroofOpen ? 'Sunroof Open' : 'Sunroof',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: _telemetry.sunroofOpen ? Colors.amber : colors.textSecondary,
                                   ),
                                 ),
                               ],
