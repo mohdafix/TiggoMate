@@ -4,21 +4,26 @@ import '../theme/app_theme.dart';
 import '../carlinko/carlinko_api.dart';
 import '../carlinko/vehicle_repository.dart';
 import '../carlinko/vehicle_telemetry.dart';
+import 'apple_design_widgets.dart';
 
-/// Dedicated 4-Door Power Windows Controller Sheet.
-/// Provides independent 1-tap control for Vent (20mm), Open All, and Close All.
+/// Full-Featured Windows, Panoramic Sunroof & Electric Sunshade Controller Sheet.
+/// Provides independent 1-tap controls for Windows, Sunroof Glass, and Electric Curtain.
 class WindowsControlSheet extends StatefulWidget {
   final VehicleRepository repository;
   final VehicleTelemetry telemetry;
   final bool initialWindowsVented;
-  final ValueChanged<bool> onWindowsChanged;
+  final bool initialSunroofOpen;
+  final ValueChanged<bool>? onWindowsChanged;
+  final ValueChanged<bool>? onSunroofChanged;
 
   const WindowsControlSheet({
     super.key,
     required this.repository,
     required this.telemetry,
     required this.initialWindowsVented,
-    required this.onWindowsChanged,
+    this.initialSunroofOpen = false,
+    this.onWindowsChanged,
+    this.onSunroofChanged,
   });
 
   static Future<void> show(
@@ -26,7 +31,9 @@ class WindowsControlSheet extends StatefulWidget {
     required VehicleRepository repository,
     required VehicleTelemetry telemetry,
     required bool initialWindowsVented,
-    required ValueChanged<bool> onWindowsChanged,
+    bool initialSunroofOpen = false,
+    ValueChanged<bool>? onWindowsChanged,
+    ValueChanged<bool>? onSunroofChanged,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -36,7 +43,9 @@ class WindowsControlSheet extends StatefulWidget {
         repository: repository,
         telemetry: telemetry,
         initialWindowsVented: initialWindowsVented,
+        initialSunroofOpen: initialSunroofOpen,
         onWindowsChanged: onWindowsChanged,
+        onSunroofChanged: onSunroofChanged,
       ),
     );
   }
@@ -47,6 +56,10 @@ class WindowsControlSheet extends StatefulWidget {
 
 class _WindowsControlSheetState extends State<WindowsControlSheet> {
   late bool _isVented;
+  late bool _isSunroofOpen;
+  String _activeSunroofMode = 'closed'; // 'open', 'tilt', 'closed'
+  bool _sunshadeCurtainClosed = false;
+
   bool _isTransmitting = false;
   String? _activeAction;
   String? _statusFeedback;
@@ -56,13 +69,15 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
   void initState() {
     super.initState();
     _isVented = widget.initialWindowsVented;
+    _isSunroofOpen = widget.initialSunroofOpen;
+    _activeSunroofMode = widget.initialSunroofOpen ? 'open' : 'closed';
   }
 
-  Future<void> _fireWindowCommand({
+  Future<void> _fireCommand({
     required String action,
     required String opcode,
     required String label,
-    required bool resultingVentedState,
+    VoidCallback? onSuccess,
   }) async {
     if (_isTransmitting) return;
     HapticFeedback.mediumImpact();
@@ -80,11 +95,10 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
 
       if (res.success) {
         setState(() {
-          _isVented = resultingVentedState;
           _statusFeedback = '✓ $label executed successfully';
           _lastSuccess = true;
+          onSuccess?.call();
         });
-        widget.onWindowsChanged(resultingVentedState);
       } else {
         final errDetail = (res.code != null && res.code!.isNotEmpty)
             ? ' [${res.code}: ${res.message ?? "Error"}]'
@@ -113,35 +127,12 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
   @override
   Widget build(BuildContext context) {
     final colors = AppColors(context);
-    final isDark = colors.isDark;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF12141A) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        border: Border.all(
-          color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0),
-          width: 1,
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+    return AppleSheetContainer(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Drag Handle
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: isDark ? Colors.white24 : Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-
           // Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -149,10 +140,10 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(9),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
+                      color: const Color(0xFF00E5FF).withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(Icons.sensor_window_rounded, size: 22, color: Color(0xFF00E5FF)),
                   ),
@@ -161,16 +152,21 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Power Windows Control',
+                        'Windows & Panoramic Sunroof',
                         style: TextStyle(
-                          fontSize: 16.5,
+                          fontSize: 17,
                           fontWeight: FontWeight.bold,
+                          letterSpacing: -0.3,
                           color: colors.textPrimary,
                         ),
                       ),
                       Text(
-                        'Instant 4-Door Actuation • Anti-Pinch',
-                        style: TextStyle(fontSize: 11, color: colors.textSecondary),
+                        'Individual 1-Tap Actuation • Glazing & Shade',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: colors.textSecondary,
+                        ),
                       ),
                     ],
                   ),
@@ -182,25 +178,27 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
           // Feedback Banner if transmitting / finished
           if (_statusFeedback != null) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               margin: const EdgeInsets.only(bottom: 14),
               decoration: BoxDecoration(
                 color: (_lastSuccess == true)
-                    ? Colors.green.withValues(alpha: 0.15)
+                    ? Colors.green.withValues(alpha: 0.16)
                     : (_lastSuccess == false)
-                        ? Colors.red.withValues(alpha: 0.15)
+                        ? Colors.red.withValues(alpha: 0.16)
                         : colors.tileBg,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: (_lastSuccess == true)
-                      ? Colors.green.withValues(alpha: 0.4)
+                      ? Colors.green.withValues(alpha: 0.45)
                       : (_lastSuccess == false)
-                          ? Colors.red.withValues(alpha: 0.4)
+                          ? Colors.red.withValues(alpha: 0.45)
                           : colors.border,
                 ),
               ),
@@ -212,7 +210,7 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                       height: 14,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 10),
                   ],
                   Expanded(
                     child: Text(
@@ -220,7 +218,7 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                       style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 11,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w600,
                         color: (_lastSuccess == true)
                             ? const Color(0xFF39FF14)
                             : (_lastSuccess == false)
@@ -234,66 +232,234 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
             ),
           ],
 
-          // 3 Direct 1-Tap Action Cards
+          // 1. 4-Door Power Windows Section
+          Text(
+            '4-DOOR POWER WINDOWS',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.6,
+              color: colors.textMuted,
+            ),
+          ),
+          const SizedBox(height: 8),
+
           Row(
             children: [
-              _buildActionCard(
-                actionKey: 'vent',
-                title: 'Vent (20mm)',
-                subtitle: 'Cabin Heat Escape',
-                icon: Icons.air_rounded,
-                activeColor: const Color(0xFF00E5FF),
-                isCurrent: _isVented,
-                colors: colors,
-                onTap: () => _fireWindowCommand(
-                  action: 'vent',
-                  opcode: CarLinkoOpcodes.windowsVent,
-                  label: 'Vent (20mm)',
-                  resultingVentedState: true,
+              Expanded(
+                child: AppleControlTile(
+                  title: 'Vent (20mm)',
+                  subtitle: 'Heat Escape',
+                  icon: Icons.air_rounded,
+                  activeColor: const Color(0xFF00E5FF),
+                  isSelected: _isVented,
+                  isBusy: _isTransmitting && _activeAction == 'win_vent',
+                  onTap: () => _fireCommand(
+                    action: 'win_vent',
+                    opcode: CarLinkoOpcodes.windowsVent,
+                    label: 'Vent (20mm)',
+                    onSuccess: () {
+                      _isVented = true;
+                      widget.onWindowsChanged?.call(true);
+                    },
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
-              _buildActionCard(
-                actionKey: 'open',
-                title: 'Open All',
-                subtitle: 'Fully Lower 4x',
-                icon: Icons.vertical_align_bottom_rounded,
-                activeColor: const Color(0xFFFF9F1C),
-                isCurrent: false,
-                colors: colors,
-                onTap: () => _fireWindowCommand(
-                  action: 'open',
-                  opcode: CarLinkoOpcodes.windowsOpen,
-                  label: 'Open All Windows',
-                  resultingVentedState: true,
+              const SizedBox(width: 10),
+              Expanded(
+                child: AppleControlTile(
+                  title: 'Open All',
+                  subtitle: 'Lower 4x',
+                  icon: Icons.vertical_align_bottom_rounded,
+                  activeColor: const Color(0xFFFF9F1C),
+                  isSelected: false,
+                  isBusy: _isTransmitting && _activeAction == 'win_open',
+                  onTap: () => _fireCommand(
+                    action: 'win_open',
+                    opcode: CarLinkoOpcodes.windowsOpen,
+                    label: 'Open Windows',
+                    onSuccess: () {
+                      _isVented = true;
+                      widget.onWindowsChanged?.call(true);
+                    },
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
-              _buildActionCard(
-                actionKey: 'close',
-                title: 'Close All',
-                subtitle: 'Sealed & Secured',
-                icon: Icons.vertical_align_top_rounded,
-                activeColor: colors.evTeal,
-                isCurrent: !_isVented,
-                colors: colors,
-                onTap: () => _fireWindowCommand(
-                  action: 'close',
-                  opcode: CarLinkoOpcodes.windowsClose,
-                  label: 'Close Windows',
-                  resultingVentedState: false,
+              const SizedBox(width: 10),
+              Expanded(
+                child: AppleControlTile(
+                  title: 'Close All',
+                  subtitle: 'Sealed Flush',
+                  icon: Icons.vertical_align_top_rounded,
+                  activeColor: colors.evTeal,
+                  isSelected: !_isVented,
+                  isBusy: _isTransmitting && _activeAction == 'win_close',
+                  onTap: () => _fireCommand(
+                    action: 'win_close',
+                    opcode: CarLinkoOpcodes.windowsClose,
+                    label: 'Close Windows',
+                    onSuccess: () {
+                      _isVented = false;
+                      widget.onWindowsChanged?.call(false);
+                    },
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 18),
+
+          // 2. Panoramic Glass Roof Section
+          Text(
+            'PANORAMIC SUNROOF GLASS',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.6,
+              color: colors.textMuted,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          Row(
+            children: [
+              Expanded(
+                child: AppleControlTile(
+                  title: 'Slide Open',
+                  subtitle: 'Full Sky View',
+                  icon: Icons.open_in_browser_rounded,
+                  activeColor: Colors.amber,
+                  isSelected: _activeSunroofMode == 'open',
+                  isBusy: _isTransmitting && _activeAction == 'roof_open',
+                  onTap: () => _fireCommand(
+                    action: 'roof_open',
+                    opcode: CarLinkoOpcodes.sunroofOpen,
+                    label: 'Open Sunroof',
+                    onSuccess: () {
+                      _activeSunroofMode = 'open';
+                      _isSunroofOpen = true;
+                      widget.onSunroofChanged?.call(true);
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: AppleControlTile(
+                  title: 'Tilt / Vent',
+                  subtitle: 'Highway Aero',
+                  icon: Icons.open_in_full_rounded,
+                  activeColor: Colors.amber,
+                  isSelected: _activeSunroofMode == 'tilt',
+                  isBusy: _isTransmitting && _activeAction == 'roof_tilt',
+                  onTap: () => _fireCommand(
+                    action: 'roof_tilt',
+                    opcode: CarLinkoOpcodes.sunroofTilt,
+                    label: 'Tilt Sunroof',
+                    onSuccess: () {
+                      _activeSunroofMode = 'tilt';
+                      _isSunroofOpen = true;
+                      widget.onSunroofChanged?.call(true);
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: AppleControlTile(
+                  title: 'Close Glass',
+                  subtitle: 'Weather Sealed',
+                  icon: Icons.wb_twilight_rounded,
+                  activeColor: colors.evTeal,
+                  isSelected: _activeSunroofMode == 'closed',
+                  isBusy: _isTransmitting && _activeAction == 'roof_close',
+                  onTap: () => _fireCommand(
+                    action: 'roof_close',
+                    opcode: CarLinkoOpcodes.sunroofClose,
+                    label: 'Close Sunroof',
+                    onSuccess: () {
+                      _activeSunroofMode = 'closed';
+                      _isSunroofOpen = false;
+                      widget.onSunroofChanged?.call(false);
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+
+          // 3. Electric Sunshade Curtain Section
+          Text(
+            'ELECTRIC SUNSHADE CURTAIN',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.6,
+              color: colors.textMuted,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: colors.tileBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: colors.border),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      _sunshadeCurtainClosed
+                          ? Icons.curtains_closed_rounded
+                          : Icons.curtains_rounded,
+                      size: 22,
+                      color: colors.textPrimary,
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Sunshade Fabric Curtain',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.2,
+                            color: colors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          _sunshadeCurtainClosed ? 'Curtain drawn (Max UV Block)' : 'Curtain retracted (Open sky)',
+                          style: TextStyle(fontSize: 10.5, color: colors.textMuted),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                Switch.adaptive(
+                  value: _sunshadeCurtainClosed,
+                  activeColor: colors.evTeal,
+                  onChanged: (v) {
+                    HapticFeedback.selectionClick();
+                    setState(() => _sunshadeCurtainClosed = v);
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
 
           // Informational Tip
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
             decoration: BoxDecoration(
               color: colors.tileBg,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(color: colors.border),
             ),
             child: Row(
@@ -302,83 +468,14 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Instant 1-Tap: Tapping an action immediately fires CAN-bus commands to your Tiggo 7 PHEV.',
-                    style: TextStyle(fontSize: 11, color: colors.textSecondary),
+                    'Instant 1-Tap: Directly communicates with your Tiggo 7 PHEV CAN gateway.',
+                    style: TextStyle(fontSize: 11.5, color: colors.textSecondary),
                   ),
                 ),
               ],
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildActionCard({
-    required String actionKey,
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color activeColor,
-    required bool isCurrent,
-    required AppColors colors,
-    required VoidCallback onTap,
-  }) {
-    final isBusy = _isTransmitting && _activeAction == actionKey;
-
-    return Expanded(
-      child: InkWell(
-        onTap: _isTransmitting ? null : onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-          decoration: BoxDecoration(
-            color: isCurrent
-                ? activeColor.withValues(alpha: colors.isDark ? 0.20 : 0.12)
-                : colors.tileBg,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isCurrent ? activeColor : colors.border,
-              width: isCurrent ? 1.8 : 1,
-            ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (isBusy)
-                SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2.2, color: activeColor),
-                )
-              else
-                Icon(
-                  icon,
-                  size: 26,
-                  color: isCurrent ? activeColor : colors.textPrimary,
-                ),
-              const SizedBox(height: 8),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.bold,
-                  color: isCurrent ? activeColor : colors.textPrimary,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  fontSize: 9,
-                  color: colors.textMuted,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:model_viewer_plus/model_viewer_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../carlinko/carlinko_api.dart';
+import '../carlinko/carlinko_ble_controller.dart';
 import '../carlinko/vehicle_repository.dart';
 import '../carlinko/vehicle_telemetry.dart';
 import '../carlinko/vehicle_skin.dart';
@@ -24,14 +25,13 @@ import '../widgets/home_widget_service.dart';
 import 'climate_control_sheet.dart';
 import 'windows_control_sheet.dart';
 import 'sunroof_control_sheet.dart';
-import 'window_sunroof_sheet.dart';
 import 'remote_engine_sheet.dart';
 import 'remote_command_diagnostics_sheet.dart';
 import 'car_view_carousel.dart';
 import 'energy_screen.dart';
 import '../mytnb/mytnb_api.dart';
 import 'mytnb_connect_dialog.dart';
-import '../service/phone_parking_location.dart';
+import '../service/bluetooth_driving_tracker_service.dart';
 
 class NeoDashboard extends StatefulWidget {
   final VehicleRepository repository;
@@ -101,9 +101,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
-    unawaited(PhoneParkingLocationService.captureNow());
     _telemetry = widget.repository.currentTelemetry;
-    _isDoorsLocked = !_telemetry.doorsOpen;
+    _isDoorsLocked = _telemetry.doorsLocked;
     _isAcActive = _telemetry.acOn;
     _isTrunkOpen = _telemetry.trunkOpen;
     _isWindowsVented = _telemetry.windowsOpen;
@@ -128,17 +127,11 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
 
     widget.repository.telemetryStream.listen((data) {
       if (mounted) {
-        // The car just transitioned to parked -- grab the phone's own GPS
-        // position now, while it's still near the car, as a fallback for
-        // when CarLinko's own GPS fetch fails (see PhoneParkingLocationService).
-        if (data.isParked && !_wasParked) {
-          unawaited(PhoneParkingLocationService.captureNow());
-        }
         _wasParked = data.isParked;
 
         setState(() {
           _telemetry = data;
-          _isDoorsLocked = !data.doorsOpen;
+          _isDoorsLocked = data.doorsLocked;
           _isAcActive = data.acOn;
           _isTrunkOpen = data.trunkOpen;
           _isWindowsVented = data.windowsOpen;
@@ -640,9 +633,12 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     ClimateControlSheet.show(
       context,
       telemetry: _telemetry,
+      repository: widget.repository,
       initialAcOn: _isAcActive,
       initialTempC: _telemetry.acTemp.toDouble(),
-      initialDurationMin: _telemetry.airDurationMin,
+      initialDurationMin: _telemetry.airDurationMin > 0
+          ? _telemetry.airDurationMin
+          : widget.repository.vehicleCapabilities.airDurationMin,
       onApply: (acOn, tempC, durationMin, {
         bool? rapidCool,
         bool? frontDefrost,
@@ -681,20 +677,108 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             ? ((rapidCool == true) ? CarLinkoOpcodes.quickCool : CarLinkoOpcodes.acOn)
             : CarLinkoOpcodes.acOff;
 
-        _sendCommandAndReport(
-          opcode,
-          successMessage: acOn
-              ? '❄️ Cabin Pre-cooling (${tempC.toStringAsFixed(1)}°C, ${durationMin}m)'
-              : '❄️ Climate Pre-conditioning OFF',
-          failureMessage: '⚠️ Climate command failed',
-          onRevert: () {
-            setState(() {
-              _isAcActive = previousAc;
-              _telemetry = previousTelemetry;
-            });
-            _syncWidgetTelemetry();
-          },
-        );
+        if (acOn != previousAc || (acOn && (rapidCool != previousTelemetry.rapidCool))) {
+          _sendCommandAndReport(
+            opcode,
+            successMessage: acOn
+                ? '❄️ Cabin Pre-cooling (${tempC.toStringAsFixed(1)}°C, ${durationMin}m)'
+                : '❄️ Climate Pre-conditioning OFF',
+            failureMessage: '⚠️ Climate command failed',
+            onRevert: () {
+              setState(() {
+                _isAcActive = previousAc;
+                _telemetry = previousTelemetry;
+              });
+              _syncWidgetTelemetry();
+            },
+          );
+        }
+
+        // Dynamic Cabin Temperature Setpoint (CAN 0x7411xx: 0x80 + round(tempC * 2))
+        if (acOn && (tempC.round() != previousTelemetry.acTemp || acOn != previousAc)) {
+          final tempOp = CarLinkoOpcodes.acTemperature(tempC);
+          _sendCommandAndReport(
+            tempOp,
+            successMessage: '🌡️ Cabin Target Temp: ${tempC.toStringAsFixed(1)}°C',
+            failureMessage: '⚠️ Temperature setpoint command failed',
+          );
+        }
+
+        // Air conditioning duration setting
+        if (durationMin != previousTelemetry.airDurationMin) {
+          widget.repository.setAirDuration(durationMin).catchError((_) => false);
+        }
+
+        // Front Seat Ventilation (CAN 0x74 opcodes 741Axx / 741Bxx)
+        if (seatVentDriver != null && seatVentDriver != previousTelemetry.seatVentDriver) {
+          final op = CarLinkoOpcodes.driverSeatVentOpcode(seatVentDriver);
+          _sendCommandAndReport(
+            op,
+            successMessage: seatVentDriver > 0
+                ? '💺 Driver Seat Vent: Level $seatVentDriver'
+                : '💺 Driver Seat Vent: OFF',
+            failureMessage: '⚠️ Seat ventilation command failed',
+          );
+        }
+        if (seatVentPass != null && seatVentPass != previousTelemetry.seatVentPass) {
+          final op = CarLinkoOpcodes.passengerSeatVentOpcode(seatVentPass);
+          _sendCommandAndReport(
+            op,
+            successMessage: seatVentPass > 0
+                ? '💺 Passenger Seat Vent: Level $seatVentPass'
+                : '💺 Passenger Seat Vent: OFF',
+            failureMessage: '⚠️ Seat ventilation command failed',
+          );
+        }
+
+        // Front Seat Heating (CAN 0x74 opcodes 7415xx / 7416xx)
+        if (seatHeatDriver != null && seatHeatDriver != previousTelemetry.seatHeatDriver) {
+          final op = CarLinkoOpcodes.driverSeatHeatOpcode(seatHeatDriver);
+          _sendCommandAndReport(
+            op,
+            successMessage: seatHeatDriver > 0
+                ? '♨️ Driver Seat Heat: Level $seatHeatDriver'
+                : '♨️ Driver Seat Heat: OFF',
+            failureMessage: '⚠️ Seat heating command failed',
+          );
+        }
+        if (seatHeatPass != null && seatHeatPass != previousTelemetry.seatHeatPass) {
+          final op = CarLinkoOpcodes.passengerSeatHeatOpcode(seatHeatPass);
+          _sendCommandAndReport(
+            op,
+            successMessage: seatHeatPass > 0
+                ? '♨️ Passenger Seat Heat: Level $seatHeatPass'
+                : '♨️ Passenger Seat Heat: OFF',
+            failureMessage: '⚠️ Seat heating command failed',
+          );
+        }
+
+        // Dedicated Rear Defogger (CAN opcode 742602 / 742600)
+        if (rearDefrost != null && rearDefrost != previousTelemetry.rearDefrost) {
+          _sendCommandAndReport(
+            rearDefrost ? CarLinkoOpcodes.rearDefogOn : CarLinkoOpcodes.rearDefogOff,
+            successMessage: rearDefrost ? '♨️ Rear Window Defogger ON' : 'Rear Defogger OFF',
+            failureMessage: '⚠️ Rear defogger command failed',
+          );
+        }
+
+        // Front Defroster (CAN opcode 741201 / 741200)
+        if (frontDefrost != null && frontDefrost != previousTelemetry.frontDefrost) {
+          _sendCommandAndReport(
+            frontDefrost ? CarLinkoOpcodes.defogOn : CarLinkoOpcodes.defogOff,
+            successMessage: frontDefrost ? '💨 Front Defroster ON' : 'Front Defroster OFF',
+            failureMessage: '⚠️ Front defroster command failed',
+          );
+        }
+
+        // Steering Wheel Heat (CAN opcode 742401 / 742400)
+        if (steeringHeat != null && steeringHeat != previousTelemetry.steeringHeat) {
+          _sendCommandAndReport(
+            steeringHeat ? CarLinkoOpcodes.steeringHeatOn : CarLinkoOpcodes.steeringHeatOff,
+            successMessage: steeringHeat ? '🔥 Heated Steering Wheel ON' : 'Heated Steering Wheel OFF',
+            failureMessage: '⚠️ Heated steering wheel command failed',
+          );
+        }
       },
     );
   }
@@ -705,10 +789,17 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       repository: widget.repository,
       telemetry: _telemetry,
       initialWindowsVented: _isWindowsVented,
+      initialSunroofOpen: _telemetry.sunroofOpen,
       onWindowsChanged: (vented) {
         setState(() {
           _isWindowsVented = vented;
           _telemetry = _telemetry.copyWith(windowsOpen: vented);
+        });
+        _syncWidgetTelemetry();
+      },
+      onSunroofChanged: (isOpen) {
+        setState(() {
+          _telemetry = _telemetry.copyWith(sunroofOpen: isOpen);
         });
         _syncWidgetTelemetry();
       },
@@ -774,7 +865,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     final result = await widget.repository.sendRemoteCommandWithResult(command);
     if (!mounted) return;
     if (result.success) {
-      _showNotification(successMessage);
+      final codeTag = (result.code != null && result.code != '0000') ? ' [${result.code}]' : '';
+      _showNotification('$successMessage$codeTag • ${result.message ?? "Accepted"} (${result.latencyMs}ms)');
     } else {
       onRevert?.call();
       final errDetail = (result.code != null && result.code!.isNotEmpty)
@@ -907,6 +999,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       VehicleRadarSheet.show(
         context,
         telemetry: _telemetry,
+        repository: widget.repository,
         onHornFlash: () => _sendCommandAndReport(
           // The semantic strings ('locate', then 'vehicle_locate') both
           // failed with a real "parameter error" from CarLinko — the API
@@ -992,6 +1085,28 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
         setState(() {
           _scheduledCharging = isScheduled;
         });
+        widget.repository.setTargetSoc(targetSoc).then((ok) {
+          if (ok) {
+            _showNotification('🔋 Target SoC limit updated to $targetSoc% on Chery T-Box.');
+          }
+        }).catchError((_) {});
+
+        final startMins = startTime.hour * 60 + startTime.minute;
+        final endMins = endTime.hour * 60 + endTime.minute;
+        final diffMins = endMins > startMins ? (endMins - startMins) : (24 * 60 - startMins + endMins);
+        final durationHours = (diffMins / 60).round().clamp(1, 24);
+        widget.repository.setBatterySchedule({
+          'enabled': isScheduled,
+          'hour': startTime.hour,
+          'minute': startTime.minute,
+          'duration': durationHours,
+          'week': List<bool>.filled(7, true),
+        }).then((ok) {
+          if (ok) {
+            _showNotification('🗓️ Cloud AC charge schedule synced (${durationHours}h window).');
+          }
+        }).catchError((_) {});
+
         final startHour = startTime.hourOfPeriod == 0 ? 12 : startTime.hourOfPeriod;
         final startMin = startTime.minute.toString().padLeft(2, '0');
         final startP = startTime.period == DayPeriod.am ? 'AM' : 'PM';
@@ -1119,6 +1234,10 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 ),
                 Row(
                   children: [
+                    _buildBluetoothStatusBadge(context, cardCol, borderCol, textPrimary, textMuted, limeAccent),
+                    const SizedBox(width: 6),
+                    _buildCellularSignalBadge(context, cardCol, borderCol, textPrimary, textMuted, limeAccent),
+                    const SizedBox(width: 4),
                     // Bell icon
                     ListenableBuilder(
                       listenable: VehicleAlertsManager.instance,
@@ -1185,6 +1304,9 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                           case 'location_history':
                             LocationHistorySheet.show(context);
                             break;
+                          case 'diagnostics':
+                            RemoteCommandDiagnosticsSheet.show(context, repository: widget.repository);
+                            break;
                           case 'theme':
                             AppThemeController.instance.toggleTheme(context);
                             break;
@@ -1241,6 +1363,16 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                               Icon(Icons.location_history, size: 18, color: textMuted),
                               const SizedBox(width: 10),
                               const Text('Location History', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'diagnostics',
+                          child: Row(
+                            children: [
+                              const Icon(Icons.terminal_rounded, size: 18, color: Color(0xFF00E5FF)),
+                              const SizedBox(width: 10),
+                              const Text('Remote CAN Opcode Tester', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                             ],
                           ),
                         ),
@@ -1375,6 +1507,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       isCharging: _telemetry.isCharging,
                       tnbTariff: widget.tnbTariff,
                       fuelPrice: widget.fuelPrice,
+                      repository: widget.repository,
                     ),
                   ),
                 );
@@ -1488,52 +1621,83 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Icon(
-                          Icons.battery_charging_full,
-                          size: 12,
-                          color: widget.repository.isVehicleBound && _telemetry.volt12 > 0 ? voltAccent : textMuted,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          widget.repository.isVehicleBound && _telemetry.volt12 > 0
-                              ? '12V Aux: ${_telemetry.volt12.toStringAsFixed(2)}V'
-                              : '12V Aux: -- V',
-                          style: TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w700,
-                            color: widget.repository.isVehicleBound && _telemetry.volt12 > 0 ? voltAccent : textMuted,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (isBound) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Icon(Icons.local_gas_station, size: 12, color: fuelBarCol),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Fuel Consumption: ${_telemetry.fuelConsumptionL100km.toStringAsFixed(1)} L/100km',
-                            style: TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                              color: fuelBarCol,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
                   ],
                 ),
               ),
             ),
+            if (isBound) ...[
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: () => _showRawHexDialog(context),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF131722) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: borderCol.withValues(alpha: 0.6)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Text('Energy consumption', style: TextStyle(fontFamily: 'monospace', fontSize: 10.5, color: textMuted)),
+                              const SizedBox(width: 4),
+                              Icon(Icons.touch_app_outlined, size: 11, color: textMuted),
+                            ],
+                          ),
+                          Text(
+                            _telemetry.energyConsumptionKwh100km != 0
+                                ? '${_telemetry.energyConsumptionKwh100km.toStringAsFixed(2)} kWh/100km'
+                                : '-- kWh/100km',
+                            style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold, color: evBarCol),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Fuel consumption', style: TextStyle(fontFamily: 'monospace', fontSize: 10.5, color: textMuted)),
+                          Text(
+                            _telemetry.fuelConsumptionL100km > 0
+                                ? '${_telemetry.fuelConsumptionL100km.toStringAsFixed(2)} L/100km'
+                                : '-- L/100km',
+                            style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold, color: fuelBarCol),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Voltage', style: TextStyle(fontFamily: 'monospace', fontSize: 10.5, color: textMuted)),
+                          Text(
+                            _telemetry.volt12 > 0
+                                ? '${_telemetry.volt12.toStringAsFixed(2)} V'
+                                : '-- V',
+                            style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold, color: voltAccent),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ] else ...[
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Icon(Icons.battery_charging_full, size: 12, color: textMuted),
+                  const SizedBox(width: 4),
+                  Text('12V Aux: -- V', style: TextStyle(fontFamily: 'monospace', fontSize: 10.5, fontWeight: FontWeight.w700, color: textMuted)),
+                ],
+              ),
+            ],
             const SizedBox(height: 18),
 
             // 5. 6-GRID REMOTE CONTROL CARDS
@@ -1557,7 +1721,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 Expanded(
                   child: _buildCyberRemoteCard(
                     title: 'CLIMATE',
-                    value: !isBound ? '--' : (_isAcActive ? '${_telemetry.acTemp}°C' : 'Off → 22°'),
+                    value: !isBound ? '--' : (_isAcActive ? '${_telemetry.acTemp.clamp(16, 32)}°C' : 'Off → 22°'),
                     icon: null,
                     isActive: _isAcActive,
                     limeAccent: limeAccent,
@@ -1698,6 +1862,1055 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
   );
   }
 
+  Widget _buildBluetoothStatusBadge(
+    BuildContext context,
+    Color cardCol,
+    Color borderCol,
+    Color textPrimary,
+    Color textMuted,
+    Color limeAccent,
+  ) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([
+        BluetoothDrivingTrackerService.instance,
+        CarLinkoBleController(),
+      ]),
+      builder: (context, _) {
+        final ble = CarLinkoBleController();
+        final isBleConnected = ble.isConnected;
+        final isBleScanning = ble.isScanning;
+        final isClassicConnected = BluetoothDrivingTrackerService.instance.isCarConnected;
+
+        // Royal electric blue when BLE is actively connected (like CarLinko)
+        const bleBlue = Color(0xFF2979FF);
+        const cyberCyan = Color(0xFF00E5FF);
+        const scanAmber = Color(0xFFFFB74D);
+
+        final Color activeCol;
+        final String label;
+        final String tooltip;
+        final bool isAnyConnected;
+
+        if (isBleConnected) {
+          activeCol = bleBlue;
+          label = 'BLE';
+          tooltip = 'Chery BLE: Connected (<10m Proximity Active) • Direct CAN Actuation Armed';
+          isAnyConnected = true;
+        } else if (isBleScanning) {
+          activeCol = scanAmber;
+          label = 'SCAN';
+          tooltip = 'Chery BLE: Scanning for vehicle Nordic UART...';
+          isAnyConnected = false;
+        } else if (isClassicConnected) {
+          activeCol = cyberCyan;
+          label = 'BT';
+          tooltip = 'Chery Bluetooth: Connected (${BluetoothDrivingTrackerService.instance.connectedCarName ?? 'Chery Tiggo'})';
+          isAnyConnected = true;
+        } else {
+          activeCol = textMuted;
+          label = 'BLE';
+          tooltip = 'Chery BLE: Standby (Tap to Scan & Connect)';
+          isAnyConnected = false;
+        }
+
+        return Tooltip(
+          message: tooltip,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => _showBluetoothConnectionStatusModal(context),
+              borderRadius: BorderRadius.circular(10),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                height: 34,
+                padding: const EdgeInsets.symmetric(horizontal: 7),
+                decoration: BoxDecoration(
+                  color: isAnyConnected
+                      ? activeCol.withValues(alpha: 0.14)
+                      : (isBleScanning ? scanAmber.withValues(alpha: 0.12) : cardCol),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isAnyConnected
+                        ? activeCol.withValues(alpha: 0.7)
+                        : (isBleScanning ? scanAmber.withValues(alpha: 0.5) : borderCol),
+                    width: 1.1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isBleScanning)
+                      SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.8,
+                          color: scanAmber,
+                        ),
+                      )
+                    else
+                      Icon(
+                        isAnyConnected ? Icons.bluetooth_connected_rounded : Icons.bluetooth_rounded,
+                        size: 16,
+                        color: activeCol,
+                      ),
+                    const SizedBox(width: 4),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                        color: activeCol,
+                      ),
+                    ),
+                    if (isAnyConnected) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        width: 5,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: activeCol,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCellularSignalBadge(
+    BuildContext context,
+    Color cardCol,
+    Color borderCol,
+    Color textPrimary,
+    Color textMuted,
+    Color limeAccent,
+  ) {
+    final isBound = widget.repository.isVehicleBound;
+    final isCloud = widget.repository.isCloudConnected;
+    final lastSync = _telemetry.lastUpdated;
+    final syncAgeSec = DateTime.now().difference(lastSync).inSeconds;
+
+    int bars = 0;
+    if (isBound && isCloud) {
+      if (syncAgeSec < 180) {
+        bars = 4;
+      } else if (syncAgeSec < 600) {
+        bars = 3;
+      } else if (syncAgeSec < 3600) {
+        bars = 2;
+      } else {
+        bars = 1;
+      }
+    } else if (isCloud) {
+      bars = 1;
+    }
+
+    const cyberCyan = Color(0xFF00E5FF);
+    final signalColor = bars >= 3 ? cyberCyan : (bars >= 2 ? const Color(0xFFFFB74D) : textMuted);
+
+    return Tooltip(
+      message: isBound
+          ? 'Telematics 4G LTE: Connected ($bars/4 bars) • Synced ${_syncAgeText()} ago'
+          : 'Telematics: Awaiting car bind',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _showCellularSignalStatusModal(context),
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            height: 34,
+            padding: const EdgeInsets.symmetric(horizontal: 7),
+            decoration: BoxDecoration(
+              color: cardCol,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isBound ? cyberCyan.withValues(alpha: 0.4) : borderCol,
+                width: 1.1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: List.generate(4, (index) {
+                    final barHeight = 4.0 + (index * 2.5);
+                    final isLit = index < bars;
+                    return Container(
+                      width: 2.3,
+                      height: barHeight,
+                      margin: EdgeInsets.only(right: index < 3 ? 1.5 : 0),
+                      decoration: BoxDecoration(
+                        color: isLit ? signalColor : textMuted.withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(1),
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '4G',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                    color: isBound ? textPrimary : textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showBluetoothConnectionStatusModal(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final bgCol = isDark ? const Color(0xFF0D0F14) : const Color(0xFFF3F4F6);
+    final cardCol = isDark ? const Color(0xFF161922) : Colors.white;
+    final borderCol = isDark ? const Color(0xFF262C38) : const Color(0xFFE2E8F0);
+    final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
+    final textMuted = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    const cyberCyan = Color(0xFF00E5FF);
+    final limeAccent = isDark ? const Color(0xFFDFFF00) : const Color(0xFF65A30D);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: bgCol,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return ListenableBuilder(
+          listenable: Listenable.merge([
+            BluetoothDrivingTrackerService.instance,
+            CarLinkoBleController(),
+          ]),
+          builder: (ctx, _) {
+            final ble = CarLinkoBleController();
+            final isBleConnected = ble.isConnected;
+            final isBleScanning = ble.isScanning;
+            final isClassicConnected = BluetoothDrivingTrackerService.instance.isCarConnected;
+            final carName = ble.connectedDeviceName ?? BluetoothDrivingTrackerService.instance.connectedCarName ?? 'Chery Tiggo 7 Pro';
+
+            const bleBlue = Color(0xFF2979FF);
+            const scanAmber = Color(0xFFFFB74D);
+            final statusColor = isBleConnected ? bleBlue : (isBleScanning ? scanAmber : (isClassicConnected ? cyberCyan : textMuted));
+
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: borderCol,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: statusColor.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Icon(
+                          isBleConnected || isClassicConnected
+                              ? Icons.bluetooth_connected_rounded
+                              : Icons.bluetooth_rounded,
+                          color: statusColor,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'DUAL-LINK BLUETOOTH',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.2,
+                                color: textMuted,
+                              ),
+                            ),
+                            Text(
+                              isBleConnected
+                                  ? 'Direct BLE Connected (<10m)'
+                                  : (isBleScanning ? 'Scanning for Vehicle BLE...' : (isClassicConnected ? 'Classic BT Linked' : 'Bluetooth Standby')),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: statusColor.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        child: Text(
+                          isBleConnected ? 'BLE ACTIVE' : (isBleScanning ? 'SCANNING' : (isClassicConnected ? 'BT ACTIVE' : 'STANDBY')),
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w800,
+                            color: statusColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // BLE Connection Card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: cardCol,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isBleConnected ? bleBlue.withValues(alpha: 0.5) : borderCol,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.bolt_rounded, size: 16, color: isBleConnected ? bleBlue : textMuted),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Chery Nordic NUS BLE',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: isBleConnected ? bleBlue : textPrimary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              isBleConnected ? 'LINKED (<50ms)' : (isBleScanning ? 'SEARCHING' : 'READY'),
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: isBleConnected ? bleBlue : (isBleScanning ? scanAmber : textMuted),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Divider(color: borderCol.withValues(alpha: 0.5), height: 1),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Service UUID', style: TextStyle(fontSize: 12, color: textMuted)),
+                            Text(
+                              '6e400001 (NUS)',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: cyberCyan,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (isBleConnected && ble.connectedDeviceId != null) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Device MAC / ID', style: TextStyle(fontSize: 12, color: textMuted)),
+                              Text(
+                                ble.connectedDeviceId!,
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        if (!isBleConnected) ...[
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: isBleScanning
+                                      ? () => ble.stopScan()
+                                      : () => ble.startScan(
+                                            timeoutSeconds: 12,
+                                            targetDeviceName: BluetoothDrivingTrackerService.instance.connectedCarName,
+                                          ),
+                                  icon: isBleScanning
+                                      ? const SizedBox(
+                                          width: 14,
+                                          height: 14,
+                                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                        )
+                                      : const Icon(Icons.bluetooth_searching_rounded, size: 15),
+                                  label: Text(isBleScanning ? 'Stop' : 'Scan BLE'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: bleBlue,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11.5),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () => ble.directConnect(),
+                                  icon: const Icon(Icons.flash_on_rounded, size: 15),
+                                  label: const Text('Direct Connect (NUS)'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: limeAccent,
+                                    foregroundColor: Colors.black,
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.info_outline_rounded, size: 14, color: Colors.amber),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'CarLinko holds exclusive BLE link. If CarLinko is open, force-close it so the car can connect to TiggoMate.',
+                                    style: const TextStyle(fontSize: 10, color: Colors.amber, height: 1.25),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ] else ...[
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () => ble.disconnect(),
+                                  icon: const Icon(Icons.bluetooth_disabled_rounded, size: 15),
+                                  label: const Text('Disconnect'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: textMuted,
+                                    side: BorderSide(color: borderCol),
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () async {
+                                    final ok = await ble.sendCommand(CarLinkoBleOpcodes.lock);
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(ok ? '🔒 Doors Locked (Direct BLE)' : 'BLE Lock failed'),
+                                          backgroundColor: ok ? bleBlue : Colors.red,
+                                          duration: const Duration(seconds: 2),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  icon: const Icon(Icons.lock_rounded, size: 15),
+                                  label: const Text('BLE Lock'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: bleBlue,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () async {
+                                    final ok = await ble.sendCommand(CarLinkoBleOpcodes.unlock);
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(ok ? '🔓 Doors Unlocked (Direct BLE)' : 'BLE Unlock failed'),
+                                          backgroundColor: ok ? limeAccent : Colors.red,
+                                          duration: const Duration(seconds: 2),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  icon: const Icon(Icons.lock_open_rounded, size: 15),
+                                  label: const Text('BLE Unlock'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: limeAccent,
+                                    foregroundColor: Colors.black,
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () async {
+                                    final ok = await ble.sendCommand(CarLinkoBleOpcodes.trunkOpen);
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(ok ? '🚗 Power Tailgate Triggered (Encrypted BLE)' : 'BLE Tailgate failed'),
+                                          backgroundColor: ok ? bleBlue : Colors.red,
+                                          duration: const Duration(seconds: 2),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  icon: const Icon(Icons.sensor_door_rounded, size: 15),
+                                  label: const Text('BLE Tailgate'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF1E293B),
+                                    foregroundColor: Colors.white,
+                                    side: BorderSide(color: borderCol),
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11.5),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () async {
+                                    final ok = await ble.sendCommand(CarLinkoBleOpcodes.findCar);
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(ok ? '📢 Horn & Lights Triggered (Encrypted BLE)' : 'BLE Search failed'),
+                                          backgroundColor: ok ? bleBlue : Colors.red,
+                                          duration: const Duration(seconds: 2),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  icon: const Icon(Icons.campaign_rounded, size: 15),
+                                  label: const Text('BLE Find Car'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF1E293B),
+                                    foregroundColor: Colors.white,
+                                    side: BorderSide(color: borderCol),
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11.5),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(Icons.bolt_rounded, size: 13, color: limeAccent),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  '⚡ Direct BLE connected (<50ms). Actuation signals route directly to car via AES-256 encrypted Bluetooth.',
+                                  style: TextStyle(fontSize: 10.5, color: textMuted),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        if (!isBleConnected && ble.discoveredDevices.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Divider(color: borderCol.withValues(alpha: 0.5), height: 1),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'DISCOVERED BLUETOOTH DEVICES (${ble.discoveredDevices.length})',
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.8,
+                                  color: textMuted,
+                                ),
+                              ),
+                              if (isBleScanning)
+                                Text(
+                                  'Scanning...',
+                                  style: TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: scanAmber,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 160),
+                            child: ListView.separated(
+                              shrinkWrap: true,
+                              itemCount: ble.discoveredDevices.length,
+                              separatorBuilder: (_, __) => Divider(color: borderCol.withValues(alpha: 0.3), height: 6),
+                              itemBuilder: (c, idx) {
+                                final d = ble.discoveredDevices[idx];
+                                final advName = d.advertisementData.advName;
+                                final dName = advName.isNotEmpty ? advName : (d.device.platformName.isNotEmpty ? d.device.platformName : 'Peripheral');
+                                final isLikelyCar = dName.toLowerCase().contains('chery') ||
+                                    dName.toLowerCase().contains('tiggo') ||
+                                    dName.toLowerCase().contains('tbox') ||
+                                    dName.toLowerCase().contains('cqr') ||
+                                    dName.toLowerCase().contains('vrt') ||
+                                    (BluetoothDrivingTrackerService.instance.connectedCarName != null &&
+                                        dName.toLowerCase().contains(BluetoothDrivingTrackerService.instance.connectedCarName!.toLowerCase()));
+
+                                return Row(
+                                  children: [
+                                    Icon(
+                                      isLikelyCar ? Icons.directions_car_filled_rounded : Icons.bluetooth_rounded,
+                                      size: 16,
+                                      color: isLikelyCar ? cyberCyan : textMuted,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            dName,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: isLikelyCar ? FontWeight.w700 : FontWeight.w500,
+                                              color: isLikelyCar ? cyberCyan : textPrimary,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          Text(
+                                            '${d.device.remoteId.str} • ${d.rssi} dBm',
+                                            style: TextStyle(
+                                              fontFamily: 'monospace',
+                                              fontSize: 9.5,
+                                              color: textMuted,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      height: 28,
+                                      child: ElevatedButton(
+                                        onPressed: () => ble.connectToDevice(d.device),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: isLikelyCar ? bleBlue : borderCol,
+                                          foregroundColor: isLikelyCar ? Colors.white : textPrimary,
+                                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                          textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 10.5),
+                                        ),
+                                        child: const Text('Connect'),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Classic BT Tracking Card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: cardCol,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: borderCol),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Auto-Trip & Parking Drop', style: TextStyle(fontSize: 12, color: textMuted)),
+                            Text(
+                              isClassicConnected ? 'Monitoring · Armed' : 'Armed on Connect',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: isClassicConnected ? limeAccent : textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          isClassicConnected
+                              ? 'Connected to $carName via Bluetooth Audio. Auto-trip log & parking GPS drop armed.'
+                              : 'Pairs when driving to prevent phone Doze and track trips without cloud latency.',
+                          style: TextStyle(fontSize: 11.5, color: textMuted, height: 1.3),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.of(ctx).pop();
+                            RemoteCommandDiagnosticsSheet.show(context, repository: widget.repository);
+                          },
+                          icon: const Icon(Icons.terminal_rounded, size: 16),
+                          label: const Text('CAN Opcode Tester'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF00E5FF),
+                            side: BorderSide(color: const Color(0xFF00E5FF).withValues(alpha: 0.5)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.of(ctx).pop();
+                            widget.onOpenSettings();
+                          },
+                          icon: const Icon(Icons.settings_bluetooth_rounded, size: 16),
+                          label: const Text('BT Settings'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isBleConnected ? bleBlue : (isClassicConnected ? cyberCyan : limeAccent),
+                            foregroundColor: const Color(0xFF0A0B0E),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showCellularSignalStatusModal(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final bgCol = isDark ? const Color(0xFF0D0F14) : const Color(0xFFF3F4F6);
+    final cardCol = isDark ? const Color(0xFF161922) : Colors.white;
+    final borderCol = isDark ? const Color(0xFF262C38) : const Color(0xFFE2E8F0);
+    final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
+    final textMuted = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    const cyberCyan = Color(0xFF00E5FF);
+    final limeAccent = isDark ? const Color(0xFFDFFF00) : const Color(0xFF65A30D);
+
+    final isBound = widget.repository.isVehicleBound;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: bgCol,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: borderCol,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: (isBound ? cyberCyan : const Color(0xFFFFB74D)).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: (isBound ? cyberCyan : const Color(0xFFFFB74D)).withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.cell_tower_rounded,
+                      color: isBound ? cyberCyan : const Color(0xFFFFB74D),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'T-BOX 4G TELEMATICS',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                            color: textMuted,
+                          ),
+                        ),
+                        Text(
+                          isBound ? '4G Cellular Live' : 'Awaiting Car Bind',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: (isBound ? limeAccent : const Color(0xFFFFB74D)).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: isBound ? limeAccent : const Color(0xFFFFB74D),
+                      ),
+                    ),
+                    child: Text(
+                      isBound ? 'ONLINE' : 'UNBOUND',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        color: isBound ? limeAccent : const Color(0xFFFFB74D),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: cardCol,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: borderCol),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Cloud Sync Status', style: TextStyle(fontSize: 12, color: textMuted)),
+                        Text(
+                          isBound ? 'Synced ${_syncAgeText()} ago' : 'No Sync',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: isBound ? limeAccent : textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Divider(color: borderCol.withValues(alpha: 0.5), height: 1),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('T-Box Data Pipeline', style: TextStyle(fontSize: 12, color: textMuted)),
+                        Text(
+                          '73-Byte CAN Blob',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: cyberCyan,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Divider(color: borderCol.withValues(alpha: 0.5), height: 1),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Vehicle Plate / ID', style: TextStyle(fontSize: 12, color: textMuted)),
+                        Text(
+                          widget.carPlateNumber.isNotEmpty ? widget.carPlateNumber : 'VRT 3342',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        RemoteCommandDiagnosticsSheet.show(context, repository: widget.repository);
+                      },
+                      icon: const Icon(Icons.terminal_rounded, size: 16),
+                      label: const Text('CAN Opcode Tester'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF00E5FF),
+                        side: BorderSide(color: const Color(0xFF00E5FF).withValues(alpha: 0.5)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        Navigator.of(ctx).pop();
+                        try {
+                          await widget.repository.refresh();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Vehicle telematics refreshed via 4G cloud'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Sync failed: $e'),
+                                backgroundColor: Colors.redAccent,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.sync_rounded, size: 16),
+                      label: const Text('Sync Telematics'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: limeAccent,
+                        foregroundColor: const Color(0xFF0A0B0E),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildCyberRemoteCard({
     required String title,
     required String value,
@@ -1815,6 +3028,155 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
   }
 
   // ignore: unused_element
+  Widget _buildCarLinkoEnergyCard(AppColors colors) {
+    return InkWell(
+      onTap: () => _showRawHexDialog(context),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: colors.tileBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: colors.border),
+        ),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Energy consumption',
+                  style: TextStyle(fontSize: 13, color: colors.textSecondary),
+                ),
+                Text(
+                  _telemetry.energyConsumptionKwh100km != 0
+                      ? '${_telemetry.energyConsumptionKwh100km.toStringAsFixed(2)} kWh/100km'
+                      : '-- kWh/100km',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: colors.textPrimary),
+                ),
+              ],
+            ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 9),
+            child: Divider(height: 1, thickness: 0.6, color: colors.borderSubtle),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Fuel consumption',
+                style: TextStyle(fontSize: 13, color: colors.textSecondary),
+              ),
+              Text(
+                _telemetry.fuelConsumptionL100km > 0
+                    ? '${_telemetry.fuelConsumptionL100km.toStringAsFixed(2)} L/100km'
+                    : '-- L/100km',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: colors.textPrimary),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 9),
+            child: Divider(height: 1, thickness: 0.6, color: colors.borderSubtle),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Voltage',
+                style: TextStyle(fontSize: 13, color: colors.textSecondary),
+              ),
+              Text(
+                _telemetry.volt12 > 0
+                    ? '${_telemetry.volt12.toStringAsFixed(2)} V'
+                    : '-- V',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: colors.textPrimary),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+  Future<void> _showRawHexDialog(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    final hex = _telemetry.rawBlobHex ?? prefs.getString('tm_last_raw_hex') ?? '';
+
+    if (hex.isNotEmpty) {
+      await Clipboard.setData(ClipboardData(text: hex));
+      if (mounted) {
+        AppNotification.show(
+          context,
+          message: '📋 Hex copied to clipboard (${hex.length} chars)',
+          type: NotificationType.success,
+          icon: Icons.copy_rounded,
+        );
+      }
+    }
+
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF131722),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.terminal, color: Color(0xFFD2F835), size: 20),
+            SizedBox(width: 8),
+            Text('Live T-Box Telematics Hex', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '73-byte CAN-bus telemetry payload from your car:',
+              style: TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.black38,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white24),
+              ),
+              child: SelectableText(
+                hex.isNotEmpty ? hex : 'No raw hex captured yet. Pull to refresh dashboard.',
+                style: const TextStyle(fontFamily: 'monospace', color: Color(0xFF38BDF8), fontSize: 11),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          if (hex.isNotEmpty)
+            TextButton.icon(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: hex));
+                Navigator.of(ctx).pop();
+                AppNotification.show(
+                  context,
+                  message: '📋 Copied hex to clipboard!',
+                  type: NotificationType.success,
+                  icon: Icons.copy_rounded,
+                );
+              },
+              icon: const Icon(Icons.copy, size: 16, color: Color(0xFFD2F835)),
+              label: const Text('Copy Again', style: TextStyle(color: Color(0xFFD2F835), fontWeight: FontWeight.bold)),
+            ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Close', style: TextStyle(color: Colors.white70)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildOldDashboard(BuildContext context) {
     final colors = AppColors(context);
     final double homeAcCost = _homeAcCost;
@@ -2781,7 +4143,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     ),
                     _buildCircularRemoteButton(
                       icon: Icons.ac_unit,
-                      label: _isAcActive ? '${_telemetry.acTemp}°C ON' : 'A/C OFF',
+                      label: _isAcActive ? '${_telemetry.acTemp.clamp(16, 32)}°C ON' : 'A/C OFF',
                       sublabel: 'Climate',
                       isActive: _isAcActive,
                       activeColor: const Color(0xFF2F81F7),
@@ -3373,30 +4735,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                   ),
                 ),
                 if (widget.repository.isVehicleBound) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: colors.tileBg,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: colors.border),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.local_gas_station, size: 16, color: colors.petrolAmber),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Fuel: ${_telemetry.fuelConsumptionL100km.toStringAsFixed(1)} L/100km',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colors.textPrimary),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
+                  const SizedBox(height: 12),
+                  _buildCarLinkoEnergyCard(colors),
                 ],
               ],
             ),

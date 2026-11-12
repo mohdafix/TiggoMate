@@ -125,9 +125,18 @@ class AuthService {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // Check Firebase Auth if initialized
+      // Check Firebase Auth if initialized, or auto-sign in anonymously
       try {
-        final fbUser = fb.FirebaseAuth.instance.currentUser;
+        var fbUser = fb.FirebaseAuth.instance.currentUser;
+        if (fbUser == null) {
+          try {
+            final cred = await fb.FirebaseAuth.instance.signInAnonymously();
+            fbUser = cred.user;
+            debugPrint('[AuthService] Signed in anonymously with Firebase: ${fbUser?.uid}');
+          } catch (anonErr) {
+            debugPrint('[AuthService] Anonymous auth note: $anonErr');
+          }
+        }
         if (fbUser != null) {
           // Attempt to pull latest cloud profile from Firestore
           final cloudProfile = await _fetchFromFirestore(fbUser.uid);

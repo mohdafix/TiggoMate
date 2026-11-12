@@ -2,20 +2,33 @@ import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'carlinko_crypto.dart';
 
 /// App-global key extracted from the CarLinko mobile APK (not a user secret).
 /// Reference: https://github.com/thititongumpun/ha-carlinko
 const String carLinkoSignKey = 'mYj3fzMpn77bir66';
 const String carLinkoDefaultRegion = 'sea'; // South East Asia (Malaysia & Thailand)
-const String carLinkoApiVersion = '1.12.0';
+const String carLinkoApiVersion = '1.14.0';
 const String carLinkoUserAgent = 'Dart/3.10 (dart:io)';
 
 /// Response codes meaning "the token is stale, log in again" — matches
-/// ha-carlinko's STALE_TOKEN_CODES exactly (confirmed, not guessed). The
-/// previous narrower {'1001','1002','401'} check here missed real cases.
-const Set<String> carLinkoStaleTokenCodes = {'9997', '40001', '40003', '401', '1001', '1002'};
+/// ha-carlinko's STALE_TOKEN_CODES and Chery cloud session invalidation codes.
+const Set<String> carLinkoStaleTokenCodes = {
+  '9997',
+  '40001',
+  '40002',
+  '40003',
+  '401',
+  '403',
+  '1001',
+  '1002',
+  'A0200',
+  'A0201',
+  'A0202',
+  'A1001',
+};
 
 /// Real remote-control opcodes (sent as the `data` field, hex strings), from
 /// ha-carlinko's const.py — confirmed against the official app, unlike the
@@ -36,7 +49,8 @@ class CarLinkoOpcodes {
   static const String windowsOpen = '740600';
   static const String windowsVent = '740E00';
   static const String findCar = '740400';
-  static const String trunkOpen = '740300';
+  static const String trunkOpen = '740300'; // Jump table decode: 740300 is Trunk Open (740500 was windows close)
+  static const String trunkOpenAlt = '740500';
   static const String trunkClose = '740A00';
   static const String sunroofClose = '740F00';
   static const String sunroofOpen = '740F01';
@@ -53,6 +67,77 @@ class CarLinkoOpcodes {
   static const String airPurifyOff = '742500';
   static const String steeringHeatOn = '742401';
   static const String steeringHeatOff = '742400';
+
+  /// T-Box permission / wake pre-command observed when car replies with status 0x44.
+  static const String perm7801 = '7801';
+
+  /// Dynamic cabin temperature setpoint: `7411` + hex(`0x80 + round(celsius * 2)`).
+  /// Example: 17.5°C -> `7411A3`, 22.0°C -> `7411AC`.
+  static String acTemperature(double celsius) {
+    final clamped = celsius.clamp(16.0, 32.0);
+    final byte = 0x80 + (clamped * 2).round();
+    return '7411${byte.toRadixString(16).toUpperCase().padLeft(2, '0')}';
+  }
+
+  // Front seats: 3-level heating (0x7415 / 0x7416)
+  static const String driverSeatHeatOff = '741500';
+  static const String driverSeatHeatL1 = '741501';
+  static const String driverSeatHeatL2 = '741502';
+  static const String driverSeatHeatL3 = '741503';
+  static const String passengerSeatHeatOff = '741600';
+  static const String passengerSeatHeatL1 = '741601';
+  static const String passengerSeatHeatL2 = '741602';
+  static const String passengerSeatHeatL3 = '741603';
+
+  // Rear seats: 3-level heating (0x7417 / 0x7419)
+  static const String rearLeftSeatHeatOff = '741700';
+  static const String rearLeftSeatHeatL1 = '741701';
+  static const String rearLeftSeatHeatL2 = '741702';
+  static const String rearLeftSeatHeatL3 = '741703';
+  static const String rearRightSeatHeatOff = '741900';
+  static const String rearRightSeatHeatL1 = '741901';
+  static const String rearRightSeatHeatL2 = '741902';
+  static const String rearRightSeatHeatL3 = '741903';
+
+  // Front seats: 3-level ventilation (0x741A / 0x741B)
+  static const String driverSeatVentOff = '741A00';
+  static const String driverSeatVentL1 = '741A01';
+  static const String driverSeatVentL2 = '741A02';
+  static const String driverSeatVentL3 = '741A03';
+  static const String passengerSeatVentOff = '741B00';
+  static const String passengerSeatVentL1 = '741B01';
+  static const String passengerSeatVentL2 = '741B02';
+  static const String passengerSeatVentL3 = '741B03';
+
+  // Rear seats: 3-level ventilation (0x741C / 0x741E)
+  static const String rearLeftSeatVentOff = '741C00';
+  static const String rearLeftSeatVentL1 = '741C01';
+  static const String rearLeftSeatVentL2 = '741C02';
+  static const String rearLeftSeatVentL3 = '741C03';
+  static const String rearRightSeatVentOff = '741E00';
+  static const String rearRightSeatVentL1 = '741E01';
+  static const String rearRightSeatVentL2 = '741E02';
+  static const String rearRightSeatVentL3 = '741E03';
+
+  // Dedicated rear window defogger (CAN opcode 0x74 subcommand 0x26)
+  static const String rearDefogOff = '742600';
+  static const String rearDefogOn = '742602';
+
+  static String _levelOpcode(String prefix, int level) {
+    final safe = level.clamp(0, 3);
+    return '${prefix}0$safe';
+  }
+
+  // Helper selectors for level-based commands
+  static String driverSeatVentOpcode(int level) => _levelOpcode('741A', level);
+  static String passengerSeatVentOpcode(int level) => _levelOpcode('741B', level);
+  static String rearLeftSeatVentOpcode(int level) => _levelOpcode('741C', level);
+  static String rearRightSeatVentOpcode(int level) => _levelOpcode('741E', level);
+
+  static String driverSeatHeatOpcode(int level) => _levelOpcode('7415', level);
+  static String passengerSeatHeatOpcode(int level) => _levelOpcode('7416', level);
+  static String rearLeftSeatHeatOpcode(int level) => _levelOpcode('7417', level);
+  static String rearRightSeatHeatOpcode(int level) => _levelOpcode('7419', level);
 }
 
 class CarLinkoException implements Exception {
@@ -107,10 +192,19 @@ class CarLinkoClient {
   /// base64(HMAC-SHA256(SIGN_KEY, jsonEncode(sortByKeyAsc({**params, timestamp}))))
   static String sign(Map<String, dynamic> params, String timestamp) {
     final merged = <String, dynamic>{...params, 'timestamp': timestamp};
+    // Numbers (e.g. timeOut: 20) must be preserved as numeric values in jsonEncode,
+    // not converted to strings, matching the official client and server verification.
     final sortedKeys = merged.keys.toList()..sort();
     final sortedMap = <String, dynamic>{};
     for (final k in sortedKeys) {
-      sortedMap[k] = merged[k] ?? '';
+      final v = merged[k];
+      if (v == null) {
+        sortedMap[k] = '';
+      } else if (v is num || v is bool || v is List || v is Map) {
+        sortedMap[k] = v;
+      } else {
+        sortedMap[k] = v.toString();
+      }
     }
 
     final message = json.encode(sortedMap);
@@ -167,8 +261,8 @@ class CarLinkoClient {
       'osVersion': '13',
       'language': 'en',
       'timeZone': 'Asia/Kuala_Lumpur',
-      'phoneBrand': 'Chery',
-      'phoneModel': 'TiggoMate-Companion',
+      'phoneBrand': 'Xiaomi',
+      'phoneModel': '25098pn5ac',
       'md5': '',
       'verifyCode': '',
       'dateTime': ts,
@@ -209,8 +303,23 @@ class CarLinkoClient {
     }
 
     if (response.statusCode != 200) {
+      String serverMsg = '';
+      try {
+        final decoded = json.decode(bodyStr);
+        if (decoded is Map<String, dynamic>) {
+          serverMsg = decoded['msg']?.toString() ??
+              decoded['message']?.toString() ??
+              decoded['error']?.toString() ??
+              '';
+        }
+      } catch (_) {}
+      if (serverMsg.isEmpty && bodyStr.isNotEmpty) {
+        serverMsg = bodyStr.length > 200 ? bodyStr.substring(0, 200) : bodyStr;
+      }
       throw CarLinkoException(
-        'CarLinko server returned HTTP ${response.statusCode}',
+        serverMsg.isNotEmpty
+            ? 'CarLinko server error (${response.statusCode}): $serverMsg'
+            : 'CarLinko server returned HTTP ${response.statusCode}',
         'HTTP_${response.statusCode}',
       );
     }
@@ -254,12 +363,33 @@ class CarLinkoClient {
     return [];
   }
 
+  /// Fetch digital key authority for Phone-as-a-Key / Bluetooth verification.
+  Future<Map<String, dynamic>?> getKeyAuthority(String vehicleId) async {
+    try {
+      final q = {'vehicleId': vehicleId};
+      final res = await _request('GET', '/user/keyAuthority', queryParams: q, signParams: q);
+      if (res is Map<String, dynamic>) {
+        debugPrint('CarLinko: Fetched digital key authority for vehicle $vehicleId');
+        return res;
+      }
+    } catch (e) {
+      debugPrint('CarLinko getKeyAuthority note: $e');
+    }
+    return null;
+  }
+
   /// Retrieve decoded 73-byte telemetry state for a vehicle.
   Future<Map<String, dynamic>> getVehicleState(String vehicleId) async {
     final result = await _request('GET', '/user/vehicle/state/$vehicleId', signParams: {'id': vehicleId});
     final hexBlob = result?.toString() ?? '';
     final decoded = parseBlob(hexBlob);
     decoded['rawHex'] = hexBlob;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (hexBlob.isNotEmpty) {
+        await prefs.setString('tm_last_raw_hex', hexBlob);
+      }
+    } catch (_) {}
     return decoded;
   }
 
@@ -270,28 +400,52 @@ class CarLinkoClient {
   }
 
   /// Fetch the car's live GPS position (and, when CarLinko has one, a
-  /// pre-formatted address) via the real locate endpoint. The 73-byte
-  /// telemetry blob does not carry GPS at all — its would-be lat/lon bytes
-  /// are confirmed always zero on a real car — CarLinko's own app instead
-  /// gets location from this separate endpoint, confirmed against
-  /// ha-carlinko's reference client. Returns an empty map on no fix.
+  /// pre-formatted address) via the real locate endpoint.
+  /// Matches ha-carlinko reference client byte-for-byte:
+  /// Payload: {"sn": deviceSn, "showAddress": 1, "timestamp": ts}
   Future<Map<String, dynamic>> locateDevice(String deviceSn, {String? vehicleId}) async {
-    final body = {
-      'sn': deviceSn,
-      'deviceSn': deviceSn,
-      if (vehicleId != null && vehicleId.isNotEmpty) 'vehicleId': vehicleId,
-      'showAddress': 1,
-    };
-    try {
-      final result = await _request('POST', '/maps/deviceLocate', body: body, signParams: body);
-      if (result is Map<String, dynamic>) {
-        if (result['data'] is Map<String, dynamic>) {
-          return result['data'] as Map<String, dynamic>;
+    if (!_synced) {
+      await syncClock();
+    }
+    final ts = _currentTimestamp();
+    final cleanSn = deviceSn.trim();
+    final attempts = [
+      <String, dynamic>{
+        'sn': cleanSn,
+        'deviceId': cleanSn,
+        if (vehicleId != null && vehicleId.isNotEmpty) 'vehicleId': vehicleId,
+        'showAddress': 1,
+        'timestamp': ts,
+      },
+      <String, dynamic>{
+        'sn': cleanSn,
+        'showAddress': 1,
+        'timestamp': ts,
+      },
+      <String, dynamic>{
+        if (vehicleId != null && vehicleId.isNotEmpty) 'vehicleId': vehicleId,
+        'sn': cleanSn,
+        'timestamp': ts,
+      },
+    ];
+
+    for (final body in attempts) {
+      try {
+        final result = await _request('POST', '/maps/deviceLocate', body: body, signParams: body);
+        debugPrint('locateDevice response: $result');
+        if (result is Map<String, dynamic>) {
+          final data = result['data'] is Map<String, dynamic> ? result['data'] as Map<String, dynamic> : result;
+          if (data.containsKey('lat') || data.containsKey('latitude') || data.containsKey('point')) {
+            return data;
+          }
         }
-        return result;
+      } catch (e) {
+        debugPrint('locateDevice POST /maps/deviceLocate attempt failed: $e');
+        if (e is CarLinkoException && e.code != null) {
+          // If the endpoint explicitly rejected with an error, record it
+          return {'errorCode': e.code, 'errorMessage': e.message};
+        }
       }
-    } catch (e) {
-      debugPrint('locateDevice POST /maps/deviceLocate failed: $e');
     }
     return {};
   }
@@ -307,76 +461,529 @@ class CarLinkoClient {
   }
 
   /// Configure battery target state of charge (e.g. 80% or 100%).
-  Future<bool> setTargetSoc(String vehicleId, int targetSoc) async {
-    final body = {'vehicleId': vehicleId, 'targetSoc': targetSoc};
-    await _request('POST', '/user/device/manage/targetSoc', body: body, signParams: body);
+  /// CarLinko v1.14.0 uses HTTP PUT with `{vehicleId, deviceSn?, targetSoc}`.
+  Future<bool> setTargetSoc(String vehicleId, int targetSoc, {String? deviceSn}) async {
+    final body = <String, dynamic>{
+      'vehicleId': int.tryParse(vehicleId) ?? vehicleId,
+      if (deviceSn != null && deviceSn.trim().isNotEmpty) 'deviceSn': deviceSn.trim(),
+      'targetSoc': targetSoc,
+    };
+    await _request('PUT', '/user/device/manage/targetSoc', body: body, signParams: body);
     return true;
   }
 
-  /// Set smart cabin air conditioning pre-conditioning duration in minutes (e.g. 10 or 15 mins).
+  /// Set smart cabin air conditioning pre-conditioning duration in minutes (5, 10, or 15).
+  /// CarLinko v1.14.0 uses HTTP PUT with `{duration, vehicleId}`.
   Future<bool> setAirDuration(String vehicleId, int minutes) async {
-    final body = {'vehicleId': vehicleId, 'airDuration': minutes};
-    await _request('POST', '/user/device/manage/airDuration', body: body, signParams: body);
+    final body = <String, dynamic>{
+      'duration': minutes,
+      'vehicleId': int.tryParse(vehicleId) ?? vehicleId,
+    };
+    await _request('PUT', '/user/device/manage/airDuration', body: body, signParams: body);
     return true;
   }
 
-  /// Set smart scheduled AC charging timer.
+  /// Normalizes either native `{enabled, hour, minute, duration, week}` or
+  /// legacy `{startTime, durationMinutes, status, repeat}` into CarLinko's
+  /// `PUT /user/device/manage/batterySchedule` payload schema.
+  static Map<String, dynamic> normalizeBatterySchedulePayload(
+    String vehicleId,
+    Map<String, dynamic> scheduleParams,
+  ) {
+    final vid = int.tryParse(vehicleId) ?? vehicleId;
+    final enabled = scheduleParams.containsKey('enabled')
+        ? scheduleParams['enabled'] == true
+        : (scheduleParams['status'] == 1 || scheduleParams['status'] == true);
+
+    var hour = (scheduleParams['hour'] as num?)?.toInt() ?? 0;
+    var minute = (scheduleParams['minute'] as num?)?.toInt() ?? 0;
+    final startTimeStr = scheduleParams['startTime']?.toString();
+    if (!scheduleParams.containsKey('hour') && startTimeStr != null && startTimeStr.contains(':')) {
+      final parts = startTimeStr.split(':');
+      if (parts.length >= 2) {
+        hour = int.tryParse(parts[0].trim()) ?? hour;
+        minute = int.tryParse(parts[1].trim()) ?? minute;
+      }
+    }
+
+    final durationHours = (scheduleParams['duration'] as num?)?.toInt() ??
+        ((((scheduleParams['durationMinutes'] as num?)?.toInt() ?? 120) / 60).round().clamp(1, 24));
+
+    List<bool> week;
+    final rawWeek = scheduleParams['week'];
+    if (rawWeek is List && rawWeek.length == 7) {
+      week = rawWeek.map((e) => e == true || e == 1).toList();
+    } else {
+      final repeat = (scheduleParams['repeat']?.toString() ?? '').toLowerCase();
+      if (repeat.contains('every day') || repeat.contains('everyday') || repeat == 'daily') {
+        week = List<bool>.filled(7, true);
+      } else if (repeat.contains('weekday') || repeat.contains('monday') || repeat.contains('mon-fri')) {
+        week = [false, true, true, true, true, true, false];
+      } else if (repeat.contains('weekend') || repeat.contains('saturday') || repeat.contains('sat-sun')) {
+        week = [true, false, false, false, false, false, true];
+      } else {
+        week = List<bool>.filled(7, false);
+      }
+    }
+
+    return <String, dynamic>{
+      'vehicleId': vid,
+      'enabled': enabled,
+      'hour': hour.clamp(0, 23),
+      'minute': minute.clamp(0, 59),
+      'duration': durationHours.clamp(1, 24),
+      'week': week,
+    };
+  }
+
+  /// Set smart scheduled AC charging timer via `PUT /user/device/manage/batterySchedule`.
   Future<bool> setBatterySchedule(String vehicleId, Map<String, dynamic> scheduleParams) async {
-    final body = {'vehicleId': vehicleId, ...scheduleParams};
-    await _request('POST', '/user/device/manage/batterySchedule', body: body, signParams: body);
+    final body = normalizeBatterySchedulePayload(vehicleId, scheduleParams);
+    await _request('PUT', '/user/device/manage/batterySchedule', body: body, signParams: body);
     return true;
+  }
+
+  /// Fetch device/notification config: targetSoc, batterySchedule, startupAppointment,
+  /// and cloud alert switches (`VEHICLE_ANOMALY`, `BATTERY_ANOMALY`).
+  Future<Map<String, dynamic>> getTerminalNoticeConfig(String vehicleId) async {
+    final res = await _request(
+      'GET',
+      '/user/device/manage/terminalNoticeConfig/$vehicleId',
+      signParams: {'id': vehicleId},
+    );
+    if (res is! Map<String, dynamic>) return {};
+    final out = Map<String, dynamic>.from(res);
+    // Unpack nested JSON strings returned by CarLinko (`batterySchedule`, `extra`).
+    for (final key in ['batterySchedule', 'extra']) {
+      final raw = out[key];
+      if (raw is String && raw.trim().isNotEmpty) {
+        try {
+          out['${key}Parsed'] = json.decode(raw);
+        } catch (_) {}
+      } else if (raw is Map<String, dynamic>) {
+        out['${key}Parsed'] = raw;
+      }
+    }
+    return out;
+  }
+
+  /// Generic writer for `PUT /user/device/manage/terminalNoticeConfig`.
+  /// Supported [configName] values: `STARTUP_APPOINTMENT`, `VEHICLE_ANOMALY`, `BATTERY_ANOMALY`.
+  Future<bool> setNoticeItem({
+    required String vehicleId,
+    required String configName,
+    required bool configStatus,
+    Map<String, dynamic>? configExtra,
+  }) async {
+    final body = <String, dynamic>{
+      'configExtra': configExtra != null ? json.encode(configExtra) : '',
+      'configName': configName,
+      'configStatus': configStatus,
+      'vehicleId': int.tryParse(vehicleId) ?? vehicleId,
+    };
+    await _request('PUT', '/user/device/manage/terminalNoticeConfig', body: body, signParams: body);
+    return true;
+  }
+
+  /// Configure scheduled cabin departure pre-conditioning (`STARTUP_APPOINTMENT`).
+  Future<bool> setScheduledTravel({
+    required String vehicleId,
+    required bool enabled,
+    required int hour,
+    required int minute,
+    List<bool>? week,
+  }) {
+    final safeWeek = (week != null && week.length == 7) ? week : List<bool>.filled(7, false);
+    return setNoticeItem(
+      vehicleId: vehicleId,
+      configName: 'STARTUP_APPOINTMENT',
+      configStatus: enabled,
+      configExtra: {
+        'hour': hour.clamp(0, 23).toString().padLeft(2, '0'),
+        'minute': minute.clamp(0, 59).toString().padLeft(2, '0'),
+        'week': safeWeek,
+      },
+    );
+  }
+
+  /// Toggle cloud push alerts (`VEHICLE_ANOMALY`, `BATTERY_ANOMALY`).
+  Future<bool> setAlertSwitch({
+    required String vehicleId,
+    required String configName,
+    required bool enabled,
+  }) {
+    return setNoticeItem(
+      vehicleId: vehicleId,
+      configName: configName,
+      configStatus: enabled,
+    );
+  }
+
+  /// List configured electronic fences (geofences) for the vehicle.
+  Future<List<Map<String, dynamic>>> getGeofences(String vehicleId, {int page = 1, int size = 50}) async {
+    // Try with vehicleId, page, size first, then fall back to page only
+    try {
+      final q = {'vehicleId': vehicleId, 'page': page.toString(), 'size': size.toString()};
+      final res = await _request('GET', '/user/electronicFence/list', queryParams: q, signParams: q);
+      final list = _extractGeofenceList(res);
+      if (list.isNotEmpty) return list;
+    } catch (_) {}
+
+    try {
+      final q = {'page': page.toString(), 'size': size.toString()};
+      final res = await _request('GET', '/user/electronicFence/list', queryParams: q, signParams: q);
+      return _extractGeofenceList(res);
+    } catch (e) {
+      debugPrint('getGeofences error: $e');
+    }
+    return [];
+  }
+
+  static List<Map<String, dynamic>> _extractGeofenceList(dynamic res) {
+    if (res is Map<String, dynamic>) {
+      final list = res['list'] ?? res['data'] ?? res['records'];
+      if (list is List) return list.cast<Map<String, dynamic>>();
+    } else if (res is List) {
+      return res.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
+
+  /// Create a new electronic fence (geofence).
+  /// Matches CarLinko AddGeofenceParams: [name], [lat], [lng], [radius], [alarmType], [fenceType], [status].
+  /// [alarmType]: 1 = Enter (googleDriveIn), 2 = Exit (googleDriveOut). Default is 2 (Exit).
+  /// [fenceType]: 1 = Circle, 2 = Square.
+  Future<Map<String, dynamic>> addGeofence({
+    required String vehicleId,
+    required String fenceName,
+    required double latitude,
+    required double longitude,
+    required double radiusMeters,
+    int alarmType = 2,
+    int fenceType = 1,
+    int status = 1,
+  }) async {
+    final cleanLat = double.parse(latitude.toStringAsFixed(6));
+    final cleanLng = double.parse(longitude.toStringAsFixed(6));
+    final body = <String, dynamic>{
+      'vehicleId': vehicleId,
+      'name': fenceName,
+      'lat': cleanLat,
+      'lng': cleanLng,
+      'radius': radiusMeters.round(),
+      'alarmType': alarmType,
+      'fenceType': fenceType,
+      'status': status,
+    };
+    final res = await _request('POST', '/user/electronicFence/add', body: body, signParams: body);
+    return res is Map<String, dynamic> ? res : {'status': 'ok'};
+  }
+
+  /// Update an existing electronic fence (geofence) by ID.
+  /// Matches CarLinko UpdateGeofenceParams.
+  Future<Map<String, dynamic>> updateGeofence({
+    required String fenceId,
+    required String vehicleId,
+    required String fenceName,
+    required double latitude,
+    required double longitude,
+    required double radiusMeters,
+    int alarmType = 2,
+    int fenceType = 1,
+    int status = 1,
+  }) async {
+    final cleanLat = double.parse(latitude.toStringAsFixed(6));
+    final cleanLng = double.parse(longitude.toStringAsFixed(6));
+    final body = <String, dynamic>{
+      'id': fenceId,
+      'vehicleId': vehicleId,
+      'name': fenceName,
+      'lat': cleanLat,
+      'lng': cleanLng,
+      'radius': radiusMeters.round(),
+      'alarmType': alarmType,
+      'fenceType': fenceType,
+      'status': status,
+    };
+    final res = await _request('POST', '/user/electronicFence/update', body: body, signParams: body);
+    return res is Map<String, dynamic> ? res : {'status': 'ok'};
+  }
+
+  /// Toggle geofence active status (1 = enabled, 0 = disabled).
+  Future<bool> updateGeofenceStatus({
+    required String vehicleId,
+    required String fenceId,
+    required int status,
+  }) async {
+    final body = {
+      'id': fenceId,
+      'vehicleId': vehicleId,
+      'status': status,
+    };
+    await _request('POST', '/user/electronicFence/updateStatus', body: body, signParams: body);
+    return true;
+  }
+
+  /// Delete an electronic fence by ID.
+  Future<bool> deleteGeofence(String fenceId, {String? vehicleId}) async {
+    final body = {
+      'id': fenceId,
+      if (vehicleId != null) 'vehicleId': vehicleId,
+    };
+    try {
+      await _request('POST', '/user/electronicFence/delete', body: body, signParams: body);
+      return true;
+    } catch (_) {
+      try {
+        await _request('DELETE', '/user/electronicFence/$fenceId', signParams: {'id': fenceId});
+        return true;
+      } catch (e) {
+        debugPrint('deleteGeofence error: $e');
+        return false;
+      }
+    }
+  }
+
+  /// Extracts a list of map items from standard CarLinko paginated responses.
+  static List<Map<String, dynamic>> _extractPagedList(dynamic res) {
+    if (res is Map<String, dynamic>) {
+      final list = res['records'] ?? res['list'] ?? res['rows'] ?? res['data'];
+      if (list is List) {
+        return List<Map<String, dynamic>>.from(list.whereType<Map<String, dynamic>>());
+      }
+    } else if (res is List) {
+      return List<Map<String, dynamic>>.from(res.whereType<Map<String, dynamic>>());
+    }
+    return [];
+  }
+
+  /// Fetches the vehicle operation / remote control history from `GET /user/operating/page`.
+  /// Matches CarLinko v1.14.0's official "Vehicle control record" screen.
+  Future<List<Map<String, dynamic>>> getOperatingRecord({
+    String? vehicleId,
+    String? vin,
+    int pageNum = 1,
+    int pageSize = 20,
+  }) async {
+    try {
+      final q = <String, String>{
+        if (vehicleId != null && vehicleId.isNotEmpty) 'vehicleId': vehicleId,
+        'page': pageNum.toString(),
+        'size': pageSize.toString(),
+      };
+      final res = await _request('GET', '/user/operating/page', queryParams: q, signParams: q);
+      final rows = _extractPagedList(res);
+      if (rows.isNotEmpty || (vehicleId != null && vehicleId.isNotEmpty)) {
+        return rows;
+      }
+    } catch (e) {
+      debugPrint('getOperatingRecord GET /user/operating/page error: $e');
+    }
+    return [];
+  }
+
+  /// Fetch paginated cloud notifications (`GET /user/notice/page`).
+  Future<List<Map<String, dynamic>>> getCloudNotifications(
+    String vehicleId, {
+    int page = 1,
+    int size = 20,
+  }) async {
+    try {
+      final q = {'vehicleId': vehicleId, 'page': page.toString(), 'size': size.toString()};
+      final res = await _request('GET', '/user/notice/page', queryParams: q, signParams: q);
+      return _extractPagedList(res);
+    } catch (e) {
+      debugPrint('getCloudNotifications error: $e');
+      return [];
+    }
+  }
+
+  /// Fetch unread cloud notice count (`GET /user/notice/unReadCount`).
+  Future<int> getUnreadNoticeCount(String vehicleId) async {
+    try {
+      final q = {'vehicleId': vehicleId, 'clientType': 'C'};
+      final res = await _request('GET', '/user/notice/unReadCount', queryParams: q, signParams: q);
+      if (res is num) return res.toInt();
+      if (res is Map<String, dynamic>) {
+        return (res['count'] as num?)?.toInt() ?? (res['unReadCount'] as num?)?.toInt() ?? 0;
+      }
+      return int.tryParse(res?.toString() ?? '') ?? 0;
+    } catch (e) {
+      debugPrint('getUnreadNoticeCount error: $e');
+      return 0;
+    }
+  }
+
+  /// Chery T-Box CAN refusal code mapping (reversed from libapp.so & verified in j5-ev-dashboard).
+  static const Map<String, String> refusalReasons = {
+    '2A': 'Vehicle in motion',
+    '93': 'Vehicle not in remote mode',
+    '23': 'Vehicle is started',
+    '94': 'High-voltage fault',
+    '95': 'Battery too low',
+    '96': 'Key detected inside the car',
+    '22': 'A door is unlocked',
+    '99': 'T-Box authentication failed',
+    '9A': 'Not in P',
+    '9B': 'Hazard lights are on',
+    '04': 'T-Box auth fail (plain opcode rejected by firmware >= 2.3.1)',
+    '44': 'Car did not apply command (CAN sleeping / not in remote mode or BCM refused)',
+  };
+
+  /// Translate an acknowledgment status code into a readable description.
+  static String? refusalReason(String? ackCode) {
+    if (ackCode == null) return null;
+    return refusalReasons[ackCode.toUpperCase()];
+  }
+
+  /// Parse CarLinko's `<sn>__<OPCODE><STATUS_BYTE>` echo string.
+  /// Returns `'00'` (applied), `'44'` (not applied by T-Box), etc., or `null`
+  /// when the response does not contain a recognizable trailing status byte.
+  static String? parseAckStatus(dynamic rawResponse, String sentOpcode) {
+    final op = sentOpcode.trim().toUpperCase();
+    if (op.isEmpty) return null;
+    String raw = '';
+    if (rawResponse is Map) {
+      raw = (rawResponse['data'] ?? rawResponse['echo'] ?? '').toString();
+    } else if (rawResponse != null) {
+      raw = rawResponse.toString();
+    }
+    if (raw.isEmpty) return null;
+    final echo = raw.split('__').last.trim().toUpperCase();
+    if (echo.startsWith(op) && echo.length == op.length + 2) {
+      return echo.substring(op.length);
+    }
+    // Some T-Box firmwares (e.g. 2.3.1_050F01R) reply with a shortened
+    // `<family><STATUS>` error such as `7404` when rejecting a `74xx` command.
+    if (op.length >= 4 && echo.length == 4 && echo.startsWith(op.substring(0, 2))) {
+      return echo.substring(2);
+    }
+    return null;
+  }
+
+  /// Fetch current CarLinko account profile (`GET /user/info`) for account ID.
+  /// Rethrows [CarLinkoAuthException] (and stale-token [CarLinkoException]) so
+  /// callers can trigger auto-reauth rather than silently losing `userId`.
+  Future<Map<String, dynamic>?> getUserInfo() async {
+    try {
+      final res = await _request('GET', '/user/info', signParams: const {});
+      if (res is Map<String, dynamic>) return res;
+      if (res is Map) return Map<String, dynamic>.from(res);
+    } on CarLinkoAuthException {
+      rethrow;
+    } on CarLinkoException catch (e) {
+      if (e.code != null && carLinkoStaleTokenCodes.contains(e.code)) rethrow;
+      debugPrint('getUserInfo error: $e');
+    } catch (e) {
+      debugPrint('getUserInfo error: $e');
+    }
+    return null;
   }
 
   /// Send a remote-control opcode to the Chery T-Box via
   /// /user/vehicle/remoteControl. [opcode] is a raw hex string from
-  /// [CarLinkoOpcodes] (e.g. CarLinkoOpcodes.lock) — the real API takes the
-  /// command as a `data` field holding an opcode, not a semantic command
-  /// name; the earlier 'door_lock'/'vehicle_locate'-style strings this
-  /// client sent were wrong guesses the real API rejected.
+  /// [CarLinkoOpcodes] (e.g. CarLinkoOpcodes.lock = '740100').
   ///
-  /// [deviceSn] is the vehicle's device serial number (from getVehicles()),
-  /// a separate required field alongside vehicleId. When [sendWakeupHandshake]
-  /// is true, fires an init ("77") opcode first (mirrors the official Chery app).
+  /// When [vin] and [userId] are provided, `74xx` actuation commands are
+  /// AES-128-ECB encrypted (`"66" + randomHex + ciphertextHex`) as required
+  /// by CarLinko v1.14.10+ / T-Box >= 2.3.1_050F01R. Init commands (`77`,
+  /// `2301`, `24`) remain plain.
+  ///
+  /// Automatically parses the `<sn>__<opcode><STATUS>` echo byte (`00` = applied,
+  /// `44`/non-`00` = rejected by T-Box).
+  ///
+  /// Following GodrezJr2/j5-ev-dashboard and official CarLinko app flow:
+  /// - Sends `77` init wake when [sendWakeupHandshake] or [sendWakeupInit] is true
+  ///   with a 600ms delay to bring CAN bus out of sleep mode.
+  /// - Legacy `2301` is only sent if explicitly requested ([send0x23Init]).
+  /// - `7801` retry is completely dropped (7801 is rejected on modern firmware).
   Future<Map<String, dynamic>> sendRemoteControl({
     required String vehicleId,
     required String deviceSn,
     required String opcode,
+    String? vin,
+    String? userId,
     bool sendWakeupHandshake = true,
+    bool sendWakeupInit = false,
     bool send0x23Init = false,
   }) async {
-    if (sendWakeupHandshake && opcode != CarLinkoOpcodes.init && opcode != CarLinkoOpcodes.init0x23) {
+    bool isEncrypted = false;
+    Future<dynamic> postOp(String op, {int timeOut = 20}) {
+      var payloadData = op;
+      if (op.toUpperCase().startsWith('74') &&
+          vin != null &&
+          vin.isNotEmpty &&
+          userId != null &&
+          userId.isNotEmpty) {
+        payloadData = CarLinkoCrypto.buildControlPayload(op, vin, userId);
+        isEncrypted = true;
+      }
+      final b = <String, dynamic>{
+        'vehicleId': vehicleId,
+        'deviceSn': deviceSn,
+        'data': payloadData,
+        'timeOut': timeOut,
+      };
+      return _request('POST', '/user/vehicle/remoteControl', body: b, signParams: b);
+    }
+
+    // Official CarLinko / j5-ev-dashboard wakeup flow: init '77' then 600ms delay
+    if (sendWakeupHandshake || sendWakeupInit) {
       try {
-        if (send0x23Init) {
-          await sendRemoteControl(
-            vehicleId: vehicleId,
-            deviceSn: deviceSn,
-            opcode: CarLinkoOpcodes.init0x23,
-            sendWakeupHandshake: false,
-          );
-          await Future.delayed(const Duration(milliseconds: 200));
-        }
-        await sendRemoteControl(
-          vehicleId: vehicleId,
-          deviceSn: deviceSn,
-          opcode: CarLinkoOpcodes.init,
-          sendWakeupHandshake: false,
-        );
-        // Wake-up settling window for vehicle T-Box CAN-bus
-        await Future.delayed(const Duration(milliseconds: 400));
-      } catch (_) {
-        // Init handshake is best effort
+        debugPrint('CarLinko Cloud: Dispatching official Stage 1 wake (opcode 77)...');
+        await postOp('77', timeOut: 15);
+        await Future.delayed(const Duration(milliseconds: 600));
+      } catch (e) {
+        debugPrint('CarLinko Cloud: Stage 1 wakeup note: $e');
       }
     }
 
-    final body = {
-      'vehicleId': vehicleId,
-      'deviceSn': deviceSn,
-      'data': opcode,
-      'timeOut': 20,
-    };
-    final res = await _request('POST', '/user/vehicle/remoteControl', body: body, signParams: body);
-    if (res is Map<String, dynamic>) return res;
-    return {'status': 'success'};
+    // Optional legacy 0x23 init (only if explicitly enabled)
+    if (send0x23Init) {
+      try {
+        debugPrint('CarLinko Cloud: Dispatching legacy 0x23 init (opcode 2301)...');
+        await postOp('2301', timeOut: 10);
+        await Future.delayed(const Duration(milliseconds: 250));
+      } catch (e) {
+        debugPrint('CarLinko Cloud: Legacy 0x23 note: $e');
+      }
+    }
+
+    try {
+      final res = await postOp(opcode, timeOut: 20);
+      final ackStatus = parseAckStatus(res, opcode);
+      final applied = ackStatus == null || ackStatus == '00';
+      final rawEcho = res is Map ? (res['data'] ?? res['echo'] ?? res).toString() : (res?.toString() ?? '<null>');
+
+      if (res is Map<String, dynamic>) {
+        return {
+          ...res,
+          'status': applied ? (res['status'] ?? 'success') : 'rejected',
+          'applied': applied,
+          if (ackStatus != null) 'ackStatus': ackStatus,
+          'echo': rawEcho,
+          'encrypted': isEncrypted,
+          'refusalReason': refusalReason(ackStatus),
+        };
+      }
+      return {
+        'status': applied ? 'success' : 'rejected',
+        'applied': applied,
+        if (ackStatus != null) 'ackStatus': ackStatus,
+        'echo': rawEcho,
+        'encrypted': isEncrypted,
+        'refusalReason': refusalReason(ackStatus),
+        'data': res,
+      };
+    } on CarLinkoException catch (e) {
+      if (e.code == '50043' || e.code == 'A50043' || e.message.contains('设备网络不佳')) {
+        throw CarLinkoException(
+          'Vehicle cellular modem is asleep (code 50043).',
+          '50043',
+        );
+      }
+      rethrow;
+    }
   }
 
   Future<dynamic> _request(
@@ -390,7 +997,10 @@ class CarLinkoClient {
       await syncClock();
     }
 
-    final ts = _currentTimestamp();
+    // If body already has timestamp (e.g. locateDevice, login), use it so body and headers match byte-for-byte.
+    final ts = (body != null && body['timestamp'] != null && body['timestamp'].toString().isNotEmpty)
+        ? body['timestamp'].toString()
+        : _currentTimestamp();
     var uri = Uri.parse('$baseUrl$path');
     if (queryParams != null && queryParams.isNotEmpty) {
       uri = uri.replace(queryParameters: queryParams);
@@ -400,8 +1010,10 @@ class CarLinkoClient {
 
     HttpClientResponse response;
     String bodyStr;
+    final isRemoteControl = path.contains('remoteControl');
+    final timeoutDuration = Duration(seconds: isRemoteControl ? 35 : 15);
     try {
-      final request = await _client.openUrl(method, uri).timeout(const Duration(seconds: 12));
+      final request = await _client.openUrl(method, uri).timeout(timeoutDuration);
       request.headers.set('content-type', 'application/json');
       request.headers.set('timestamp', ts);
       request.headers.set('signature', signature);
@@ -420,7 +1032,7 @@ class CarLinkoClient {
         request.add(utf8Body);
       }
 
-      response = await request.close().timeout(const Duration(seconds: 12));
+      response = await request.close().timeout(timeoutDuration);
       bodyStr = await response.transform(utf8.decoder).join();
     } on SocketException {
       throw CarLinkoException(
@@ -437,8 +1049,23 @@ class CarLinkoClient {
     }
 
     if (response.statusCode != 200) {
+      String serverMsg = '';
+      try {
+        final decoded = json.decode(bodyStr);
+        if (decoded is Map<String, dynamic>) {
+          serverMsg = decoded['msg']?.toString() ??
+              decoded['message']?.toString() ??
+              decoded['error']?.toString() ??
+              '';
+        }
+      } catch (_) {}
+      if (serverMsg.isEmpty && bodyStr.isNotEmpty) {
+        serverMsg = bodyStr.length > 200 ? bodyStr.substring(0, 200) : bodyStr;
+      }
       throw CarLinkoException(
-        'CarLinko server returned HTTP ${response.statusCode}',
+        serverMsg.isNotEmpty
+            ? 'CarLinko server error (${response.statusCode}): $serverMsg'
+            : 'CarLinko server returned HTTP ${response.statusCode}',
         'HTTP_${response.statusCode}',
       );
     }
@@ -458,11 +1085,19 @@ class CarLinkoClient {
     }
 
     final code = payload['code']?.toString() ?? 'unknown';
-    if (code != '0000') {
-      if (carLinkoStaleTokenCodes.contains(code)) {
-        throw CarLinkoAuthException(payload['msg']?.toString() ?? 'Session expired', code);
+    final msg = payload['msg']?.toString() ?? payload['message']?.toString() ?? '';
+    if (code != '0000' && code != 'A0000' && code != '0' && code != '200') {
+      final lowerMsg = msg.toLowerCase();
+      final isAuthError = carLinkoStaleTokenCodes.contains(code) ||
+          lowerMsg.contains('token') ||
+          lowerMsg.contains('login') ||
+          lowerMsg.contains('session') ||
+          lowerMsg.contains('unauthorized') ||
+          lowerMsg.contains('auth fail');
+      if (isAuthError) {
+        throw CarLinkoAuthException(msg.isNotEmpty ? msg : 'Session expired', code);
       }
-      throw CarLinkoException(payload['msg']?.toString() ?? 'API error', code);
+      throw CarLinkoException(msg.isNotEmpty ? msg : 'API error', code);
     }
 
     return payload['data'];
@@ -510,8 +1145,26 @@ class CarLinkoClient {
     out['odometer'] = u24(18);
 
     final ac = u8(23);
-    out['ac_on'] = ac != null ? ac != 0 : null;
-    out['ac_temp'] = u8(24);
+    final rawAcTemp = u8(24);
+    int? decodedAcTemp;
+    if (rawAcTemp != null && rawAcTemp > 0) {
+      if (rawAcTemp >= 100) {
+        // Bit 7 (0x80 = 128) is the AC status / active flag.
+        // Bits 0-6 (0x7F) represent the target temperature in 0.5°C steps.
+        // e.g. 172 (0xAC) -> 172 & 0x7F = 44 -> 44 * 0.5 = 22.0°C!
+        final halfDeg = rawAcTemp & 0x7F;
+        decodedAcTemp = (halfDeg > 0) ? (halfDeg * 0.5).round() : null;
+      } else if (rawAcTemp >= 32 && rawAcTemp <= 70) {
+        // Unmasked half-degrees (e.g. 44 -> 22°C).
+        decodedAcTemp = (rawAcTemp * 0.5).round();
+      } else if (rawAcTemp >= 15 && rawAcTemp <= 35) {
+        // Direct integer Celsius (e.g. 22).
+        decodedAcTemp = rawAcTemp;
+      }
+    }
+
+    out['ac_on'] = ac != null ? ac != 0 : ((rawAcTemp != null && (rawAcTemp & 0x80) != 0) ? true : null);
+    out['ac_temp'] = decodedAcTemp;
 
     out['battery_pct'] = u8(28);
     out['range_km'] = u16(29);
@@ -535,14 +1188,30 @@ class CarLinkoClient {
     final rawFuelCap = u8(21);
     out['fuel_capacity_pct'] = (rawFuelCap == null || rawFuelCap > 100) ? null : rawFuelCap;
 
-    final cons = u8(55);
-    out['consumption'] = cons != null ? (cons * 0.1) : null;
+    // Confirmed against real CarLinko telematics & live CAN-bus hex (2026-11-08):
+    // 12-bit signed EV energy consumption packed across Byte 54 (low 4 bits) and Byte 55,
+    // with standard automotive CAN offset -1000 and 0.1 factor:
+    // (raw_12bit - 1000) * 0.1 kWh/100km.
+    // e.g. Byte 54 = 0x13, Byte 55 = 0xE1 -> raw = ((0x13 & 0x0F) << 8) | 0xE1 = 993
+    //      (993 - 1000) * 0.1 = -0.70 kWh/100km, matching CarLinko exactly.
+    final b54 = u8(54);
+    final b55 = u8(55);
+    double? parsedConsumption;
+    if (b54 != null && b55 != null && !(b54 == 0xFF && b55 == 0xFF)) {
+      final rawCons = ((b54 & 0x0F) << 8) | b55;
+      parsedConsumption = (rawCons - 1000) * 0.1;
+    } else if (b55 != null && b55 != 0xFF) {
+      parsedConsumption = (b55 - 1000) * 0.1;
+    }
+    out['consumption'] = parsedConsumption;
+    out['energy_consumption_kwh100km'] = parsedConsumption;
 
-    // Confirmed against the same reading: byte 53 * 0.1 = 6.1 L/100km,
-    // matching the real CarLinko app's "Fuel consumption: 6.10 L/100km"
-    // exactly (2026-11-01).
+    // Confirmed against real CarLinko telematics (Tiggo 7 PHEV): byte 53 * 0.1
+    // = fuel consumption (e.g. 11 * 0.1 = 1.10 L/100km). Byte 55 * 0.1
+    // = energy consumption (e.g. 94 * 0.1 = 9.40 kWh/100km).
     final fuelCons = u8(53);
-    out['fuel_consumption_l100km'] = fuelCons != null ? (fuelCons * 0.1) : null;
+    final double? parsedFuelCons = (fuelCons == null || fuelCons == 0xFF) ? null : (fuelCons * 0.1);
+    out['fuel_consumption_l100km'] = parsedFuelCons;
 
     out['charge_mode'] = u8(56);
     final chargeState = u8(57);

@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../carlinko/vehicle_telemetry.dart';
+import '../carlinko/vehicle_repository.dart';
 import '../theme/app_tokens.dart';
 
 /// Screen 3: ENERGY · HOME AC (Smart Home AC Charging Plan & TNB Optimizer)
@@ -10,6 +12,7 @@ class EnergyScreen extends StatefulWidget {
   final bool scheduledCharging;
   final double tnbTariff;
   final double fuelPrice;
+  final VehicleRepository? repository;
   final ValueChanged<bool>? onToggleCharge;
   final Function(bool isScheduled, TimeOfDay startTime, TimeOfDay endTime, int targetSoc, double powerKw)? onSaveSchedule;
 
@@ -20,6 +23,7 @@ class EnergyScreen extends StatefulWidget {
     this.scheduledCharging = true,
     this.tnbTariff = 0.28,
     this.fuelPrice = 2.05,
+    this.repository,
     this.onToggleCharge,
     this.onSaveSchedule,
   });
@@ -34,6 +38,128 @@ class _EnergyScreenState extends State<EnergyScreen> {
 
   // Tiggo 7 PHEV Battery Size in Malaysia
   static const double batteryCapacityKwh = 18.3;
+
+  // Schedule parameters
+  TimeOfDay _startTime = const TimeOfDay(hour: 22, minute: 0);
+  int _durationMinutes = 360; // 6 hours
+  String _repeatMode = 'Everyday';
+  bool _isScheduledChargingEnabled = true;
+  bool _reminderEnabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isScheduledChargingEnabled = widget.scheduledCharging;
+    _loadSavedSettings();
+  }
+
+  Future<void> _loadSavedSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _targetSoc = prefs.getInt('tm_charge_target_soc') ?? 80;
+      _reminderEnabled = prefs.getBool('tm_charge_reminder_enabled') ?? false;
+      _isScheduledChargingEnabled = prefs.getBool('tm_charge_schedule_enabled') ?? widget.scheduledCharging;
+      final hour = prefs.getInt('tm_charge_schedule_hour') ?? 22;
+      final min = prefs.getInt('tm_charge_schedule_minute') ?? 0;
+      _startTime = TimeOfDay(hour: hour, minute: min);
+      _durationMinutes = prefs.getInt('tm_charge_schedule_duration_min') ?? 360;
+      _repeatMode = prefs.getString('tm_charge_schedule_repeat') ?? 'Everyday';
+    });
+
+    final repo = widget.repository;
+    if (repo != null) {
+      try {
+        final cfg = await repo.getTerminalNoticeConfig();
+        if (!mounted || cfg.isEmpty) return;
+        final cloudTarget = (cfg['targetSoc'] as num?)?.toInt();
+        final sched = cfg['batteryScheduleParsed'];
+        setState(() {
+          if (cloudTarget != null && cloudTarget >= 50 && cloudTarget <= 100) {
+            _targetSoc = cloudTarget;
+          }
+          if (sched is Map<String, dynamic>) {
+            if (sched.containsKey('enabled')) {
+              _isScheduledChargingEnabled = sched['enabled'] == true;
+            }
+            final h = (sched['hour'] as num?)?.toInt();
+            final m = (sched['minute'] as num?)?.toInt();
+            if (h != null && m != null) {
+              _startTime = TimeOfDay(hour: h.clamp(0, 23), minute: m.clamp(0, 59));
+            }
+            final durHours = (sched['duration'] as num?)?.toInt();
+            if (durHours != null && durHours > 0) {
+              _durationMinutes = durHours * 60;
+            }
+            final wk = sched['week'];
+            if (wk is List && wk.length == 7) {
+              final bools = wk.map((e) => e == true || e == 1).toList();
+              if (bools.every((b) => b)) {
+                _repeatMode = 'Everyday';
+              } else if (!bools[0] && bools.sublist(1, 6).every((b) => b) && !bools[6]) {
+                _repeatMode = 'Monday to Friday';
+              } else if (bools[0] && bools.sublist(1, 6).every((b) => !b) && bools[6]) {
+                _repeatMode = 'Saturday to Sunday';
+              } else {
+                _repeatMode = 'Once';
+              }
+            }
+          }
+        });
+      } catch (e) {
+        debugPrint('getTerminalNoticeConfig hydrate error: $e');
+      }
+    }
+  }
+
+  List<bool> _weekMaskForRepeat(String repeat) {
+    final r = repeat.toLowerCase();
+    if (r.contains('everyday') || r.contains('every day')) {
+      return List<bool>.filled(7, true);
+    }
+    if (r.contains('monday') || r.contains('weekday')) {
+      return [false, true, true, true, true, true, false];
+    }
+    if (r.contains('saturday') || r.contains('weekend')) {
+      return [true, false, false, false, false, false, true];
+    }
+    return List<bool>.filled(7, false);
+  }
+
+  Future<void> _setTargetSoc(int soc) async {
+    setState(() => _targetSoc = soc);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('tm_charge_target_soc', soc);
+    if (widget.repository != null) {
+      await widget.repository!.setTargetSoc(soc);
+    }
+  }
+
+  Future<void> _persistSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('tm_charge_target_soc', _targetSoc);
+    await prefs.setBool('tm_charge_reminder_enabled', _reminderEnabled);
+    await prefs.setBool('tm_charge_schedule_enabled', _isScheduledChargingEnabled);
+    await prefs.setInt('tm_charge_schedule_hour', _startTime.hour);
+    await prefs.setInt('tm_charge_schedule_minute', _startTime.minute);
+    await prefs.setInt('tm_charge_schedule_duration_min', _durationMinutes);
+    await prefs.setString('tm_charge_schedule_repeat', _repeatMode);
+
+    if (widget.repository != null) {
+      try {
+        await widget.repository!.setTargetSoc(_targetSoc);
+        await widget.repository!.setBatterySchedule({
+          'enabled': _isScheduledChargingEnabled,
+          'hour': _startTime.hour,
+          'minute': _startTime.minute,
+          'duration': (_durationMinutes <= 0 ? 480 : _durationMinutes) ~/ 60,
+          'week': _weekMaskForRepeat(_repeatMode),
+        });
+      } catch (e) {
+        debugPrint('setBatterySchedule error: $e');
+      }
+    }
+  }
 
   /// Null when the car has not reported a battery level.
   int? get currentSoc =>
@@ -52,19 +178,167 @@ class _EnergyScreenState extends State<EnergyScreen> {
   double get offPeakCost => addsKwh * 0.280; // TNB off-peak residential rate
   double get peakCost => addsKwh * 0.570;    // TNB peak block rate
   double get ron95Cost {
-    // 18.3 kWh gives ~90 km EV range. 90 km on petrol (5.5L/100km) = 4.95L * RM 2.05 = ~RM 10.15
     final equivKm = (addsKwh / batteryCapacityKwh) * 90.0;
     final petrolLitres = (equivKm / 100.0) * 5.5;
     return petrolLitres * widget.fuelPrice;
   }
 
   String get doneTimeStr {
-    final startMinutes = 22 * 60; // 22:00
+    final startMinutes = _startTime.hour * 60 + _startTime.minute;
     final durationMinutes = (chargingHours * 60).round();
     final totalMinutes = (startMinutes + durationMinutes) % (24 * 60);
     final h = (totalMinutes ~/ 60).toString().padLeft(2, '0');
     final m = (totalMinutes % 60).toString().padLeft(2, '0');
     return '$h:$m';
+  }
+
+  String _formatTime(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  String _formatDuration(int minutes) {
+    if (minutes <= 0) return 'Until target SoC';
+    final h = (minutes ~/ 60).toString().padLeft(2, '0');
+    final m = (minutes % 60).toString().padLeft(2, '0');
+    return '$h h $m min';
+  }
+
+  Future<void> _pickStartTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _startTime,
+      builder: (context, child) => Theme(
+        data: ThemeData.dark().copyWith(
+          colorScheme: ColorScheme.dark(
+            primary: context.tokens.accent,
+            surface: const Color(0xFF131722),
+            onSurface: Colors.white,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) {
+      setState(() => _startTime = picked);
+      await _persistSettings();
+    }
+  }
+
+  Future<void> _pickDuration() async {
+    final durations = [
+      {'label': 'Until target SoC (${_targetSoc}%)', 'min': 0},
+      {'label': '02 h 00 min', 'min': 120},
+      {'label': '04 h 00 min', 'min': 240},
+      {'label': '06 h 00 min', 'min': 360},
+      {'label': '08 h 00 min', 'min': 480},
+    ];
+
+    final chosen = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: const Color(0xFF131722),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'CHARGING DURATION',
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                  color: context.tokens.accent,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...durations.map((d) {
+                final isSelected = _durationMinutes == d['min'];
+                return ListTile(
+                  title: Text(
+                    d['label'] as String,
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 13,
+                      color: isSelected ? context.tokens.accent : Colors.white,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                  trailing: isSelected
+                      ? Icon(Icons.check, color: context.tokens.accent, size: 18)
+                      : null,
+                  onTap: () => Navigator.of(ctx).pop(d['min'] as int),
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (chosen != null) {
+      setState(() => _durationMinutes = chosen);
+      await _persistSettings();
+    }
+  }
+
+  Future<void> _pickRepeat() async {
+    final repeats = ['Everyday', 'Monday to Friday', 'Saturday to Sunday', 'Once'];
+
+    final chosen = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF131722),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'REPEAT SCHEDULE',
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                  color: context.tokens.accent,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...repeats.map((r) {
+                final isSelected = _repeatMode == r;
+                return ListTile(
+                  title: Text(
+                    r,
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 13,
+                      color: isSelected ? context.tokens.accent : Colors.white,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                  trailing: isSelected
+                      ? Icon(Icons.check, color: context.tokens.accent, size: 18)
+                      : null,
+                  onTap: () => Navigator.of(ctx).pop(r),
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (chosen != null) {
+      setState(() => _repeatMode = chosen);
+      await _persistSettings();
+    }
   }
 
   @override
@@ -86,32 +360,49 @@ class _EnergyScreenState extends State<EnergyScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 1. Header Row
+              // 1. Header Row with Back Button
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Row(
                     children: [
-                      Text(
-                        'ENERGY · HOME AC',
-                        style: TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.4,
-                          color: textMuted,
+                      GestureDetector(
+                        onTap: () => Navigator.of(context).pop(),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          margin: const EdgeInsets.only(right: 12),
+                          decoration: BoxDecoration(
+                            color: cardCol,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: borderCol),
+                          ),
+                          child: Icon(Icons.arrow_back_ios_new, size: 16, color: textPrimary),
                         ),
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        'Charge plan',
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.5,
-                          color: textPrimary,
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'ENERGY · HOME AC',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.4,
+                              color: textMuted,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            'Charge plan',
+                            style: TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.5,
+                              color: textPrimary,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -170,7 +461,7 @@ class _EnergyScreenState extends State<EnergyScreen> {
                       fontFamily: 'monospace',
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: textMuted,
+                      color: limeAccent,
                     ),
                   ),
                 ],
@@ -215,7 +506,7 @@ class _EnergyScreenState extends State<EnergyScreen> {
                       borderCol: borderCol,
                       textMuted: textMuted,
                       textPrimary: textPrimary,
-                      onTap: () => setState(() => _targetSoc = 80),
+                      onTap: () => _setTargetSoc(80),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -228,7 +519,7 @@ class _EnergyScreenState extends State<EnergyScreen> {
                       borderCol: borderCol,
                       textMuted: textMuted,
                       textPrimary: textPrimary,
-                      onTap: () => setState(() => _targetSoc = 90),
+                      onTap: () => _setTargetSoc(90),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -241,7 +532,7 @@ class _EnergyScreenState extends State<EnergyScreen> {
                       borderCol: borderCol,
                       textMuted: textMuted,
                       textPrimary: textPrimary,
-                      onTap: () => setState(() => _targetSoc = 100),
+                      onTap: () => _setTargetSoc(100),
                     ),
                   ),
                 ],
@@ -284,7 +575,7 @@ class _EnergyScreenState extends State<EnergyScreen> {
                   isDark: isDark,
                   offPeakStart: 22.0,
                   offPeakEnd: 8.0,
-                  chargingStart: 22.0,
+                  chargingStart: _startTime.hour + _startTime.minute / 60.0,
                   chargingDurationHours: chargingHours,
                 ),
               ),
@@ -303,7 +594,7 @@ class _EnergyScreenState extends State<EnergyScreen> {
               ),
               const SizedBox(height: 18),
 
-              // 6. Metrics Row: START | DONE | ADDS
+              // 6. Metrics Row: START (TAPPABLE TO EDIT) | DONE | ADDS
               Container(
                 decoration: BoxDecoration(
                   color: cardCol,
@@ -312,20 +603,40 @@ class _EnergyScreenState extends State<EnergyScreen> {
                 ),
                 child: Row(
                   children: [
+                    // START (Tappable with edit icon)
                     Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('START', style: TextStyle(fontFamily: 'monospace', fontSize: 9.5, color: textMuted)),
-                            const SizedBox(height: 3),
-                            Text('22:00', style: TextStyle(fontFamily: 'monospace', fontSize: 18, fontWeight: FontWeight.w700, color: textPrimary)),
-                          ],
+                      child: InkWell(
+                        onTap: _pickStartTime,
+                        borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text('START', style: TextStyle(fontFamily: 'monospace', fontSize: 9.5, color: textMuted)),
+                                  const SizedBox(width: 4),
+                                  Icon(Icons.edit_outlined, size: 10, color: limeAccent),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                _formatTime(_startTime),
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: limeAccent,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                     Container(width: 1, height: 40, color: borderCol),
+                    // DONE
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -340,6 +651,7 @@ class _EnergyScreenState extends State<EnergyScreen> {
                       ),
                     ),
                     Container(width: 1, height: 40, color: borderCol),
+                    // ADDS
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -356,9 +668,179 @@ class _EnergyScreenState extends State<EnergyScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-              // 7. Cost of this charge section
+              // 7. Interactive Charging Schedule & Settings Card
+              Container(
+                decoration: BoxDecoration(
+                  color: cardCol,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: borderCol),
+                ),
+                child: Column(
+                  children: [
+                    // Row 1: Scheduled charging toggle
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.schedule, size: 16, color: limeAccent),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Scheduled charging',
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Switch(
+                            value: _isScheduledChargingEnabled,
+                            activeColor: limeAccent,
+                            onChanged: (val) {
+                              setState(() => _isScheduledChargingEnabled = val);
+                              _persistSettings();
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    Divider(height: 1, color: borderCol),
+                    // Row 2: Time, Duration & Repeat Pickers
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      child: Row(
+                        children: [
+                          // Time chip
+                          Expanded(
+                            child: InkWell(
+                              onTap: _pickStartTime,
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF161A24) : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: borderCol),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('TIME', style: TextStyle(fontFamily: 'monospace', fontSize: 8.5, color: textMuted)),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _formatTime(_startTime),
+                                      style: TextStyle(fontFamily: 'monospace', fontSize: 12, fontWeight: FontWeight.bold, color: textPrimary),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          // Duration chip
+                          Expanded(
+                            child: InkWell(
+                              onTap: _pickDuration,
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF161A24) : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: borderCol),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('DURATION', style: TextStyle(fontFamily: 'monospace', fontSize: 8.5, color: textMuted)),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _formatDuration(_durationMinutes),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold, color: textPrimary),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          // Repeat chip
+                          Expanded(
+                            child: InkWell(
+                              onTap: _pickRepeat,
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF161A24) : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: borderCol),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('REPEAT', style: TextStyle(fontFamily: 'monospace', fontSize: 8.5, color: textMuted)),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _repeatMode,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold, color: textPrimary),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Divider(height: 1, color: borderCol),
+                    // Row 3: Overstay Reminder switch
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Charger Occupancy Reminder',
+                                style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.w600, color: textPrimary),
+                              ),
+                              Text(
+                                'Alert hourly if vehicle stays plugged after 100%',
+                                style: TextStyle(fontSize: 10, color: textMuted),
+                              ),
+                            ],
+                          ),
+                          Switch(
+                            value: _reminderEnabled,
+                            activeColor: limeAccent,
+                            onChanged: (val) {
+                              setState(() => _reminderEnabled = val);
+                              _persistSettings();
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // 8. Cost of this charge section
               Text(
                 'COST OF THIS CHARGE',
                 style: TextStyle(
@@ -417,7 +899,7 @@ class _EnergyScreenState extends State<EnergyScreen> {
               ),
               const SizedBox(height: 28),
 
-              // 8. Dual Action Buttons: [ Charge now ] and [ Schedule for 22:00 ]
+              // 9. Dual Action Buttons: [ Charge now ] and [ Schedule for XX:XX ]
               Row(
                 children: [
                   Expanded(
@@ -447,17 +929,27 @@ class _EnergyScreenState extends State<EnergyScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () {
+                      onPressed: () async {
+                        setState(() => _isScheduledChargingEnabled = true);
+                        await _persistSettings();
                         widget.onSaveSchedule?.call(
                           true,
-                          const TimeOfDay(hour: 22, minute: 0),
+                          _startTime,
                           const TimeOfDay(hour: 8, minute: 0),
                           _targetSoc,
                           _powerKw,
                         );
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Smart Schedule confirmed for 22:00 (Target: $_targetSoc%).')),
-                        );
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: const Color(0xFF131722),
+                              content: Text(
+                                'Smart Schedule set for ${_formatTime(_startTime)} ($_repeatMode, target $_targetSoc%)',
+                                style: TextStyle(color: limeAccent, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          );
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: limeAccent,
@@ -466,9 +958,9 @@ class _EnergyScreenState extends State<EnergyScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         elevation: 0,
                       ),
-                      child: const Text(
-                        'Schedule for 22:00',
-                        style: TextStyle(
+                      child: Text(
+                        'Schedule for ${_formatTime(_startTime)}',
+                        style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFF0A0B0E),
@@ -750,17 +1242,26 @@ class _Timeline24hPainter extends CustomPainter {
       Paint()..color = offPeakCol,
     );
 
-    // Draw charging duration block in lime
+    // Draw charging duration block in lime starting from chargingStart
+    // Hours from 12:00
+    double startHoursFrom12 = chargingStart - 12.0;
+    if (startHoursFrom12 < 0) startHoursFrom12 += 24.0;
+    final startX = size.width * (startHoursFrom12 / 24.0);
     final chargeDurationFraction = chargingDurationHours / 24.0;
     final chargeW = size.width * chargeDurationFraction;
+
     canvas.drawRect(
-      Rect.fromLTWH(offPeakX1, 10, chargeW, size.height - 10),
+      Rect.fromLTWH(startX, 10, chargeW, size.height - 10),
       Paint()..color = accentColor,
     );
     canvas.restore();
 
-    // NOW indicator at top of bar (around 20:00 = 8h from 12:00)
-    final nowX = size.width * (8.5 / 24.0);
+    // NOW indicator at top of bar (around current local hour from 12:00)
+    final now = DateTime.now();
+    double nowHoursFrom12 = (now.hour + now.minute / 60.0) - 12.0;
+    if (nowHoursFrom12 < 0) nowHoursFrom12 += 24.0;
+    final nowX = size.width * (nowHoursFrom12 / 24.0);
+
     final textPainter = TextPainter(
       text: TextSpan(
         text: 'NOW',

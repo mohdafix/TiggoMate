@@ -572,20 +572,41 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
       final cloudTrips = await FirebaseSyncService.instance.fetchTrips();
       final cloudExpenses = await FirebaseSyncService.instance.fetchExpenses();
       if (mounted && (cloudTrips.isNotEmpty || cloudExpenses.isNotEmpty)) {
+        bool tripsAdded = false;
+        bool expAdded = false;
         setState(() {
           final existingTripIds = _trips.map((t) => t.id).toSet();
           for (final t in cloudTrips) {
             if (!existingTripIds.contains(t.id) && !_sampleTripIds.contains(t.id)) {
               _trips.add(t);
+              tripsAdded = true;
             }
           }
           final existingExpIds = _customExpenses.map((e) => e.id).toSet();
           for (final e in cloudExpenses) {
             if (!existingExpIds.contains(e.id) && !_sampleExpenseIds.contains(e.id)) {
               _customExpenses.add(e);
+              expAdded = true;
             }
           }
+          if (_trips.isNotEmpty) _featuredTrip = _trips[0];
         });
+
+        // Persist restored cloud items to local storage so they remain available offline
+        if (tripsAdded || expAdded) {
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            if (tripsAdded) {
+              final encoded = jsonEncode(_trips.map((t) => t.toJson()).toList());
+              await prefs.setString(_kTripsStorageKey, encoded);
+            }
+            if (expAdded) {
+              final encoded = jsonEncode(_customExpenses.map((e) => e.toJson()).toList());
+              await prefs.setString(_kExpenseStorageKey, encoded);
+            }
+            debugPrint('[TripsLogbook] Restored cloud records cached to offline storage');
+          } catch (_) {}
+        }
       }
     } catch (_) {}
   }

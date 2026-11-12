@@ -8,6 +8,7 @@ import '../carlinko/vehicle_telemetry.dart';
 import '../firebase/firebase_sync_service.dart';
 import '../ui/app_notification.dart';
 import '../ui/trips_logbook_screen.dart';
+import 'price_book_service.dart';
 
 /// In-flight state of an ongoing vehicle driving trip.
 class InFlightTrip {
@@ -562,10 +563,14 @@ class AutoTripAndChargeService extends ChangeNotifier {
     final durMin = (durSec / 60.0).round().clamp(1, 1440);
     final avgSpeed = (distKm / (durMin / 60.0)).clamp(1.0, 180.0);
 
-    // Energy calculation
+    // Energy calculation using date-effective PriceBook tariff
     final socDrop = (t.startSoc - t.lastSoc).clamp(0, 100);
     final kwhUsed = (socDrop / 100.0) * batteryCapacityKwh;
-    final tariff = tnbTariff ?? 0.57; // Default TNB Home Tariff RM 0.57/kWh
+    final tariff = PriceBookService.instance.rateForCharge(
+      t.startTs,
+      isDc: false,
+      fallback: tnbTariff ?? 0.57,
+    );
     final costRm = kwhUsed * tariff;
 
     // EV distance attribution
@@ -634,7 +639,11 @@ class AutoTripAndChargeService extends ChangeNotifier {
     }
 
     final bool isPublic = c.isDcFast || c.peakKw > 22.0;
-    final double unitRate = isPublic ? 1.30 : (tnbTariff ?? 0.57);
+    final double unitRate = PriceBookService.instance.rateForCharge(
+      c.startTs,
+      isDc: isPublic,
+      fallback: isPublic ? 1.30 : (tnbTariff ?? 0.57),
+    );
     final double amountRm = kwhAdded * unitRate;
 
     final now = DateTime.now();

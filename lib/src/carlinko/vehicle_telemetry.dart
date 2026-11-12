@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 enum VehicleConnectionStatus {
   disconnected,
   connecting,
@@ -48,9 +50,11 @@ class VehicleTelemetry {
   final int? chargeRemainMin;
   /// Average fuel consumption, L/100km. 0 means unknown.
   final double fuelConsumptionL100km;
+  final double energyConsumptionKwh100km;
   final bool acOn;
   final int acTemp;
   final bool doorsOpen;
+  final bool doorsLocked;
   final bool trunkOpen;
   final bool windowsOpen;
   final bool sunroofOpen;
@@ -89,6 +93,7 @@ class VehicleTelemetry {
   final bool isSimulated;
   final bool isBound;
   final String dataSourceLabel;
+  final String? rawBlobHex;
 
   const VehicleTelemetry({
     this.batteryPct = 0,
@@ -103,9 +108,11 @@ class VehicleTelemetry {
     this.chargePowerKw = 0.0,
     this.chargeRemainMin,
     this.fuelConsumptionL100km = 0.0,
+    this.energyConsumptionKwh100km = 0.0,
     this.acOn = false,
     this.acTemp = 22,
     this.doorsOpen = false,
+    this.doorsLocked = true,
     this.trunkOpen = false,
     this.windowsOpen = false,
     this.sunroofOpen = false,
@@ -139,6 +146,7 @@ class VehicleTelemetry {
     this.isSimulated = false,
     this.isBound = false,
     this.dataSourceLabel = 'Pending Car Bind',
+    this.rawBlobHex,
   });
 
   /// Full live status as a readable block, for handing to the AI assistant
@@ -148,12 +156,12 @@ class VehicleTelemetry {
     final lines = <String>[
       'Odometer: $odometerKm km',
       'Battery: $batteryPct% (EV range ~$electricRangeKm km)${isCharging ? ', Charging: yes (${chargePowerKw.toStringAsFixed(1)} kW${chargeRemainMin != null ? ', ~$chargeRemainMin min remaining' : ''})' : ', Charging: no'}',
-      'Fuel: $fuelCapacityPct% (range ~$fuelRangeKm km)${fuelConsumptionL100km > 0 ? ', consumption ${fuelConsumptionL100km.toStringAsFixed(1)} L/100km' : ''}',
+      'Fuel: $fuelCapacityPct% (range ~$fuelRangeKm km)${fuelConsumptionL100km > 0 ? ', consumption ${fuelConsumptionL100km.toStringAsFixed(1)} L/100km' : ''}${energyConsumptionKwh100km > 0 ? ', energy ${energyConsumptionKwh100km.toStringAsFixed(2)} kWh/100km' : ''}',
       'Total combined range: ~$totalRangeKm km',
       '12V aux battery: ${volt12 > 0 ? '${volt12.toStringAsFixed(2)} V' : 'unknown'}',
       'Speed: ${speedKmH.toStringAsFixed(0)} km/h',
       'Engine: ${engineOn ? 'running' : 'off'}',
-      'Doors: ${doorsOpen ? 'open' : 'locked/closed'}',
+      'Doors: ${doorsOpen ? 'open/ajar' : (doorsLocked ? 'locked' : 'unlocked')}',
       'Trunk: ${trunkOpen ? 'open' : 'closed'}',
       'Windows: ${windowsOpen ? 'open/vented' : 'closed'}',
       'Sunroof: ${sunroofOpen ? 'open' : 'closed'}',
@@ -191,6 +199,8 @@ class VehicleTelemetry {
       isCharging: false,
       chargePowerKw: 0.0,
       chargeRemainMin: null,
+      fuelConsumptionL100km: 0.0,
+      energyConsumptionKwh100km: 0.0,
       acOn: false,
       acTemp: 22,
       doorsOpen: false,
@@ -243,6 +253,8 @@ class VehicleTelemetry {
       isCharging: false,
       chargePowerKw: 0.0,
       chargeRemainMin: null,
+      fuelConsumptionL100km: 1.10,
+      energyConsumptionKwh100km: 9.40,
       acOn: false,
       acTemp: 22,
       doorsOpen: false,
@@ -283,6 +295,26 @@ class VehicleTelemetry {
   }
 
   /// Factory creating validated telemetry from decoded CarLinko blob map.
+  /// Normalizes CAN-bus HVAC raw temperature values to standard Celsius (16-32°C).
+  /// Handles Chery T-Box 0.5°C step encoding and Bit-7 active status flags
+  /// (e.g. 172 [0xAC] -> 172 & 0x7F = 44 -> 44 * 0.5 = 22°C).
+  static int sanitizeAcTemp(num? raw) {
+    if (raw == null) return 22;
+    final val = raw.toInt();
+    if (val >= 100) {
+      final deg = ((val & 0x7F) * 0.5).round();
+      return (deg >= 16 && deg <= 32) ? deg : 22;
+    }
+    if (val >= 32 && val <= 70) {
+      final deg = (val * 0.5).round();
+      return (deg >= 16 && deg <= 32) ? deg : 22;
+    }
+    if (val >= 16 && val <= 32) {
+      return val;
+    }
+    return 22;
+  }
+
   factory VehicleTelemetry.fromBlobMap(Map<String, dynamic> m, {required bool isSimulated}) {
     final int batt = (m['battery_pct'] as num?)?.toInt() ?? 0;
     final int evRange = (m['range_km'] as num?)?.toInt() ?? 0;
@@ -293,6 +325,12 @@ class VehicleTelemetry {
     final double pwr = (m['charge_power_kw'] as num?)?.toDouble() ?? 0.0;
     final int? remMin = (m['charge_remain_min'] as num?)?.toInt();
     final double fuelCons = (m['fuel_consumption_l100km'] as num?)?.toDouble() ?? 0.0;
+    final double energyCons = (m['energy_consumption_kwh100km'] as num?)?.toDouble() ??
+        (m['consumption'] as num?)?.toDouble() ??
+        0.0;
+    final int? rawUnlocked = (m['unlocked'] as num?)?.toInt();
+    final bool isDoorAjar = ((m['doors'] as num?)?.toInt() ?? 0) != 0;
+    final bool isDoorLocked = rawUnlocked != null ? (rawUnlocked == 0) : !isDoorAjar;
 
     // TPMS: 0 means no reading, and the UI shows it as blank
     final double flP = (m['tyre_fl_pressure'] as num?)?.toDouble() ?? 0.0;
@@ -326,9 +364,11 @@ class VehicleTelemetry {
       chargePowerKw: pwr,
       chargeRemainMin: remMin,
       fuelConsumptionL100km: fuelCons,
+      energyConsumptionKwh100km: energyCons,
       acOn: m['ac_on'] == true,
-      acTemp: (m['ac_temp'] as num?)?.toInt() ?? 23,
-      doorsOpen: ((m['doors'] as num?)?.toInt() ?? 0) != 0,
+      acTemp: sanitizeAcTemp(m['ac_temp'] as num?),
+      doorsOpen: isDoorAjar,
+      doorsLocked: isDoorLocked,
       trunkOpen: ((m['trunk'] as num?)?.toInt() ?? 0) != 0,
       windowsOpen: ((m['windows'] as num?)?.toInt() ?? 0) != 0,
       sunroofOpen: ((m['sunroof'] as num?)?.toInt() ?? 0) != 0,
@@ -352,6 +392,7 @@ class VehicleTelemetry {
       isSimulated: isSimulated,
       isBound: !isSimulated,
       dataSourceLabel: isSimulated ? 'Chery CarLinko Cloud • Simulated' : 'LIVE CARLINKO TELEMATICS',
+      rawBlobHex: m['rawHex'] as String?,
     );
   }
 
@@ -374,9 +415,11 @@ class VehicleTelemetry {
         'chargePowerKw': chargePowerKw,
         'chargeRemainMin': chargeRemainMin,
         'fuelConsumptionL100km': fuelConsumptionL100km,
+        'energyConsumptionKwh100km': energyConsumptionKwh100km,
         'acOn': acOn,
         'acTemp': acTemp,
         'doorsOpen': doorsOpen,
+        'doorsLocked': doorsLocked,
         'trunkOpen': trunkOpen,
         'windowsOpen': windowsOpen,
         'sunroofOpen': sunroofOpen,
@@ -410,6 +453,7 @@ class VehicleTelemetry {
         'isSimulated': isSimulated,
         'isBound': isBound,
         'dataSourceLabel': dataSourceLabel,
+        'rawBlobHex': rawBlobHex,
       };
 
   factory VehicleTelemetry.fromJson(Map<String, dynamic> json) => VehicleTelemetry(
@@ -425,9 +469,11 @@ class VehicleTelemetry {
         chargePowerKw: (json['chargePowerKw'] as num?)?.toDouble() ?? 0.0,
         chargeRemainMin: (json['chargeRemainMin'] as num?)?.toInt(),
         fuelConsumptionL100km: (json['fuelConsumptionL100km'] as num?)?.toDouble() ?? 0.0,
+        energyConsumptionKwh100km: (json['energyConsumptionKwh100km'] as num?)?.toDouble() ?? 0.0,
         acOn: json['acOn'] as bool? ?? false,
-        acTemp: (json['acTemp'] as num?)?.toInt() ?? 22,
+        acTemp: sanitizeAcTemp(json['acTemp'] as num?),
         doorsOpen: json['doorsOpen'] as bool? ?? false,
+        doorsLocked: json['doorsLocked'] as bool? ?? true,
         trunkOpen: json['trunkOpen'] as bool? ?? false,
         windowsOpen: json['windowsOpen'] as bool? ?? false,
         sunroofOpen: json['sunroofOpen'] as bool? ?? false,
@@ -461,6 +507,7 @@ class VehicleTelemetry {
         isSimulated: json['isSimulated'] as bool? ?? false,
         isBound: json['isBound'] as bool? ?? false,
         dataSourceLabel: json['dataSourceLabel'] as String? ?? 'Pending Car Bind',
+        rawBlobHex: json['rawBlobHex'] as String?,
       );
 
   /// Convert kPa to PSI for dual automotive readouts.
@@ -488,9 +535,11 @@ class VehicleTelemetry {
     double? chargePowerKw,
     int? chargeRemainMin,
     double? fuelConsumptionL100km,
+    double? energyConsumptionKwh100km,
     bool? acOn,
     int? acTemp,
     bool? doorsOpen,
+    bool? doorsLocked,
     bool? trunkOpen,
     bool? windowsOpen,
     bool? sunroofOpen,
@@ -524,6 +573,7 @@ class VehicleTelemetry {
     bool? isSimulated,
     bool? isBound,
     String? dataSourceLabel,
+    String? rawBlobHex,
   }) {
     return VehicleTelemetry(
       batteryPct: batteryPct ?? this.batteryPct,
@@ -538,9 +588,11 @@ class VehicleTelemetry {
       chargePowerKw: chargePowerKw ?? this.chargePowerKw,
       chargeRemainMin: chargeRemainMin ?? this.chargeRemainMin,
       fuelConsumptionL100km: fuelConsumptionL100km ?? this.fuelConsumptionL100km,
+      energyConsumptionKwh100km: energyConsumptionKwh100km ?? this.energyConsumptionKwh100km,
       acOn: acOn ?? this.acOn,
       acTemp: acTemp ?? this.acTemp,
       doorsOpen: doorsOpen ?? this.doorsOpen,
+      doorsLocked: doorsLocked ?? this.doorsLocked,
       trunkOpen: trunkOpen ?? this.trunkOpen,
       windowsOpen: windowsOpen ?? this.windowsOpen,
       sunroofOpen: sunroofOpen ?? this.sunroofOpen,
@@ -574,6 +626,112 @@ class VehicleTelemetry {
       isSimulated: isSimulated ?? this.isSimulated,
       isBound: isBound ?? this.isBound,
       dataSourceLabel: dataSourceLabel ?? this.dataSourceLabel,
+      rawBlobHex: rawBlobHex ?? this.rawBlobHex,
+    );
+  }
+}
+
+/// Dynamic vehicle capability flags and official CarLinko CDN render URLs
+/// decoded from `/user/vehicle` (`vehicleImgConfig`, `vehicleControlConfig`,
+/// and `airDuration`).
+class VehicleCapabilities {
+  final String? plateNumber;
+  final String? vin;
+  final String? seriesName;
+  final String? modelName;
+  final String? frontImageUrl;
+  final String? sideImageUrl;
+  final String? topImageUrl;
+  final int airDurationMin;
+  final double minAcTemp;
+  final double maxAcTemp;
+  final double tempStep;
+  final bool hasSeatHeat;
+  final bool hasSeatVent;
+  final bool hasSunroof;
+  final bool hasTailgate;
+  final bool hasScheduledCharge;
+  final bool hasScheduledTravel;
+
+  const VehicleCapabilities({
+    this.plateNumber,
+    this.vin,
+    this.seriesName,
+    this.modelName,
+    this.frontImageUrl,
+    this.sideImageUrl,
+    this.topImageUrl,
+    this.airDurationMin = 10,
+    this.minAcTemp = 16.0,
+    this.maxAcTemp = 32.0,
+    this.tempStep = 0.5,
+    this.hasSeatHeat = true,
+    this.hasSeatVent = true,
+    this.hasSunroof = true,
+    this.hasTailgate = true,
+    this.hasScheduledCharge = true,
+    this.hasScheduledTravel = true,
+  });
+
+  factory VehicleCapabilities.defaults() => const VehicleCapabilities();
+
+  static Map<String, dynamic> _decodeJsonMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is String && raw.trim().isNotEmpty) {
+      try {
+        final decoded = json.decode(raw);
+        if (decoded is Map<String, dynamic>) return decoded;
+      } catch (_) {}
+    }
+    return {};
+  }
+
+  static bool _flag(Map<String, dynamic> ctrl, List<String> keys, {bool fallback = true}) {
+    for (final k in keys) {
+      if (ctrl.containsKey(k)) {
+        final v = ctrl[k];
+        if (v is bool) return v;
+        if (v is num) return v > 0;
+        if (v is String) {
+          final lower = v.toLowerCase().trim();
+          if (lower == 'true' || lower == '1' || lower == 'yes') return true;
+          if (lower == 'false' || lower == '0' || lower == 'no') return false;
+        }
+        if (v is Map) {
+          return v['enable'] == true || v['enabled'] == true || v['support'] == true;
+        }
+      }
+    }
+    return fallback;
+  }
+
+  factory VehicleCapabilities.fromVehicleMap(Map<String, dynamic> row) {
+    final imgs = _decodeJsonMap(row['vehicleImgConfig']);
+    final ctrl = _decodeJsonMap(row['vehicleControlConfig']);
+    final acCfg = _decodeJsonMap(ctrl['airConditioner'] ?? ctrl['ac'] ?? ctrl['climate']);
+
+    final rawMin = (acCfg['minTemp'] ?? ctrl['minAcTemp'] ?? ctrl['tempMin']) as num?;
+    final rawMax = (acCfg['maxTemp'] ?? ctrl['maxAcTemp'] ?? ctrl['tempMax']) as num?;
+    final rawStep = (acCfg['step'] ?? ctrl['tempStep']) as num?;
+
+    return VehicleCapabilities(
+      plateNumber: row['plateNumber']?.toString() ?? row['licensePlate']?.toString(),
+      vin: row['vin']?.toString(),
+      seriesName: row['seriesName']?.toString() ?? row['brandName']?.toString(),
+      modelName: row['modelName']?.toString() ?? row['vehicleModelName']?.toString(),
+      frontImageUrl: imgs['Front']?.toString() ?? imgs['front']?.toString(),
+      sideImageUrl: imgs['Side']?.toString() ?? imgs['side']?.toString(),
+      topImageUrl: imgs['Top']?.toString() ?? imgs['top']?.toString(),
+      airDurationMin: (row['airDuration'] as num?)?.toInt() ?? 10,
+      minAcTemp: rawMin?.toDouble() ?? 16.0,
+      maxAcTemp: rawMax?.toDouble() ?? 32.0,
+      tempStep: rawStep?.toDouble() ?? 0.5,
+      hasSeatHeat: _flag(ctrl, ['seatHeat', 'seatHeating', 'frontSeatHeat']),
+      hasSeatVent: _flag(ctrl, ['seatVent', 'seatVentilation', 'frontSeatVent']),
+      hasSunroof: _flag(ctrl, ['sunroof', 'skylight']),
+      hasTailgate: _flag(ctrl, ['tailgate', 'trunk', 'powerTailgate']),
+      hasScheduledCharge: _flag(ctrl, ['batterySchedule', 'scheduledCharge']),
+      hasScheduledTravel: _flag(ctrl, ['startupAppointment', 'scheduledTravel']),
     );
   }
 }

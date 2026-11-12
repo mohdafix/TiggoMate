@@ -71,6 +71,9 @@ class AiConfigResolver {
       if (key.isNotEmpty) headers['authorization'] = 'Bearer $key';
       headers['HTTP-Referer'] = 'https://tiggomate.app';
       headers['X-Title'] = 'TiggoMate';
+      if (model.startsWith('openai/')) {
+        model = model.replaceFirst('openai/', '');
+      }
     } else if (isExplicitOpenAi ||
         (provider == 'Auto-Detect' &&
             (key.startsWith('sk-proj-') ||
@@ -130,35 +133,89 @@ class AiConfigResolver {
 
     final stopwatch = Stopwatch()..start();
     try {
-      final client = HttpClient()..connectionTimeout = const Duration(seconds: 12);
-      final request = await client.postUrl(Uri.parse(config.endpoint));
-      config.headers.forEach((k, v) => request.headers.set(k, v));
+      final modelLower = config.model.toLowerCase();
+      final isReasoningOrGpt5 = modelLower.startsWith('o1') ||
+          modelLower.startsWith('o3') ||
+          modelLower.startsWith('gpt-5') ||
+          modelLower.contains('r1') ||
+          modelLower.contains('qwq') ||
+          modelLower.contains('reasoning');
+      final isOpenAi = config.providerName.toLowerCase().contains('openai');
 
-      final payload = jsonEncode({
+      final payloadMap = <String, dynamic>{
         "model": config.model,
         "messages": [
-          {"role": "user", "content": "ping"}
+          {"role": isReasoningOrGpt5 ? "developer" : "user", "content": "ping"}
         ],
-        "max_tokens": 5,
         "stream": false,
-      });
+      };
 
-      final utf8Payload = utf8.encode(payload);
-      request.headers.contentLength = utf8Payload.length;
-      request.add(utf8Payload);
-      final res = await request.close();
+      if (isReasoningOrGpt5) {
+        payloadMap["max_completion_tokens"] = 150;
+        payloadMap["reasoning_effort"] = "low";
+      } else if (isOpenAi) {
+        payloadMap["max_completion_tokens"] = 50;
+      } else {
+        payloadMap["max_tokens"] = 15;
+      }
+
+      Future<(int, String)> postJson(Map<String, dynamic> data) async {
+        final client = HttpClient()..connectionTimeout = const Duration(seconds: 12);
+        final request = await client.postUrl(Uri.parse(config.endpoint));
+        config.headers.forEach((k, v) => request.headers.set(k, v));
+        final utf8Payload = utf8.encode(jsonEncode(data));
+        request.headers.contentLength = utf8Payload.length;
+        request.add(utf8Payload);
+        final res = await request.close();
+        final b = await res.transform(utf8.decoder).join();
+        return (res.statusCode, b);
+      }
+
+      var (statusCode, body) = await postJson(payloadMap);
+
+      // Self-healing parameter fallback for modern / legacy proxies
+      if (statusCode == 400) {
+        bool needRetry = false;
+        if (body.contains('reasoning_effort') && payloadMap.containsKey('reasoning_effort')) {
+          payloadMap.remove('reasoning_effort');
+          needRetry = true;
+        }
+        if ((body.contains('developer') || body.contains('role')) && isReasoningOrGpt5) {
+          payloadMap["messages"] = [
+            {"role": "user", "content": "ping"}
+          ];
+          needRetry = true;
+        }
+        if (body.contains('max_tokens') && body.contains('max_completion_tokens')) {
+          payloadMap.remove('max_tokens');
+          payloadMap['max_completion_tokens'] = isReasoningOrGpt5 ? 150 : 50;
+          needRetry = true;
+        } else if (body.contains('max_completion_tokens') && !payloadMap.containsKey('max_tokens')) {
+          payloadMap.remove('max_completion_tokens');
+          payloadMap.remove('reasoning_effort');
+          payloadMap['max_tokens'] = 15;
+          needRetry = true;
+        }
+        if (body.contains('temperature') && payloadMap.containsKey('temperature')) {
+          payloadMap.remove('temperature');
+          needRetry = true;
+        }
+        if (needRetry) {
+          final retry = await postJson(payloadMap);
+          statusCode = retry.$1;
+          body = retry.$2;
+        }
+      }
       stopwatch.stop();
 
-      final body = await res.transform(utf8.decoder).join();
-
-      if (res.statusCode == 200) {
+      if (statusCode == 200) {
         return (
           ok: true,
           message: 'Connected to ${config.providerName}! Model ${config.model} responded.',
           latencyMs: stopwatch.elapsedMilliseconds,
         );
       } else {
-        String errorMsg = 'HTTP ${res.statusCode}';
+        String errorMsg = 'HTTP $statusCode';
         try {
           final data = jsonDecode(body);
           if (data is Map && data.containsKey('error')) {
@@ -223,16 +280,18 @@ Vehicle Telematics & Specs:
 - Battery: 18.3 kWh LFP (CATL cells), 350V
 - Current Battery SoC: $batteryPct%
 - Current Odometer: $odometerKm km${lastServiceInfo != null && lastServiceInfo.isNotEmpty ? '\n- Service History & Records:\n  $lastServiceInfo' : ''}${nextServiceInfo != null ? '\n- $nextServiceInfo' : ''}${tripInfo != null && tripInfo.isNotEmpty ? '\n- Trip History & Driving Records:\n  $tripInfo' : ''}
-- EV Range: ~82 km (NEDC ~100 km)
-${liveStatusBlock != null ? '\nLive Vehicle Status (real-time from vehicle telematics):\n- $liveStatusBlock\n' : ''}
-- Fuel Tank: 60L RON95 Petrol
-- Total Hybrid Range: ~920 km
+- Factory Battery Specs: 18.3 kWh LFP (CATL cells), 350V (NEDC ~100 km EV, WLTP ~82 km EV when fully charged)
+- Factory Fuel Tank: 60L RON95 Petrol
+${liveStatusBlock != null ? '\nLive Vehicle Status (real-time from vehicle CAN telematics):\n- $liveStatusBlock\n' : ''}
 - AC Charging: Type 2 (6.6 kW, ~3 hours 0-100%)
 - DC Fast Charging: CCS2 (supports ~30 mins 30-80%)
 - Tariff: TNB Domestic Tariff A (Off-peak: 22:00-08:00 @ RM 0.280/kWh, Normal: RM 0.516/kWh)
 - Connected CAN-bus Telematics: Vehicle T-Box
 
 IMPORTANT INSTRUCTIONS:
+0. REAL-TIME RANGE & TELEMETRICS GROUNDING:
+- When discussing or calculating vehicle range, fuel distance, battery autonomy, or travel capabilities, ALWAYS rely strictly on the real-time values provided in 'Live Vehicle Status' above (Live Total Combined Range, EV Range, Petrol Range).
+- NEVER invent or use a static 920 km range. The vehicle's ECU dynamically calculates the real combined range based on active fuel level, battery state-of-charge, and actual consumption.
 1. VEHICLE CONTROL ACTION TRIGGER:
 If the user's intent is to control the car or trigger an app feature (such as opening/closing windows, turning on aircond/climate, scheduling charging, checking TNB rate, locking/unlocking doors, opening trunk/tailgate, opening sunroof, remote engine start), you MUST output an action tag on its very own first line:
 [ACTION: <action_id> | <Action Title> | <Short Description>]
@@ -259,31 +318,91 @@ Answer in the user's language (English or Bahasa Melayu).
 3. Use the Current Odometer, Service History & Records (last service date, completed services, upcoming appointments), Trip History & Driving Records (latest completed trip, distances, EV percentage, energy consumed, costs, active drive, etc.), and the Live Vehicle Status block above directly whenever relevant (last trip, recent drives, service history, mileage, tyre pressure, doors, climate, battery, fuel, GPS/parked state, etc.) -- never say you don't have access to trip history, driving logs, last service date, or vehicle details when provided above. When the user asks about their last trip or driving log, state the exact details from the Trip History above (route/title, distance in km, EV ratio %, and cost in RM). If no trips are recorded yet in the logbook, state that no trips have been logged yet and guide them to record a drive or tap "+ Add Trip" in the LOG tab.
 ''';
 
+    final modelLower = config.model.toLowerCase();
+    final isReasoningOrGpt5 = modelLower.startsWith('o1') ||
+        modelLower.startsWith('o3') ||
+        modelLower.startsWith('gpt-5') ||
+        modelLower.contains('r1') ||
+        modelLower.contains('qwq') ||
+        modelLower.contains('reasoning');
+    final isOpenAi = config.providerName.toLowerCase().contains('openai');
+
+    final roleName = isReasoningOrGpt5 ? 'developer' : 'system';
     final messages = <Map<String, String>>[
-      {"role": "system", "content": systemPrompt},
+      {"role": roleName, "content": systemPrompt},
       ...history,
       {"role": "user", "content": prompt},
     ];
 
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 25);
-    final request = await client.postUrl(Uri.parse(config.endpoint));
-    config.headers.forEach((k, v) => request.headers.set(k, v));
-
-    final payload = jsonEncode({
+    final payloadMap = <String, dynamic>{
       "model": config.model,
       "messages": messages,
-      "max_tokens": 450,
-      "temperature": 0.6,
       "stream": false,
-    });
+    };
 
-    final utf8Payload = utf8.encode(payload);
-    request.headers.contentLength = utf8Payload.length;
-    request.add(utf8Payload);
-    final res = await request.close();
+    if (isReasoningOrGpt5) {
+      // Reasoning models (gpt-5-nano, o1, o3) use completion tokens for internal thought
+      // tokens + visible answer. Budget ample tokens (3500) and set reasoning_effort to low.
+      payloadMap["max_completion_tokens"] = 3500;
+      payloadMap["reasoning_effort"] = "low";
+    } else if (isOpenAi) {
+      payloadMap["max_completion_tokens"] = 1200;
+    } else {
+      payloadMap["max_tokens"] = 600;
+    }
 
-    final body = await res.transform(utf8.decoder).join();
-    if (res.statusCode == 200) {
+    if (!isReasoningOrGpt5) {
+      payloadMap["temperature"] = 0.6;
+    }
+
+    Future<(int, String)> postJson(Map<String, dynamic> data) async {
+      final client = HttpClient()..connectionTimeout = const Duration(seconds: 25);
+      final request = await client.postUrl(Uri.parse(config.endpoint));
+      config.headers.forEach((k, v) => request.headers.set(k, v));
+      final utf8Payload = utf8.encode(jsonEncode(data));
+      request.headers.contentLength = utf8Payload.length;
+      request.add(utf8Payload);
+      final res = await request.close();
+      final b = await res.transform(utf8.decoder).join();
+      return (res.statusCode, b);
+    }
+
+    var (statusCode, body) = await postJson(payloadMap);
+
+    // Self-healing parameter fallback for modern / legacy models
+    if (statusCode == 400) {
+      bool needRetry = false;
+      if (body.contains('reasoning_effort') && payloadMap.containsKey('reasoning_effort')) {
+        payloadMap.remove('reasoning_effort');
+        needRetry = true;
+      }
+      if ((body.contains('developer') || body.contains('role')) && isReasoningOrGpt5) {
+        messages[0] = {"role": "system", "content": systemPrompt};
+        payloadMap["messages"] = messages;
+        needRetry = true;
+      }
+      if (body.contains('max_tokens') && body.contains('max_completion_tokens')) {
+        payloadMap.remove('max_tokens');
+        payloadMap['max_completion_tokens'] = isReasoningOrGpt5 ? 3500 : 1200;
+        needRetry = true;
+      } else if (body.contains('max_completion_tokens') && !payloadMap.containsKey('max_tokens')) {
+        payloadMap.remove('max_completion_tokens');
+        payloadMap.remove('reasoning_effort');
+        payloadMap['max_tokens'] = 600;
+        needRetry = true;
+      }
+      if (body.contains('temperature') && payloadMap.containsKey('temperature')) {
+        payloadMap.remove('temperature');
+        needRetry = true;
+      }
+      if (needRetry) {
+        final retry = await postJson(payloadMap);
+        statusCode = retry.$1;
+        body = retry.$2;
+      }
+    }
+
+    if (statusCode == 200) {
       final trimmedBody = body.trim();
       // Handle SSE stream fallback if the proxy streams despite stream:false
       if (trimmedBody.startsWith('data:')) {
@@ -300,7 +419,14 @@ Answer in the user's language (English or Bahasa Melayu).
               if (choices != null && choices.isNotEmpty) {
                 final delta = choices[0]['delta'] as Map?;
                 final content = delta?['content'] as String?;
-                if (content != null) buffer.write(content);
+                if (content != null && content.isNotEmpty) {
+                  buffer.write(content);
+                } else {
+                  final reasoning = delta?['reasoning_content'] as String?;
+                  if (reasoning != null && reasoning.isNotEmpty && buffer.isEmpty) {
+                    buffer.write(reasoning);
+                  }
+                }
               }
             }
           } catch (_) {}
@@ -310,20 +436,24 @@ Answer in the user's language (English or Bahasa Melayu).
       }
 
       try {
-        final data = jsonDecode(body) as Map<String, dynamic>;
-        final choices = data['choices'] as List?;
-        if (choices != null && choices.isNotEmpty) {
-          final first = choices[0] as Map<String, dynamic>;
-          final message = first['message'] as Map<String, dynamic>?;
-          final content = message?['content'] as String?;
-          if (content != null && content.isNotEmpty) {
-            return content.trim();
+        final data = jsonDecode(body);
+        final extracted = _safeExtractText(data);
+        if (extracted != null && extracted.isNotEmpty) {
+          return extracted;
+        }
+
+        if (data is Map && data['choices'] is List && (data['choices'] as List).isNotEmpty) {
+          final first = (data['choices'] as List).first;
+          if (first is Map && first['finish_reason'] == 'length') {
+            return 'Model hit token limit during internal reasoning. Please ask a shorter question or use a standard conversational model like gpt-4o-mini.';
           }
         }
-      } catch (_) {}
+      } catch (err) {
+        // Safe fallback
+      }
       return 'No response generated from ${config.providerName}.';
     } else {
-      String err = 'HTTP ${res.statusCode}';
+      String err = 'HTTP $statusCode';
       try {
         final data = jsonDecode(body);
         if (data is Map && data.containsKey('error')) {
@@ -337,6 +467,59 @@ Answer in the user's language (English or Bahasa Melayu).
       } catch (_) {}
       throw Exception('$err (${config.providerName})');
     }
+  }
+
+  static String? _safeExtractText(dynamic data) {
+    if (data == null) return null;
+    if (data is String) {
+      final s = data.trim();
+      return s.isNotEmpty ? s : null;
+    }
+    if (data is List) {
+      final buf = StringBuffer();
+      for (final item in data) {
+        final t = _safeExtractText(item);
+        if (t != null && t.isNotEmpty) buf.write(t);
+      }
+      final res = buf.toString().trim();
+      return res.isNotEmpty ? res : null;
+    }
+    if (data is Map) {
+      // 1. Direct content or text fields
+      for (final key in ['content', 'text', 'response', 'output']) {
+        if (data.containsKey(key)) {
+          final t = _safeExtractText(data[key]);
+          if (t != null && t.isNotEmpty) return t;
+        }
+      }
+      // 2. Choices list
+      if (data['choices'] is List && (data['choices'] as List).isNotEmpty) {
+        for (final item in (data['choices'] as List)) {
+          final t = _safeExtractText(item);
+          if (t != null && t.isNotEmpty) return t;
+        }
+      }
+      // 3. Nested message or delta
+      for (final key in ['message', 'delta']) {
+        if (data.containsKey(key)) {
+          final t = _safeExtractText(data[key]);
+          if (t != null && t.isNotEmpty) return t;
+        }
+      }
+      // 4. Reasoning / thought fields
+      for (final key in ['reasoning_content', 'reasoning', 'thought']) {
+        if (data.containsKey(key)) {
+          final t = _safeExtractText(data[key]);
+          if (t != null && t.isNotEmpty) return t;
+        }
+      }
+      // 5. Refusal
+      if (data['refusal'] != null) {
+        final r = _safeExtractText(data['refusal']);
+        if (r != null && r.isNotEmpty) return 'AI Refusal: $r';
+      }
+    }
+    return null;
   }
 }
 

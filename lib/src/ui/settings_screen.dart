@@ -17,6 +17,7 @@ import 'setup_intro_screen.dart';
 import 'remote_command_diagnostics_sheet.dart';
 import '../firebase/firebase_sync_service.dart';
 import '../service/bluetooth_driving_tracker_service.dart';
+import '../service/price_book_service.dart';
 
 // Re-export AppSettings and SettingsService so existing callers keep working seamlessly
 class AppSettings {
@@ -156,6 +157,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _is24Hour = true;
   bool _useKmh = true;
   bool _isTestingAi = false;
+  bool _vehicleAnomalyAlert = true;
+  bool _batteryAnomalyAlert = true;
+  int _unreadCloudNotices = 0;
 
   AppTokens get t => context.tokens;
 
@@ -189,6 +193,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _loadPreferences() async {
     try {
+      PriceBookService.instance.onCloudSync = FirebaseSyncService.instance.syncPriceBook;
+      await PriceBookService.instance.ensureLoaded();
+      unawaited(() async {
+        final cloudPb = await FirebaseSyncService.instance.fetchPriceBook();
+        if (cloudPb != null) {
+          await PriceBookService.instance.importJson(cloudPb);
+        }
+      }());
       final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
       setState(() {
@@ -196,7 +208,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _is24Hour = prefs.getBool('tm_clock_24h') ?? true;
         _useKmh = prefs.getBool('tm_speed_kmh') ?? true;
       });
+      if (AppVehicleRepository.instance.isCloudConnected &&
+          AppVehicleRepository.instance.vehicleId != null) {
+        final cfgFuture = AppVehicleRepository.instance.getTerminalNoticeConfig();
+        final unreadFuture = AppVehicleRepository.instance.getUnreadNoticeCount();
+        final cfg = await cfgFuture;
+        final unread = await unreadFuture;
+        if (!mounted) return;
+        setState(() {
+          if (cfg.containsKey('enableVehicleAnomalyWarning')) {
+            _vehicleAnomalyAlert = cfg['enableVehicleAnomalyWarning'] == true;
+          }
+          if (cfg.containsKey('enableBatteryAnomalyWarning')) {
+            _batteryAnomalyAlert = cfg['enableBatteryAnomalyWarning'] == true;
+          }
+          _unreadCloudNotices = unread;
+        });
+      }
     } catch (_) {}
+  }
+
+  Future<void> _showCloudActivitySheet() async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _CloudActivitySheet(repository: AppVehicleRepository.instance),
+    );
+  }
+
+  Future<void> _showPriceBookSheet() async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _PriceBookSheet(
+        onRatesUpdated: () {
+          if (mounted) setState(() {});
+        },
+      ),
+    );
   }
 
   @override
@@ -228,6 +279,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       vehicleSkinKey: _vehicleSkinKey,
     );
     VehicleSkinManager.instance.setSkin(_vehicleSkinKey);
+    PriceBookService.instance.onCloudSync = FirebaseSyncService.instance.syncPriceBook;
+    unawaited(
+      PriceBookService.instance.recordSettingsRates(
+        tnbTariff: updated.tnbTariff,
+        fuelPrice: updated.fuelPrice,
+      ),
+    );
     widget.onSave(updated);
     Navigator.of(context).pop(updated);
     AppNotification.show(
@@ -841,6 +899,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 );
               },
             ),
+            _buildSettingTile(
+              leading: Icon(Icons.history_rounded, color: t.ink2, size: 22),
+              title: 'Cloud Operation Log & Notices',
+              subtitle: _unreadCloudNotices > 0
+                  ? '$_unreadCloudNotices unread CarLinko cloud notice(s)'
+                  : 'Official T-Box remote command history & cloud alerts',
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_unreadCloudNotices > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      margin: const EdgeInsets.only(right: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '$_unreadCloudNotices',
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  Icon(Icons.chevron_right_rounded, color: t.ink3, size: 20),
+                ],
+              ),
+              onTap: _showCloudActivitySheet,
+            ),
+            _switchRow(
+              Icons.warning_amber_rounded,
+              'Vehicle Anomaly Cloud Alerts',
+              'CarLinko push warning for unexpected movement or door/intrusion events',
+              _vehicleAnomalyAlert,
+              (val) async {
+                setState(() => _vehicleAnomalyAlert = val);
+                final ok = await AppVehicleRepository.instance.setAlertSwitch(
+                  configName: 'VEHICLE_ANOMALY',
+                  enabled: val,
+                );
+                if (!ok && mounted) {
+                  setState(() => _vehicleAnomalyAlert = !val);
+                }
+              },
+            ),
+            _switchRow(
+              Icons.battery_alert_rounded,
+              'Battery Anomaly Cloud Alerts',
+              'CarLinko push warning for HV/12V battery or charging fault events',
+              _batteryAnomalyAlert,
+              (val) async {
+                setState(() => _batteryAnomalyAlert = val);
+                final ok = await AppVehicleRepository.instance.setAlertSwitch(
+                  configName: 'BATTERY_ANOMALY',
+                  enabled: val,
+                );
+                if (!ok && mounted) {
+                  setState(() => _batteryAnomalyAlert = !val);
+                }
+              },
+            ),
           ]),
 
           // Bluetooth Auto-Drive & Parking Tracker
@@ -931,6 +1048,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               controller: _fuelController,
               hintText: '2.05',
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            ),
+            _buildSettingTile(
+              leading: Icon(Icons.timeline_rounded, color: t.accent, size: 22),
+              title: 'Dated Tariff & Fuel Price History',
+              subtitle: '${PriceBookService.instance.rules.length} active/historical rate period(s) preserved',
+              trailing: Icon(Icons.chevron_right_rounded, color: t.ink3, size: 20),
+              onTap: _showPriceBookSheet,
             ),
           ]),
 
@@ -1119,6 +1243,443 @@ class _SettingsScreenState extends State<SettingsScreen> {
               'TiggoMate 2.0 (CSH Edition)\nCrafted for Malaysian Chery Owners',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, color: t.ink3, height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CloudActivitySheet extends StatefulWidget {
+  final VehicleRepository repository;
+
+  const _CloudActivitySheet({required this.repository});
+
+  @override
+  State<_CloudActivitySheet> createState() => _CloudActivitySheetState();
+}
+
+class _CloudActivitySheetState extends State<_CloudActivitySheet> {
+  bool _loading = true;
+  int _tab = 0; // 0 = Operations, 1 = Cloud Notices
+  List<Map<String, dynamic>> _ops = [];
+  List<Map<String, dynamic>> _notices = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    final opsFuture = widget.repository.getOperatingRecord();
+    final noticesFuture = widget.repository.getCloudNotifications(page: 1, size: 30);
+    final ops = await opsFuture;
+    final notices = await noticesFuture;
+    if (!mounted) return;
+    setState(() {
+      _ops = ops;
+      _notices = notices;
+      _loading = false;
+    });
+  }
+
+  String _pick(Map<String, dynamic> row, List<String> keys, {String fallback = ''}) {
+    for (final k in keys) {
+      final v = row[k];
+      if (v != null && v.toString().trim().isNotEmpty) return v.toString().trim();
+    }
+    return fallback;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final items = _tab == 0 ? _ops : _notices;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.78,
+      decoration: BoxDecoration(
+        color: t.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 10),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: t.ink3.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 12, 10, 8),
+            child: Row(
+              children: [
+                Icon(Icons.cloud_queue_rounded, color: t.accent, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'CarLinko Cloud Log & Notices',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: t.ink),
+                  ),
+                ),
+                IconButton(
+                  onPressed: _load,
+                  icon: Icon(Icons.refresh_rounded, color: t.ink2, size: 20),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: Icon(Icons.close, color: t.ink3, size: 20),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ChoiceChip(
+                    label: Text('Command History (${_ops.length})'),
+                    selected: _tab == 0,
+                    onSelected: (_) => setState(() => _tab = 0),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ChoiceChip(
+                    label: Text('Cloud Notices (${_notices.length})'),
+                    selected: _tab == 1,
+                    onSelected: (_) => setState(() => _tab = 1),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : items.isEmpty
+                    ? Center(
+                        child: Text(
+                          widget.repository.isCloudConnected
+                              ? 'No CarLinko cloud records found yet.'
+                              : 'Connect CarLinko account to view cloud logs.',
+                          style: TextStyle(color: t.ink3, fontSize: 13),
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+                        itemCount: items.length,
+                        separatorBuilder: (_, _) => Divider(color: t.border, height: 12),
+                        itemBuilder: (_, idx) {
+                          final row = items[idx];
+                          final title = _pick(
+                            row,
+                            ['operatingName', 'operateName', 'title', 'noticeTitle', 'typeName', 'data'],
+                            fallback: _tab == 0 ? 'Remote Command' : 'Vehicle Notice',
+                          );
+                          final subtitle = _pick(
+                            row,
+                            ['operatingResult', 'resultMsg', 'content', 'noticeContent', 'remark', 'msg'],
+                          );
+                          final ts = _pick(row, ['createTime', 'operateTime', 'noticeTime', 'updateTime', 'time']);
+                          final okFlag = row['status'] ?? row['operatingStatus'];
+
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: CircleAvatar(
+                              radius: 18,
+                              backgroundColor: t.accent.withValues(alpha: 0.14),
+                              child: Icon(
+                                _tab == 0 ? Icons.settings_remote_rounded : Icons.notifications_active_outlined,
+                                size: 17,
+                                color: t.accent,
+                              ),
+                            ),
+                            title: Text(
+                              title,
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: t.ink),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (subtitle.isNotEmpty)
+                                  Text(subtitle, style: TextStyle(fontSize: 12, color: t.ink2)),
+                                if (ts.isNotEmpty)
+                                  Text(ts, style: TextStyle(fontSize: 10.5, color: t.ink3)),
+                              ],
+                            ),
+                            trailing: okFlag != null
+                                ? Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: (okFlag == 1 || okFlag == true || okFlag == '00'
+                                              ? t.ok
+                                              : Colors.orangeAccent)
+                                          .withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      okFlag.toString(),
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: okFlag == 1 || okFlag == true || okFlag == '00'
+                                            ? t.ok
+                                            : Colors.orangeAccent,
+                                      ),
+                                    ),
+                                  )
+                                : null,
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PriceBookSheet extends StatefulWidget {
+  final VoidCallback onRatesUpdated;
+
+  const _PriceBookSheet({required this.onRatesUpdated});
+
+  @override
+  State<_PriceBookSheet> createState() => _PriceBookSheetState();
+}
+
+class _PriceBookSheetState extends State<_PriceBookSheet> {
+  Future<void> _showAddRuleDialog() async {
+    var kind = PriceKind.charge;
+    var scope = ChargeScope.ac;
+    var effectiveDate = DateTime.now();
+    final priceCtrl = TextEditingController(text: '0.57');
+    final labelCtrl = TextEditingController();
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final t = context.tokens;
+          return AlertDialog(
+            backgroundColor: t.surface,
+            title: Text('Add Dated Rate Rule', style: TextStyle(color: t.ink, fontSize: 16, fontWeight: FontWeight.bold)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ChoiceChip(
+                          label: const Text('Charging (kWh)'),
+                          selected: kind == PriceKind.charge,
+                          onSelected: (_) => setDialogState(() {
+                            kind = PriceKind.charge;
+                            priceCtrl.text = '0.57';
+                          }),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ChoiceChip(
+                          label: const Text('Petrol (L)'),
+                          selected: kind == PriceKind.fuel,
+                          onSelected: (_) => setDialogState(() {
+                            kind = PriceKind.fuel;
+                            scope = ChargeScope.all;
+                            priceCtrl.text = '2.05';
+                          }),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (kind == PriceKind.charge) ...[
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<ChargeScope>(
+                      initialValue: scope,
+                      decoration: const InputDecoration(labelText: 'Charger Type'),
+                      items: const [
+                        DropdownMenuItem(value: ChargeScope.ac, child: Text('Home / AC')),
+                        DropdownMenuItem(value: ChargeScope.dc, child: Text('Public / DC Fast')),
+                        DropdownMenuItem(value: ChargeScope.all, child: Text('All Charging')),
+                      ],
+                      onChanged: (v) {
+                        if (v != null) setDialogState(() => scope = v);
+                      },
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('Effective From', style: TextStyle(fontSize: 12, color: t.ink2)),
+                    subtitle: Text(
+                      '${effectiveDate.year}-${effectiveDate.month.toString().padLeft(2, '0')}-${effectiveDate.day.toString().padLeft(2, '0')}',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: t.ink),
+                    ),
+                    trailing: Icon(Icons.calendar_today_rounded, color: t.accent, size: 18),
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: ctx,
+                        initialDate: effectiveDate,
+                        firstDate: DateTime(2023),
+                        lastDate: DateTime(2030),
+                      );
+                      if (picked != null) {
+                        setDialogState(() => effectiveDate = picked);
+                      }
+                    },
+                  ),
+                  TextField(
+                    controller: priceCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: kind == PriceKind.charge ? 'Rate (RM / kWh)' : 'Price (RM / L)',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: labelCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Label (optional)',
+                      hintText: 'e.g. TNB AFA Adjustment',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+              ElevatedButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Save')),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (saved == true) {
+      final rate = double.tryParse(priceCtrl.text.trim());
+      if (rate != null && rate > 0) {
+        await PriceBookService.instance.addOrUpdateRule(
+          PriceRule(
+            id: 'custom_${DateTime.now().millisecondsSinceEpoch}',
+            kind: kind,
+            scope: kind == PriceKind.fuel ? ChargeScope.all : scope,
+            effectiveFrom: effectiveDate,
+            pricePerUnit: rate,
+            label: labelCtrl.text.trim().isEmpty
+                ? (kind == PriceKind.fuel ? 'RON95 Period' : 'EV Tariff Period')
+                : labelCtrl.text.trim(),
+          ),
+        );
+        if (mounted) {
+          setState(() {});
+          widget.onRatesUpdated();
+        }
+      }
+    }
+    priceCtrl.dispose();
+    labelCtrl.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final rules = PriceBookService.instance.rules;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.72,
+      decoration: BoxDecoration(
+        color: t.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 10),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(color: t.ink3.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(2)),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 12, 12, 6),
+            child: Row(
+              children: [
+                Icon(Icons.timeline_rounded, color: t.accent, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Dated Tariff & Fuel Price Book',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: t.ink)),
+                      Text('Preserves historical trip & charge costs across rate changes',
+                          style: TextStyle(fontSize: 11, color: t.ink3)),
+                    ],
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: _showAddRuleDialog,
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('Add'),
+                ),
+              ],
+            ),
+          ),
+          Divider(color: t.border, height: 1),
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: rules.length,
+              separatorBuilder: (_, _) => Divider(color: t.border, height: 12),
+              itemBuilder: (_, idx) {
+                final r = rules[idx];
+                final dateStr =
+                    '${r.effectiveFrom.year}-${r.effectiveFrom.month.toString().padLeft(2, '0')}-${r.effectiveFrom.day.toString().padLeft(2, '0')}';
+                final isFuel = r.kind == PriceKind.fuel;
+                final unit = isFuel ? '/L' : '/kWh';
+                final tag = isFuel ? 'FUEL' : r.scope.name.toUpperCase();
+
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(
+                    radius: 18,
+                    backgroundColor: (isFuel ? Colors.orangeAccent : t.accent).withValues(alpha: 0.14),
+                    child: Icon(
+                      isFuel ? Icons.local_gas_station_outlined : Icons.bolt_rounded,
+                      size: 17,
+                      color: isFuel ? Colors.orangeAccent : t.accent,
+                    ),
+                  ),
+                  title: Text(
+                    'RM ${r.pricePerUnit.toStringAsFixed(r.pricePerUnit == 1.3 ? 2 : 3)}$unit • ${r.label.isNotEmpty ? r.label : tag}',
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: t.ink),
+                  ),
+                  subtitle: Text('Effective from $dateStr • $tag', style: TextStyle(fontSize: 11.5, color: t.ink3)),
+                  trailing: rules.length > 1
+                      ? IconButton(
+                          icon: Icon(Icons.delete_outline, color: t.ink3, size: 18),
+                          onPressed: () async {
+                            await PriceBookService.instance.deleteRule(r.id);
+                            if (mounted) {
+                              setState(() {});
+                              widget.onRatesUpdated();
+                            }
+                          },
+                        )
+                      : null,
+                );
+              },
             ),
           ),
         ],

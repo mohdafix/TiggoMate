@@ -52,9 +52,31 @@ class BluetoothDrivingTrackerService extends ChangeNotifier {
       _customCarBtName = prefs.getString(_kCustomBtNameKey);
 
       _channel.setMethodCallHandler(_handleNativeCall);
+      await checkConnection();
     } catch (e) {
       debugPrint('BluetoothDrivingTrackerService init error: $e');
     }
+  }
+
+  /// Polls the native Android layer to verify if vehicle Bluetooth is currently connected.
+  Future<bool> checkConnection() async {
+    try {
+      final res = await _channel.invokeMethod('checkCurrentConnection');
+      if (res is Map) {
+        final connected = res['connected'] == true;
+        final name = res['name']?.toString() ?? 'Chery Tiggo';
+        if (connected && !_isCarConnected) {
+          _isCarConnected = true;
+          _connectedCarName = name;
+          notifyListeners();
+        } else if (!connected && _isCarConnected) {
+          _isCarConnected = false;
+          notifyListeners();
+        }
+        return connected;
+      }
+    } catch (_) {}
+    return _isCarConnected;
   }
 
   Future<void> setEnabled(bool enabled) async {
@@ -171,9 +193,9 @@ class BluetoothDrivingTrackerService extends ChangeNotifier {
 
     debugPrint('🅿️ Car Bluetooth Disconnected: $name -> Capturing parking location & finalizing trip');
 
-    // 1. Immediately capture phone GPS and reverse-geocode address
+    // 1. Immediately capture phone GPS and reverse-geocode address ONLY on car Bluetooth disconnect
     try {
-      await PhoneParkingLocationService.captureNow();
+      await PhoneParkingLocationService.captureOnBluetoothDisconnect(carName: name);
     } catch (_) {}
 
     final phoneParked = await PhoneParkingLocationService.loadLast();

@@ -130,6 +130,35 @@ class MainActivity : FlutterActivity() {
                     TiggoMateForegroundService.stop(this)
                     result.success(true)
                 }
+                "checkCurrentConnection" -> {
+                    try {
+                        val btManager = getSystemService(Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
+                        val adapter = btManager?.adapter
+                        if (adapter != null && adapter.isEnabled) {
+                            val a2dp = adapter.getProfileConnectionState(android.bluetooth.BluetoothProfile.A2DP) == android.bluetooth.BluetoothProfile.STATE_CONNECTED
+                            val headset = adapter.getProfileConnectionState(android.bluetooth.BluetoothProfile.HEADSET) == android.bluetooth.BluetoothProfile.STATE_CONNECTED
+                            if (a2dp || headset) {
+                                val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+                                val customName = prefs.getString("flutter.tm_car_bluetooth_name", null)?.uppercase()?.trim()
+
+                                val bonded = adapter.bondedDevices ?: emptySet()
+                                val carDevice = bonded.firstOrNull { d ->
+                                    val n = (d.name ?: "").uppercase()
+                                    (!customName.isNullOrEmpty() && n.contains(customName)) ||
+                                    n.contains("CHERY") || n.contains("TIGGO") || n.contains("CARLINKO") || n.contains("JAECOO") || n.contains("OMODA") || n.contains("CAR-") || n.contains("CAR_BT")
+                                }
+                                result.success(mapOf(
+                                    "connected" to true,
+                                    "name" to (carDevice?.name ?: "Chery Tiggo")
+                                ))
+                                return@setMethodCallHandler
+                            }
+                        }
+                        result.success(mapOf("connected" to false, "name" to null))
+                    } catch (e: Exception) {
+                        result.success(mapOf("connected" to false, "name" to null))
+                    }
+                }
                 "getPairedDevices" -> {
                     try {
                         val btManager = getSystemService(Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager

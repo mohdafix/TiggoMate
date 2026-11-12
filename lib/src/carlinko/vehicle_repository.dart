@@ -1,13 +1,19 @@
-import '../service/phone_parking_location.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../firebase/firebase_sync_service.dart';
 import '../service/vehicle_alert_notifier.dart';
 import '../service/auto_trip_and_charge_service.dart';
 import 'carlinko_api.dart';
+import 'carlinko_ble_controller.dart';
 import 'reverse_geocoder.dart';
 import 'vehicle_telemetry.dart';
+
+const _secureStorage = FlutterSecureStorage();
+const String _kCarLinkoSavedPasswordKey = 'tm_carlinko_saved_password';
+const String _kCarLinkoSavedPasswordAccountKey = 'tm_carlinko_saved_password_account';
 
 const String _kCarLinkoTokenKey = 'tm_carlinko_token';
 const String _kCarLinkoAccountKey = 'tm_carlinko_account';
@@ -17,10 +23,11 @@ const String _kCarLinkoDeviceSnKey = 'tm_carlinko_device_sn';
 
 /// Pulls the vehicle's device serial number from a /user/vehicle row. Real
 /// API responses use either key depending on the account (per ha-carlinko).
+/// Prioritizes deviceSn and sn over deviceId (which is an internal database row ID).
 String? _extractDeviceSn(Map<String, dynamic> vehicle) =>
-    vehicle['deviceId']?.toString() ??
     vehicle['deviceSn']?.toString() ??
     vehicle['sn']?.toString() ??
+    vehicle['deviceId']?.toString() ??
     vehicle['vin']?.toString() ??
     vehicle['vehicleId']?.toString();
 
@@ -29,6 +36,8 @@ class RemoteCommandResult {
   final bool success;
   final String opcode;
   final String? code;
+  final String? ackStatus;
+  final bool retriedWith7801;
   final String? message;
   final dynamic rawData;
   final int latencyMs;
@@ -38,6 +47,8 @@ class RemoteCommandResult {
     required this.success,
     required this.opcode,
     this.code,
+    this.ackStatus,
+    this.retriedWith7801 = false,
     this.message,
     this.rawData,
     this.latencyMs = 0,
@@ -46,18 +57,24 @@ class RemoteCommandResult {
 
   @override
   String toString() =>
-      'RemoteCommandResult(success: $success, opcode: $opcode, code: $code, message: $message, latency: ${latencyMs}ms)';
+      'RemoteCommandResult(success: $success, opcode: $opcode, code: $code, ackStatus: $ackStatus, retried7801: $retriedWith7801, message: $message, latency: ${latencyMs}ms)';
 }
 
 abstract class VehicleRepository {
   Stream<VehicleTelemetry> get telemetryStream;
   VehicleTelemetry get currentTelemetry;
+  VehicleCapabilities get vehicleCapabilities;
   VehicleConnectionStatus get connectionStatus;
   bool get isCloudConnected;
   bool get isPreActivationMode;
   bool get isVehicleBound;
   String? get connectedAccount;
   String? get vehicleId;
+  String? get vin;
+  String? get userId;
+  String? get deviceSn;
+  String? get lastLocateStatus;
+  Future<List<Map<String, dynamic>>> getOperatingRecord();
   Future<void> refresh();
   Future<void> connect({required String account, required String password, String region = 'sea'});
   Future<void> disconnect();
@@ -68,6 +85,52 @@ abstract class VehicleRepository {
     bool sendWakeupHandshake = true,
     bool send0x23Init = false,
   });
+  Future<bool> setTargetSoc(int targetSoc);
+  Future<bool> setAirDuration(int minutes);
+  Future<bool> setBatterySchedule(Map<String, dynamic> params);
+  Future<Map<String, dynamic>> getTerminalNoticeConfig();
+  Future<bool> setScheduledTravel({
+    required bool enabled,
+    required int hour,
+    required int minute,
+    List<bool>? week,
+  });
+  Future<bool> setAlertSwitch({required String configName, required bool enabled});
+  Future<List<Map<String, dynamic>>> getCloudNotifications({int page = 1, int size = 20});
+  Future<int> getUnreadNoticeCount();
+  Future<List<Map<String, dynamic>>> getGeofences();
+  Future<bool> addGeofence({
+    required String name,
+    required double lat,
+    required double lng,
+    required double radius,
+    int alarmType = 2,
+  });
+  Future<RemoteCommandResult> addGeofenceWithResult({
+    required String name,
+    required double lat,
+    required double lng,
+    required double radius,
+    int alarmType = 2,
+  });
+  Future<bool> updateGeofence({
+    required String fenceId,
+    required String name,
+    required double lat,
+    required double lng,
+    required double radius,
+    int alarmType = 2,
+  });
+  Future<RemoteCommandResult> updateGeofenceWithResult({
+    required String fenceId,
+    required String name,
+    required double lat,
+    required double lng,
+    required double radius,
+    int alarmType = 2,
+  });
+  Future<bool> updateGeofenceStatus(String id, int status);
+  Future<bool> deleteGeofence(String id);
   void dispose();
 }
 
@@ -104,10 +167,28 @@ class MockVehicleRepository implements VehicleRepository {
   bool get isVehicleBound => _current.isBound;
 
   @override
+  VehicleCapabilities get vehicleCapabilities => VehicleCapabilities.defaults();
+
+  @override
+  String? get lastLocateStatus => 'GPS locked (Demo)';
+
+  @override
   String? get connectedAccount => null;
 
   @override
   String? get vehicleId => null;
+
+  @override
+  String? get vin => null;
+
+  @override
+  String? get userId => '88504';
+
+  @override
+  String? get deviceSn => 'SEA1257A68450667';
+
+  @override
+  Future<List<Map<String, dynamic>>> getOperatingRecord() async => [];
 
   @override
   Future<void> refresh() async {
@@ -149,7 +230,7 @@ class MockVehicleRepository implements VehicleRepository {
   @override
   Future<RemoteCommandResult> sendRemoteCommandWithResult(
     String command, {
-    bool sendWakeupHandshake = true,
+    bool sendWakeupHandshake = false,
     bool send0x23Init = false,
   }) async {
     return RemoteCommandResult(
@@ -159,6 +240,142 @@ class MockVehicleRepository implements VehicleRepository {
       message: 'Mock command executed successfully',
       latencyMs: 12,
     );
+  }
+
+  @override
+  Future<bool> setTargetSoc(int targetSoc) async => true;
+
+  @override
+  Future<bool> setAirDuration(int minutes) async => true;
+
+  @override
+  Future<bool> setBatterySchedule(Map<String, dynamic> params) async => true;
+
+  @override
+  Future<Map<String, dynamic>> getTerminalNoticeConfig() async => {};
+
+  @override
+  Future<bool> setScheduledTravel({
+    required bool enabled,
+    required int hour,
+    required int minute,
+    List<bool>? week,
+  }) async =>
+      true;
+
+  @override
+  Future<bool> setAlertSwitch({required String configName, required bool enabled}) async => true;
+
+  @override
+  Future<List<Map<String, dynamic>>> getCloudNotifications({int page = 1, int size = 20}) async => [];
+
+  @override
+  Future<int> getUnreadNoticeCount() async => 0;
+
+  final List<Map<String, dynamic>> _mockGeofences = [];
+
+  @override
+  Future<List<Map<String, dynamic>>> getGeofences() async => List.from(_mockGeofences);
+
+  @override
+  Future<bool> addGeofence({
+    required String name,
+    required double lat,
+    required double lng,
+    required double radius,
+    int alarmType = 2,
+  }) async {
+    final res = await addGeofenceWithResult(name: name, lat: lat, lng: lng, radius: radius, alarmType: alarmType);
+    return res.success;
+  }
+
+  @override
+  Future<RemoteCommandResult> addGeofenceWithResult({
+    required String name,
+    required double lat,
+    required double lng,
+    required double radius,
+    int alarmType = 2,
+  }) async {
+    _mockGeofences.add({
+      'id': 'mock_${DateTime.now().millisecondsSinceEpoch}',
+      'name': name,
+      'lat': lat,
+      'lng': lng,
+      'radius': radius.round(),
+      'alarmType': alarmType,
+      'status': 1,
+    });
+    return RemoteCommandResult(
+      success: true,
+      opcode: 'GEOFENCE',
+      code: '0000',
+      message: 'Geofence active',
+    );
+  }
+
+  @override
+  Future<bool> updateGeofence({
+    required String fenceId,
+    required String name,
+    required double lat,
+    required double lng,
+    required double radius,
+    int alarmType = 2,
+  }) async {
+    final res = await updateGeofenceWithResult(
+      fenceId: fenceId,
+      name: name,
+      lat: lat,
+      lng: lng,
+      radius: radius,
+      alarmType: alarmType,
+    );
+    return res.success;
+  }
+
+  @override
+  Future<RemoteCommandResult> updateGeofenceWithResult({
+    required String fenceId,
+    required String name,
+    required double lat,
+    required double lng,
+    required double radius,
+    int alarmType = 2,
+  }) async {
+    final idx = _mockGeofences.indexWhere((f) => f['id'] == fenceId);
+    if (idx != -1) {
+      _mockGeofences[idx] = {
+        'id': fenceId,
+        'name': name,
+        'lat': lat,
+        'lng': lng,
+        'radius': radius.round(),
+        'alarmType': alarmType,
+        'status': _mockGeofences[idx]['status'] ?? 1,
+      };
+    }
+    return RemoteCommandResult(
+      success: true,
+      opcode: 'GEOFENCE',
+      code: '0000',
+      message: 'Geofence updated',
+    );
+  }
+
+  @override
+  Future<bool> updateGeofenceStatus(String id, int status) async {
+    final idx = _mockGeofences.indexWhere((f) => f['id'] == id);
+    if (idx != -1) {
+      _mockGeofences[idx]['status'] = status;
+    }
+    return true;
+  }
+
+  @override
+  Future<bool> deleteGeofence(String id) async {
+    _mockGeofences.removeWhere((f) => f['id'] == id);
+    return true;
   }
 
   @override
@@ -175,8 +392,12 @@ class LiveCarLinkoRepository implements VehicleRepository {
   VehicleConnectionStatus _status = VehicleConnectionStatus.disconnected;
   String? _vehicleId;
   String? _deviceSn;
+  String? _vin;
+  String? _userId;
   String? _account;
   bool _isPreActivation = false;
+  String? _lastLocateStatus;
+  VehicleCapabilities _capabilities = VehicleCapabilities.defaults();
 
   LiveCarLinkoRepository({String region = 'sea', CarLinkoClient? client})
       : _client = client ?? CarLinkoClient(region: region),
@@ -184,9 +405,20 @@ class LiveCarLinkoRepository implements VehicleRepository {
 
   CarLinkoClient get client => _client;
   @override
+  VehicleCapabilities get vehicleCapabilities => _capabilities;
+  @override
   String? get vehicleId => _vehicleId;
+  @override
+  String? get vin => _vin;
+  @override
+  String? get userId => _userId;
+  @override
+  String? get deviceSn => _deviceSn;
   String? get account => _account;
   bool get isPreActivation => _isPreActivation;
+
+  @override
+  String? get lastLocateStatus => _lastLocateStatus;
 
   @override
   Stream<VehicleTelemetry> get telemetryStream => _controller.stream;
@@ -239,9 +471,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
         );
         _controller.add(_current);
       } else {
-        _isPreActivation = false;
-        _vehicleId = vehicles.first['vehicleId']?.toString();
-        _deviceSn = _extractDeviceSn(vehicles.first);
+        _bindVehicleRow(vehicles.first);
         _status = VehicleConnectionStatus.connected;
         await refresh();
       }
@@ -257,6 +487,18 @@ class LiveCarLinkoRepository implements VehicleRepository {
       }
       rethrow;
     }
+  }
+
+  void _bindVehicleRow(Map<String, dynamic> row) {
+    _vehicleId = row['vehicleId']?.toString();
+    _deviceSn = _extractDeviceSn(row);
+    _vin = row['vin']?.toString() ?? row['carVin']?.toString() ?? row['vinNo']?.toString();
+    if (row['userId'] != null) {
+      _userId ??= row['userId']?.toString();
+    }
+    _capabilities = VehicleCapabilities.fromVehicleMap(row);
+    _isPreActivation = false;
+    unawaited(_ensureUserId());
   }
 
   Future<void> _persistSession() async {
@@ -277,7 +519,70 @@ class LiveCarLinkoRepository implements VehicleRepository {
       } else {
         await prefs.remove(_kCarLinkoDeviceSnKey);
       }
+      if (_vin != null) {
+        await prefs.setString('tm_carlinko_vin', _vin!);
+      } else {
+        await prefs.remove('tm_carlinko_vin');
+      }
+      if (_userId != null) {
+        await prefs.setString('tm_carlinko_user_id', _userId!);
+      } else {
+        await prefs.remove('tm_carlinko_user_id');
+      }
     } catch (_) {}
+  }
+
+  Future<String?> _ensureUserId() async {
+    if (_userId != null && _userId!.isNotEmpty) return _userId;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getString('tm_carlinko_user_id');
+      if (cached != null && cached.isNotEmpty) {
+        _userId = cached;
+        return _userId;
+      }
+    } catch (_) {}
+    Map<String, dynamic>? info;
+    try {
+      info = await _client.getUserInfo();
+    } on CarLinkoAuthException {
+      if (await _tryAutoReauth()) {
+        try {
+          info = await _client.getUserInfo();
+        } catch (_) {}
+      }
+    } on CarLinkoException catch (e) {
+      if (e.code != null && carLinkoStaleTokenCodes.contains(e.code) && await _tryAutoReauth()) {
+        try {
+          info = await _client.getUserInfo();
+        } catch (_) {}
+      }
+    } catch (_) {}
+    final id = info?['id']?.toString();
+    if (id != null && id.isNotEmpty) {
+      _userId = id;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('tm_carlinko_user_id', id);
+      } catch (_) {}
+    }
+    return _userId;
+  }
+
+  Future<bool> _tryAutoReauth() async {
+    try {
+      final savedAccount = await _secureStorage.read(key: _kCarLinkoSavedPasswordAccountKey);
+      final savedPassword = await _secureStorage.read(key: _kCarLinkoSavedPasswordKey);
+      final accountToUse = (_account != null && _account!.isNotEmpty) ? _account! : savedAccount;
+      if (accountToUse != null && savedPassword != null && accountToUse.isNotEmpty && savedPassword.isNotEmpty) {
+        debugPrint('Auto-reauthenticating CarLinko session for account $accountToUse...');
+        await connect(account: accountToUse, password: savedPassword, region: _client.region);
+        return true;
+      }
+    } catch (e) {
+      debugPrint('Auto-reauth failed: $e');
+    }
+    return false;
   }
 
   Future<void> _clearPersistedSession() async {
@@ -287,6 +592,8 @@ class LiveCarLinkoRepository implements VehicleRepository {
       await prefs.remove(_kCarLinkoRegionKey);
       await prefs.remove(_kCarLinkoVehicleIdKey);
       await prefs.remove(_kCarLinkoDeviceSnKey);
+      await prefs.remove('tm_carlinko_user_id');
+      _userId = null;
       // Keep the account name saved so the connect dialog can still
       // pre-fill it; only the token/session itself is invalidated.
     } catch (_) {}
@@ -312,11 +619,17 @@ class LiveCarLinkoRepository implements VehicleRepository {
 
       final savedVehicleId = prefs.getString(_kCarLinkoVehicleIdKey);
       final savedDeviceSn = prefs.getString(_kCarLinkoDeviceSnKey);
+      _vin ??= prefs.getString('tm_carlinko_vin');
+      _userId ??= prefs.getString('tm_carlinko_user_id');
       List<Map<String, dynamic>> vehicles = [];
       try {
         vehicles = await _client.getVehicles();
       } catch (e) {
         if (e is CarLinkoAuthException) {
+          final reauthed = await _tryAutoReauth();
+          if (reauthed) {
+            return true;
+          }
           // Saved token is no longer valid — clear it so the user gets a
           // normal login prompt instead of silently failing forever.
           _client.token = null;
@@ -351,9 +664,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
         );
         _controller.add(_current);
       } else {
-        _isPreActivation = false;
-        _vehicleId = vehicles.first['vehicleId']?.toString();
-        _deviceSn = _extractDeviceSn(vehicles.first);
+        _bindVehicleRow(vehicles.first);
         _status = VehicleConnectionStatus.connected;
         await refresh();
       }
@@ -383,9 +694,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
         try {
           final vehicles = await _client.getVehicles();
           if (vehicles.isNotEmpty) {
-            _vehicleId = vehicles.first['vehicleId']?.toString();
-            _deviceSn = _extractDeviceSn(vehicles.first);
-            _isPreActivation = false;
+            _bindVehicleRow(vehicles.first);
             final state = await _client.getVehicleState(_vehicleId!);
             _logRawTelemetryBlob(state);
             _current = VehicleTelemetry.fromBlobMap(state, isSimulated: false);
@@ -421,6 +730,10 @@ class LiveCarLinkoRepository implements VehicleRepository {
       unawaited(VehicleAlertNotifier.checkAndNotify(_current));
     } catch (e) {
       if (e is CarLinkoAuthException) {
+        final reauthed = await _tryAutoReauth();
+        if (reauthed) {
+          return;
+        }
         _status = VehicleConnectionStatus.authRequired;
         await _clearPersistedSession();
       } else {
@@ -447,6 +760,9 @@ class LiveCarLinkoRepository implements VehicleRepository {
       if (deviceSn != null) {
         try {
           final loc = await _client.locateDevice(deviceSn, vehicleId: _vehicleId);
+          if (loc['errorCode'] != null) {
+            _lastLocateStatus = 'Chery Cloud [${loc['errorCode']}]: ${loc['errorMessage'] ?? 'Locate query failed'}';
+          }
           double? parseCoord(dynamic val) {
             if (val == null) return null;
             if (val is num) return val.toDouble();
@@ -468,6 +784,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
           address = (loc['address'] as String?)?.trim() ?? (loc['locationName'] as String?)?.trim();
         } catch (e) {
           debugPrint('CarLinko locateDevice failed: $e');
+          _lastLocateStatus = 'Locate error: $e';
         }
       }
 
@@ -475,6 +792,7 @@ class LiveCarLinkoRepository implements VehicleRepository {
         if (address == null || address.isEmpty) {
           address = await ReverseGeocoder.lookup(lat, lng);
         }
+        _lastLocateStatus = 'Vehicle GPS locked (${address ?? "$lat, $lng"})';
         _current = _current.copyWith(
           latitude: lat,
           longitude: lng,
@@ -484,17 +802,13 @@ class LiveCarLinkoRepository implements VehicleRepository {
         return;
       }
 
-      var fallback = await PhoneParkingLocationService.loadLast();
-      if (fallback == null || fallback.latitude == 0.0) {
-        await PhoneParkingLocationService.captureNow();
-        fallback = await PhoneParkingLocationService.loadLast();
-      }
-
-      if (fallback != null && fallback.latitude != 0.0) {
+      // CRITICAL: NEVER overwrite vehicle telemetry with phone parking coordinates!
+      // The vehicle's telemetry must strictly represent the car's state.
+      // If Chery T-Box has not reported GPS coordinates (e.g. offline, asleep, or underground),
+      // we maintain the telemetry's honesty and mark status accordingly.
+      if (_current.latitude == 0.0 && (_current.locationName.isEmpty || _current.locationName == 'Pending Car Bind')) {
         _current = _current.copyWith(
-          latitude: fallback.latitude,
-          longitude: fallback.longitude,
-          locationName: fallback.address ?? _current.locationName,
+          locationName: 'Vehicle GPS Signal Pending',
         );
         _controller.add(_current);
       }
@@ -510,6 +824,17 @@ class LiveCarLinkoRepository implements VehicleRepository {
   void _logRawTelemetryBlob(Map<String, dynamic> state) {
     debugPrint('CarLinko raw blob: ${state['rawHex']}');
     debugPrint('CarLinko decoded fields: $state');
+    final raw = state['rawHex']?.toString();
+    if (raw != null && raw.isNotEmpty) {
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setString('tm_last_raw_hex', raw);
+      }).catchError((_) {});
+    }
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getOperatingRecord() async {
+    return _client.getOperatingRecord(vehicleId: _vehicleId, vin: _vin);
   }
 
   @override
@@ -553,72 +878,529 @@ class LiveCarLinkoRepository implements VehicleRepository {
     bool sendWakeupHandshake = true,
     bool send0x23Init = false,
   }) async {
+    final ble = CarLinkoBleController();
+    bool bleDispatched = false;
+
+    // Optional proximity actuation if BLE is active
+    if (ble.isConnected) {
+      final bleOpcode = CarLinkoBleOpcodes.fromCloudOpcode(command);
+      if (bleOpcode != null) {
+        debugPrint('Dual-Link BLE: Dispatching proximity opcode $bleOpcode over Nordic UART');
+        bleDispatched = await ble.sendCommand(bleOpcode);
+      }
+    }
+
     if (_vehicleId == null || _deviceSn == null) {
       debugPrint('CarLinko remoteControl "$command" skipped: no vehicle/deviceSn bound');
       return RemoteCommandResult(
-        success: false,
+        success: bleDispatched,
         opcode: command,
-        code: 'NO_BIND',
-        message: 'No vehicle or device serial number bound',
+        code: bleDispatched ? 'BLE_OK' : 'NO_BIND',
+        message: bleDispatched
+            ? 'Command executed via Direct BLE (<50ms proximity)'
+            : 'No vehicle or device serial number bound',
       );
     }
+    RemoteCommandResult buildCloudResult(
+      String usedOpcode,
+      Map<String, dynamic> res, {
+      required int latencyMs,
+      String? note,
+    }) {
+      final ackStatus = res['ackStatus']?.toString();
+      final retried7801 = res['retriedWith7801'] == true;
+      final applied = res['applied'] != false;
+
+      if (applied) {
+        // Schedule a background telemetry refresh ~1.8s after T-Box confirmation so UI reflects hardware state.
+        unawaited(
+          Future.delayed(const Duration(milliseconds: 1800), () async {
+            try {
+              await refresh();
+            } catch (_) {}
+          }),
+        );
+      }
+
+      final success = applied || bleDispatched;
+      final code = applied ? (ackStatus != null ? 'ACK_$ackStatus' : '0000') : 'ACK_${ackStatus ?? 'REJECTED'}';
+      final rawEcho = res['echo']?.toString() ?? '<null>';
+      final refusalDesc = CarLinkoClient.refusalReason(ackStatus);
+      final rawTag = ' (raw: $rawEcho)';
+      final ackTag = ackStatus != null ? ' (ack $ackStatus)$rawTag' : rawTag;
+      final msg = applied
+          ? (bleDispatched
+              ? 'Executed via Direct BLE & Applied on T-Box$ackTag'
+              : '${note ?? 'Command applied by T-Box via 4G'}$ackTag')
+          : (bleDispatched
+              ? 'Executed via Direct BLE (<50ms proximity) • 4G T-Box returned $ackStatus$rawTag'
+              : 'T-Box returned status $ackStatus${refusalDesc != null ? ' ($refusalDesc)' : ' (car did not apply command)'}$rawTag');
+
+      return RemoteCommandResult(
+        success: success,
+        opcode: usedOpcode,
+        code: code,
+        ackStatus: ackStatus,
+        retriedWith7801: false,
+        message: msg,
+        rawData: res,
+        latencyMs: latencyMs,
+      );
+    }
+
+    final uid = command.toUpperCase().startsWith('74') ? await _ensureUserId() : _userId;
     final sw = Stopwatch()..start();
     try {
       final res = await _client.sendRemoteControl(
         vehicleId: _vehicleId!,
         deviceSn: _deviceSn!,
         opcode: command,
+        vin: _vin,
+        userId: uid,
         sendWakeupHandshake: sendWakeupHandshake,
         send0x23Init: send0x23Init,
       );
       sw.stop();
-      return RemoteCommandResult(
-        success: true,
-        opcode: command,
-        code: '0000',
-        message: 'Command accepted by T-Box',
-        rawData: res,
-        latencyMs: sw.elapsedMilliseconds,
-      );
+      return buildCloudResult(command, res, latencyMs: sw.elapsedMilliseconds);
     } on CarLinkoException catch (e) {
       sw.stop();
       debugPrint('CarLinko remoteControl "$command" failed: ${e.code} - ${e.message}');
+
+      // If cellular asleep (50043) but BLE succeeded, return success via BLE
+      if (e.code == '50043' && bleDispatched) {
+        return RemoteCommandResult(
+          success: true,
+          opcode: command,
+          code: 'BLE_OK',
+          message: 'Executed via Direct BLE (<50ms proximity) • (Vehicle 4G modem asleep)',
+          latencyMs: sw.elapsedMilliseconds,
+        );
+      }
+
+      // If cellular asleep (50043), trigger background BLE auto-discovery & retry with 0x77 wakeup frame
+      if (e.code == '50043') {
+        unawaited(ble.startScan(timeoutSeconds: 8));
+        if (!sendWakeupHandshake && _vehicleId != null && _deviceSn != null) {
+          debugPrint('Modem asleep (50043). Retrying with official 0x77 wakeup handshake...');
+          try {
+            final resRetry = await _client.sendRemoteControl(
+              vehicleId: _vehicleId!,
+              deviceSn: _deviceSn!,
+              opcode: command,
+              vin: _vin,
+              userId: uid,
+              sendWakeupHandshake: true,
+              send0x23Init: false,
+            );
+            return buildCloudResult(
+              command,
+              resRetry,
+              latencyMs: sw.elapsedMilliseconds,
+              note: 'Command succeeded via 4G after official 77 wakeup handshake',
+            );
+          } catch (retryErr) {
+            debugPrint('Wakeup handshake retry also failed: $retryErr');
+          }
+        }
+      }
+
+      // 1. If auth/token issue, attempt auto-reauth once and retry command
+      if (e is CarLinkoAuthException || (e.code != null && carLinkoStaleTokenCodes.contains(e.code))) {
+        debugPrint('Detected stale token during command execution. Attempting auto-reauth...');
+        final reauthed = await _tryAutoReauth();
+        if (reauthed && _vehicleId != null && _deviceSn != null) {
+          try {
+            final resRetry = await _client.sendRemoteControl(
+              vehicleId: _vehicleId!,
+              deviceSn: _deviceSn!,
+              opcode: command,
+              vin: _vin,
+              userId: await _ensureUserId(),
+              sendWakeupHandshake: sendWakeupHandshake,
+              send0x23Init: send0x23Init,
+            );
+            return buildCloudResult(
+              command,
+              resRetry,
+              latencyMs: sw.elapsedMilliseconds,
+              note: 'Command succeeded after auto-relogin',
+            );
+          } catch (retryErr) {
+            debugPrint('Command retry after auto-reauth failed: $retryErr');
+          }
+        }
+      }
+
+      // 2. Alternative opcode for A/C off (if primary opcode rejected)
       if (command == CarLinkoOpcodes.acOff) {
         try {
           final resAlt = await _client.sendRemoteControl(
             vehicleId: _vehicleId!,
             deviceSn: _deviceSn!,
             opcode: CarLinkoOpcodes.acOffAlt,
-            sendWakeupHandshake: sendWakeupHandshake,
-            send0x23Init: send0x23Init,
+            vin: _vin,
+            userId: uid,
+            sendWakeupHandshake: false,
+            send0x23Init: false,
           );
-          return RemoteCommandResult(
-            success: true,
-            opcode: CarLinkoOpcodes.acOffAlt,
-            code: '0000',
-            message: 'A/C off executed with alternative opcode',
-            rawData: resAlt,
+          return buildCloudResult(
+            CarLinkoOpcodes.acOffAlt,
+            resAlt,
             latencyMs: sw.elapsedMilliseconds,
+            note: 'A/C off executed with alternative opcode',
           );
         } catch (_) {}
       }
+
+      // 3. Alternative opcode for Trunk open (if primary opcode rejected)
+      if (command == CarLinkoOpcodes.trunkOpen) {
+        try {
+          final resAlt = await _client.sendRemoteControl(
+            vehicleId: _vehicleId!,
+            deviceSn: _deviceSn!,
+            opcode: CarLinkoOpcodes.trunkOpenAlt,
+            vin: _vin,
+            userId: uid,
+            sendWakeupHandshake: false,
+            send0x23Init: false,
+          );
+          return buildCloudResult(
+            CarLinkoOpcodes.trunkOpenAlt,
+            resAlt,
+            latencyMs: sw.elapsedMilliseconds,
+            note: 'Trunk open executed with alternative opcode',
+          );
+        } catch (_) {}
+      }
+
       return RemoteCommandResult(
-        success: false,
+        success: bleDispatched,
         opcode: command,
-        code: e.code,
-        message: e.message,
+        code: bleDispatched ? 'BLE_OK' : e.code,
+        message: bleDispatched ? 'Executed via Direct BLE (<50ms proximity)' : e.message,
         latencyMs: sw.elapsedMilliseconds,
       );
     } catch (e) {
       sw.stop();
       debugPrint('CarLinko remoteControl "$command" error: $e');
       return RemoteCommandResult(
-        success: false,
+        success: bleDispatched,
         opcode: command,
-        code: 'ERROR',
-        message: e.toString(),
+        code: bleDispatched ? 'BLE_OK' : 'ERROR',
+        message: bleDispatched ? 'Executed via Direct BLE (<50ms proximity)' : e.toString(),
         latencyMs: sw.elapsedMilliseconds,
       );
+    }
+  }
+
+  @override
+  Future<bool> setTargetSoc(int targetSoc) async {
+    if (_vehicleId == null) return false;
+    try {
+      return await _client.setTargetSoc(_vehicleId!, targetSoc, deviceSn: _deviceSn);
+    } catch (e) {
+      debugPrint('LiveCarLinkoRepository setTargetSoc error: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> setAirDuration(int minutes) async {
+    if (_vehicleId == null) return false;
+    try {
+      return await _client.setAirDuration(_vehicleId!, minutes);
+    } catch (e) {
+      debugPrint('LiveCarLinkoRepository setAirDuration error: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> setBatterySchedule(Map<String, dynamic> params) async {
+    if (_vehicleId == null) return false;
+    try {
+      return await _client.setBatterySchedule(_vehicleId!, params);
+    } catch (e) {
+      debugPrint('LiveCarLinkoRepository setBatterySchedule error: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getTerminalNoticeConfig() async {
+    if (_vehicleId == null) return {};
+    try {
+      return await _client.getTerminalNoticeConfig(_vehicleId!);
+    } catch (e) {
+      debugPrint('LiveCarLinkoRepository getTerminalNoticeConfig error: $e');
+      return {};
+    }
+  }
+
+  @override
+  Future<bool> setScheduledTravel({
+    required bool enabled,
+    required int hour,
+    required int minute,
+    List<bool>? week,
+  }) async {
+    if (_vehicleId == null) return false;
+    try {
+      return await _client.setScheduledTravel(
+        vehicleId: _vehicleId!,
+        enabled: enabled,
+        hour: hour,
+        minute: minute,
+        week: week,
+      );
+    } catch (e) {
+      debugPrint('LiveCarLinkoRepository setScheduledTravel error: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> setAlertSwitch({required String configName, required bool enabled}) async {
+    if (_vehicleId == null) return false;
+    try {
+      return await _client.setAlertSwitch(
+        vehicleId: _vehicleId!,
+        configName: configName,
+        enabled: enabled,
+      );
+    } catch (e) {
+      debugPrint('LiveCarLinkoRepository setAlertSwitch error: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getCloudNotifications({int page = 1, int size = 20}) async {
+    if (_vehicleId == null) return [];
+    return _client.getCloudNotifications(_vehicleId!, page: page, size: size);
+  }
+
+  @override
+  Future<int> getUnreadNoticeCount() async {
+    if (_vehicleId == null) return 0;
+    return _client.getUnreadNoticeCount(_vehicleId!);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getGeofences() async {
+    final list = <Map<String, dynamic>>[];
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final localJson = prefs.getString('tm_local_geofence');
+      if (localJson != null && localJson.isNotEmpty) {
+        final decoded = json.decode(localJson);
+        if (decoded is Map<String, dynamic>) {
+          list.add(decoded);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error reading local geofence: $e');
+    }
+
+    if (_vehicleId != null) {
+      try {
+        final cloudFences = await _client.getGeofences(_vehicleId!);
+        list.addAll(cloudFences);
+      } catch (e) {
+        debugPrint('LiveCarLinkoRepository getGeofences error: $e');
+      }
+    }
+    return list;
+  }
+
+  @override
+  Future<bool> addGeofence({
+    required String name,
+    required double lat,
+    required double lng,
+    required double radius,
+    int alarmType = 2,
+  }) async {
+    final res = await addGeofenceWithResult(name: name, lat: lat, lng: lng, radius: radius, alarmType: alarmType);
+    return res.success;
+  }
+
+  @override
+  Future<RemoteCommandResult> addGeofenceWithResult({
+    required String name,
+    required double lat,
+    required double lng,
+    required double radius,
+    int alarmType = 2,
+  }) async {
+    if (_vehicleId == null) {
+      return RemoteCommandResult(
+        success: false,
+        opcode: 'GEOFENCE',
+        code: 'NO_BIND',
+        message: 'No vehicle bound',
+      );
+    }
+
+    try {
+      final res = await _client.addGeofence(
+        vehicleId: _vehicleId!,
+        fenceName: name,
+        latitude: lat,
+        longitude: lng,
+        radiusMeters: radius,
+        alarmType: alarmType,
+      );
+      return RemoteCommandResult(
+        success: true,
+        opcode: 'GEOFENCE',
+        code: '0000',
+        message: 'Geofence active on T-Box',
+        rawData: res,
+      );
+    } on CarLinkoException catch (e) {
+      debugPrint('LiveCarLinkoRepository addGeofence error: ${e.code} - ${e.message}');
+      return RemoteCommandResult(
+        success: false,
+        opcode: 'GEOFENCE',
+        code: e.code,
+        message: e.message,
+      );
+    } catch (e) {
+      debugPrint('LiveCarLinkoRepository addGeofence error: $e');
+      return RemoteCommandResult(
+        success: false,
+        opcode: 'GEOFENCE',
+        code: 'ERROR',
+        message: e.toString(),
+      );
+    }
+  }
+
+  @override
+  Future<bool> updateGeofence({
+    required String fenceId,
+    required String name,
+    required double lat,
+    required double lng,
+    required double radius,
+    int alarmType = 2,
+  }) async {
+    final res = await updateGeofenceWithResult(
+      fenceId: fenceId,
+      name: name,
+      lat: lat,
+      lng: lng,
+      radius: radius,
+      alarmType: alarmType,
+    );
+    return res.success;
+  }
+
+  @override
+  Future<RemoteCommandResult> updateGeofenceWithResult({
+    required String fenceId,
+    required String name,
+    required double lat,
+    required double lng,
+    required double radius,
+    int alarmType = 2,
+  }) async {
+    if (_vehicleId == null) {
+      return RemoteCommandResult(
+        success: false,
+        opcode: 'GEOFENCE',
+        code: 'NO_BIND',
+        message: 'No vehicle bound',
+      );
+    }
+
+    try {
+      final res = await _client.updateGeofence(
+        fenceId: fenceId,
+        vehicleId: _vehicleId!,
+        fenceName: name,
+        latitude: lat,
+        longitude: lng,
+        radiusMeters: radius,
+        alarmType: alarmType,
+      );
+      return RemoteCommandResult(
+        success: true,
+        opcode: 'GEOFENCE',
+        code: '0000',
+        message: 'Geofence updated on T-Box',
+        rawData: res,
+      );
+    } on CarLinkoException catch (e) {
+      debugPrint('LiveCarLinkoRepository updateGeofence error: ${e.code} - ${e.message}');
+      return RemoteCommandResult(
+        success: false,
+        opcode: 'GEOFENCE',
+        code: e.code,
+        message: e.message,
+      );
+    } catch (e) {
+      debugPrint('LiveCarLinkoRepository updateGeofence error: $e');
+      return RemoteCommandResult(
+        success: false,
+        opcode: 'GEOFENCE',
+        code: 'ERROR',
+        message: e.toString(),
+      );
+    }
+  }
+
+  @override
+  Future<bool> updateGeofenceStatus(String id, int status) async {
+    if (id == 'local_guard' || id.startsWith('local_')) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final localJson = prefs.getString('tm_local_geofence');
+        if (localJson != null && localJson.isNotEmpty) {
+          final decoded = json.decode(localJson) as Map<String, dynamic>;
+          decoded['status'] = status;
+          await prefs.setString('tm_local_geofence', json.encode(decoded));
+          return true;
+        }
+      } catch (e) {
+        debugPrint('Error updating local geofence status: $e');
+      }
+      return false;
+    }
+
+    if (_vehicleId == null) return false;
+    try {
+      return await _client.updateGeofenceStatus(
+        vehicleId: _vehicleId!,
+        fenceId: id,
+        status: status,
+      );
+    } catch (e) {
+      debugPrint('LiveCarLinkoRepository updateGeofenceStatus error: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> deleteGeofence(String id) async {
+    if (id == 'local_guard' || id.startsWith('local_')) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('tm_local_geofence');
+        await prefs.remove('tm_fence_was_outside');
+        return true;
+      } catch (e) {
+        debugPrint('Error deleting local geofence: $e');
+        return false;
+      }
+    }
+
+    try {
+      return await _client.deleteGeofence(id, vehicleId: _vehicleId);
+    } catch (e) {
+      debugPrint('LiveCarLinkoRepository deleteGeofence error: $e');
+      return false;
     }
   }
 
@@ -685,7 +1467,14 @@ class AppVehicleRepository implements VehicleRepository {
   Stream<VehicleTelemetry> get telemetryStream => _controller.stream;
 
   @override
+  String? get lastLocateStatus => _isLiveActive ? _liveRepo.lastLocateStatus : _mockRepo.lastLocateStatus;
+
+  @override
   VehicleTelemetry get currentTelemetry => _isLiveActive ? _liveRepo.currentTelemetry : _mockRepo.currentTelemetry;
+
+  @override
+  VehicleCapabilities get vehicleCapabilities =>
+      _isLiveActive ? _liveRepo.vehicleCapabilities : _mockRepo.vehicleCapabilities;
 
   @override
   VehicleConnectionStatus get connectionStatus =>
@@ -699,6 +1488,19 @@ class AppVehicleRepository implements VehicleRepository {
       await _mockRepo.refresh();
     }
   }
+
+  @override
+  String? get vin => _isLiveActive ? _liveRepo.vin : _mockRepo.vin;
+
+  @override
+  String? get userId => _isLiveActive ? _liveRepo.userId : _mockRepo.userId;
+
+  @override
+  String? get deviceSn => _isLiveActive ? _liveRepo.deviceSn : _mockRepo.deviceSn;
+
+  @override
+  Future<List<Map<String, dynamic>>> getOperatingRecord() =>
+      _isLiveActive ? _liveRepo.getOperatingRecord() : _mockRepo.getOperatingRecord();
 
   @override
   void toggleCharging(bool charging) {
@@ -736,6 +1538,107 @@ class AppVehicleRepository implements VehicleRepository {
       send0x23Init: send0x23Init,
     );
   }
+
+  @override
+  Future<bool> setTargetSoc(int targetSoc) =>
+      _isLiveActive ? _liveRepo.setTargetSoc(targetSoc) : _mockRepo.setTargetSoc(targetSoc);
+
+  @override
+  Future<bool> setAirDuration(int minutes) =>
+      _isLiveActive ? _liveRepo.setAirDuration(minutes) : _mockRepo.setAirDuration(minutes);
+
+  @override
+  Future<bool> setBatterySchedule(Map<String, dynamic> params) =>
+      _isLiveActive ? _liveRepo.setBatterySchedule(params) : _mockRepo.setBatterySchedule(params);
+
+  @override
+  Future<Map<String, dynamic>> getTerminalNoticeConfig() =>
+      _isLiveActive ? _liveRepo.getTerminalNoticeConfig() : _mockRepo.getTerminalNoticeConfig();
+
+  @override
+  Future<bool> setScheduledTravel({
+    required bool enabled,
+    required int hour,
+    required int minute,
+    List<bool>? week,
+  }) =>
+      _isLiveActive
+          ? _liveRepo.setScheduledTravel(enabled: enabled, hour: hour, minute: minute, week: week)
+          : _mockRepo.setScheduledTravel(enabled: enabled, hour: hour, minute: minute, week: week);
+
+  @override
+  Future<bool> setAlertSwitch({required String configName, required bool enabled}) =>
+      _isLiveActive
+          ? _liveRepo.setAlertSwitch(configName: configName, enabled: enabled)
+          : _mockRepo.setAlertSwitch(configName: configName, enabled: enabled);
+
+  @override
+  Future<List<Map<String, dynamic>>> getCloudNotifications({int page = 1, int size = 20}) =>
+      _isLiveActive
+          ? _liveRepo.getCloudNotifications(page: page, size: size)
+          : _mockRepo.getCloudNotifications(page: page, size: size);
+
+  @override
+  Future<int> getUnreadNoticeCount() =>
+      _isLiveActive ? _liveRepo.getUnreadNoticeCount() : _mockRepo.getUnreadNoticeCount();
+
+  @override
+  Future<List<Map<String, dynamic>>> getGeofences() =>
+      _isLiveActive ? _liveRepo.getGeofences() : _mockRepo.getGeofences();
+
+  @override
+  Future<bool> addGeofence({
+    required String name,
+    required double lat,
+    required double lng,
+    required double radius,
+    int alarmType = 2,
+  }) => _isLiveActive
+      ? _liveRepo.addGeofence(name: name, lat: lat, lng: lng, radius: radius, alarmType: alarmType)
+      : _mockRepo.addGeofence(name: name, lat: lat, lng: lng, radius: radius, alarmType: alarmType);
+
+  @override
+  Future<RemoteCommandResult> addGeofenceWithResult({
+    required String name,
+    required double lat,
+    required double lng,
+    required double radius,
+    int alarmType = 2,
+  }) => _isLiveActive
+      ? _liveRepo.addGeofenceWithResult(name: name, lat: lat, lng: lng, radius: radius, alarmType: alarmType)
+      : _mockRepo.addGeofenceWithResult(name: name, lat: lat, lng: lng, radius: radius, alarmType: alarmType);
+
+  @override
+  Future<bool> updateGeofence({
+    required String fenceId,
+    required String name,
+    required double lat,
+    required double lng,
+    required double radius,
+    int alarmType = 2,
+  }) => _isLiveActive
+      ? _liveRepo.updateGeofence(fenceId: fenceId, name: name, lat: lat, lng: lng, radius: radius, alarmType: alarmType)
+      : _mockRepo.updateGeofence(fenceId: fenceId, name: name, lat: lat, lng: lng, radius: radius, alarmType: alarmType);
+
+  @override
+  Future<RemoteCommandResult> updateGeofenceWithResult({
+    required String fenceId,
+    required String name,
+    required double lat,
+    required double lng,
+    required double radius,
+    int alarmType = 2,
+  }) => _isLiveActive
+      ? _liveRepo.updateGeofenceWithResult(fenceId: fenceId, name: name, lat: lat, lng: lng, radius: radius, alarmType: alarmType)
+      : _mockRepo.updateGeofenceWithResult(fenceId: fenceId, name: name, lat: lat, lng: lng, radius: radius, alarmType: alarmType);
+
+  @override
+  Future<bool> updateGeofenceStatus(String id, int status) =>
+      _isLiveActive ? _liveRepo.updateGeofenceStatus(id, status) : _mockRepo.updateGeofenceStatus(id, status);
+
+  @override
+  Future<bool> deleteGeofence(String id) =>
+      _isLiveActive ? _liveRepo.deleteGeofence(id) : _mockRepo.deleteGeofence(id);
 
   /// Restore a previously-saved CarLinko session (if any) so the app
   /// doesn't force a fresh login on every cold start. Returns true if a

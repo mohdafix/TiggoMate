@@ -27,6 +27,10 @@ service cloud.firestore {
       }
     }
 
+    match /vehicles/{vehicleId}/{document=**} {
+      allow read, write: if true;
+    }
+
     match /public/{document=**} {
       allow read: if true;
       allow write: if false;

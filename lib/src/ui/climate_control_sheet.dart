@@ -1,12 +1,16 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../carlinko/vehicle_telemetry.dart';
+import '../carlinko/vehicle_repository.dart';
+import 'apple_design_widgets.dart';
 
 /// Full-featured Climate & Seat Comfort Control Sheet
 /// Ported from official Chery CarLinko CAN-bus and T-Box control protocols.
 class ClimateControlSheet extends StatefulWidget {
   final VehicleTelemetry telemetry;
+  final VehicleRepository? repository;
   final bool initialAcOn;
   final double initialTempC;
   final int initialDurationMin;
@@ -26,6 +30,7 @@ class ClimateControlSheet extends StatefulWidget {
   const ClimateControlSheet({
     super.key,
     required this.telemetry,
+    this.repository,
     required this.initialAcOn,
     required this.initialTempC,
     required this.initialDurationMin,
@@ -35,6 +40,7 @@ class ClimateControlSheet extends StatefulWidget {
   static Future<void> show(
     BuildContext context, {
     required VehicleTelemetry telemetry,
+    VehicleRepository? repository,
     required bool initialAcOn,
     required double initialTempC,
     int initialDurationMin = 10,
@@ -57,6 +63,7 @@ class ClimateControlSheet extends StatefulWidget {
       backgroundColor: Colors.transparent,
       builder: (ctx) => ClimateControlSheet(
         telemetry: telemetry,
+        repository: repository,
         initialAcOn: initialAcOn,
         initialTempC: initialTempC,
         initialDurationMin: initialDurationMin,
@@ -87,11 +94,20 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
   int _seatVentPass = 0;   // 0..3
   bool _steeringHeat = false;
 
+  // Advance Travel (Scheduled Departure / STARTUP_APPOINTMENT)
+  bool _schedTravelEnabled = false;
+  TimeOfDay _schedTravelTime = const TimeOfDay(hour: 8, minute: 0);
+  List<bool> _schedTravelWeek = [false, true, true, true, true, true, false];
+  bool _schedTravelSaving = false;
+
+  double get _minTemp => widget.repository?.vehicleCapabilities.minAcTemp ?? 16.0;
+  double get _maxTemp => widget.repository?.vehicleCapabilities.maxAcTemp ?? 32.0;
+
   @override
   void initState() {
     super.initState();
     _acOn = widget.initialAcOn;
-    _targetTemp = widget.initialTempC.clamp(18.0, 32.0);
+    _targetTemp = widget.initialTempC.clamp(_minTemp, _maxTemp);
     _durationMin = widget.initialDurationMin;
     _rapidCool = widget.telemetry.rapidCool;
     _frontDefrost = widget.telemetry.frontDefrost;
@@ -103,12 +119,65 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
     _seatHeatPass = widget.telemetry.seatHeatPass;
     _seatVentPass = widget.telemetry.seatVentPass;
     _steeringHeat = widget.telemetry.steeringHeat;
+    _loadScheduledTravel();
+  }
+
+  Future<void> _loadScheduledTravel() async {
+    final repo = widget.repository;
+    if (repo == null) return;
+    try {
+      final cfg = await repo.getTerminalNoticeConfig();
+      if (!mounted || cfg.isEmpty) return;
+      final extra = cfg['extraParsed'];
+      setState(() {
+        if (cfg.containsKey('startupAppointment')) {
+          _schedTravelEnabled = cfg['startupAppointment'] == true;
+        }
+        if (extra is Map<String, dynamic>) {
+          final h = int.tryParse(extra['hour']?.toString() ?? '') ?? _schedTravelTime.hour;
+          final m = int.tryParse(extra['minute']?.toString() ?? '') ?? _schedTravelTime.minute;
+          _schedTravelTime = TimeOfDay(hour: h.clamp(0, 23), minute: m.clamp(0, 59));
+          final wk = extra['week'];
+          if (wk is List && wk.length == 7) {
+            _schedTravelWeek = wk.map((e) => e == true || e == 1).toList();
+          }
+        }
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _saveScheduledTravel({bool? overrideEnabled}) async {
+    final repo = widget.repository;
+    if (repo == null) return;
+    final nextEnabled = overrideEnabled ?? _schedTravelEnabled;
+    setState(() {
+      _schedTravelEnabled = nextEnabled;
+      _schedTravelSaving = true;
+    });
+    final ok = await repo.setScheduledTravel(
+      enabled: nextEnabled,
+      hour: _schedTravelTime.hour,
+      minute: _schedTravelTime.minute,
+      week: _schedTravelWeek,
+    );
+    if (!mounted) return;
+    setState(() => _schedTravelSaving = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok
+              ? '🗓️ Scheduled Travel ${nextEnabled ? 'enabled for ${_schedTravelTime.format(context)}' : 'disabled'}'
+              : '⚠️ Failed to update Scheduled Travel on CarLinko cloud',
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   void _adjustTemp(double delta) {
     HapticFeedback.selectionClick();
     setState(() {
-      _targetTemp = (_targetTemp + delta).clamp(18.0, 32.0);
+      _targetTemp = (_targetTemp + delta).clamp(_minTemp, _maxTemp);
       _rapidCool = false;
       _quickWarm = false;
     });
@@ -181,34 +250,54 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
     final colors = AppColors(context);
     final isDark = colors.isDark;
 
-    return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.90,
-      ),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF12141A) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        border: Border.all(
-          color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Drag Handle
-          const SizedBox(height: 12),
-          Center(
-            child: Container(
-              width: 38,
-              height: 4,
-              decoration: BoxDecoration(
-                color: isDark ? Colors.white24 : Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.90,
+          ),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xE611151F) : const Color(0xF2FFFFFF),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border(
+              top: BorderSide(
+                color: isDark ? const Color(0x33FFFFFF) : const Color(0x80FFFFFF),
+                width: 1.2,
+              ),
+              left: BorderSide(
+                color: isDark ? const Color(0x1AFFFFFF) : const Color(0x1F000000),
+                width: 0.8,
+              ),
+              right: BorderSide(
+                color: isDark ? const Color(0x1AFFFFFF) : const Color(0x1F000000),
+                width: 0.8,
               ),
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.12),
+                blurRadius: 32,
+                offset: const Offset(0, -8),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Apple Pull Handle Pill
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4.5,
+                  margin: const EdgeInsets.only(top: 10, bottom: 10),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0x4DFFFFFF) : const Color(0x33000000),
+                    borderRadius: BorderRadius.circular(2.5),
+                  ),
+                ),
+              ),
 
           // Header Bar
           Padding(
@@ -253,19 +342,20 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                   ],
                 ),
                 // Master Power Pill
-                InkWell(
+                ApplePressable(
                   onTap: () {
                     HapticFeedback.mediumImpact();
                     setState(() => _acOn = !_acOn);
                   },
-                  borderRadius: BorderRadius.circular(6),
+                  pressedScale: 0.93,
+                  enableHaptics: true,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: _acOn
                           ? const Color(0xFFD2F835).withValues(alpha: 0.2)
                           : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06)),
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: _acOn ? const Color(0xFFD2F835) : colors.border,
                       ),
@@ -329,7 +419,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                           // Minus 0.5°C
                           _buildTempStepButton(
                             icon: Icons.remove,
-                            enabled: _targetTemp > 18.0,
+                            enabled: _targetTemp > _minTemp,
                             onTap: () => _adjustTemp(-0.5),
                             colors: colors,
                           ),
@@ -371,9 +461,9 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                               Text(
                                 !_acOn
                                     ? 'Climate is off -- turn on to apply'
-                                    : (_targetTemp <= 18.0
+                                    : (_targetTemp <= _minTemp
                                         ? 'MAX COOL (LO)'
-                                        : (_targetTemp >= 32.0 ? 'MAX HEAT (HI)' : 'Normal Dual-Zone Climate')),
+                                        : (_targetTemp >= _maxTemp ? 'MAX HEAT (HI)' : 'Normal Dual-Zone Climate')),
                                 style: TextStyle(
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.bold,
@@ -387,7 +477,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                           // Plus 0.5°C
                           _buildTempStepButton(
                             icon: Icons.add,
-                            enabled: _targetTemp < 32.0,
+                            enabled: _targetTemp < _maxTemp,
                             onTap: () => _adjustTemp(0.5),
                             colors: colors,
                           ),
@@ -402,23 +492,23 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                           final isSelected = (_targetTemp - t).abs() < 0.2;
                           return Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: InkWell(
+                            child: ApplePressable(
                               onTap: () {
-                                HapticFeedback.selectionClick();
                                 setState(() {
                                   _targetTemp = t;
                                   _rapidCool = false;
                                   _quickWarm = false;
                                 });
                               },
-                              borderRadius: BorderRadius.circular(6),
+                              pressedScale: 0.92,
+                              enableHaptics: true,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
                                   color: isSelected
                                       ? const Color(0xFFD2F835)
                                       : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.04)),
-                                  borderRadius: BorderRadius.circular(6),
+                                  borderRadius: BorderRadius.circular(8),
                                   border: Border.all(
                                     color: isSelected ? const Color(0xFFD2F835) : Colors.transparent,
                                   ),
@@ -551,12 +641,10 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                             final isSel = _durationMin == m;
                             return Padding(
                               padding: const EdgeInsets.only(left: 3),
-                              child: InkWell(
-                                onTap: () {
-                                  HapticFeedback.selectionClick();
-                                  setState(() => _durationMin = m);
-                                },
-                                borderRadius: BorderRadius.circular(6),
+                              child: ApplePressable(
+                                onTap: () => setState(() => _durationMin = m),
+                                pressedScale: 0.92,
+                                enableHaptics: true,
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3.5),
                                   decoration: BoxDecoration(
@@ -619,12 +707,10 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                           return Expanded(
                             child: Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 2),
-                              child: InkWell(
-                                onTap: () {
-                                  HapticFeedback.selectionClick();
-                                  setState(() => _fanGear = i);
-                                },
-                                borderRadius: BorderRadius.circular(6),
+                              child: ApplePressable(
+                                onTap: () => setState(() => _fanGear = i),
+                                pressedScale: 0.92,
+                                enableHaptics: true,
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(vertical: 6),
                                   decoration: BoxDecoration(
@@ -770,6 +856,11 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                 ),
                 const SizedBox(height: 14),
 
+                if (widget.repository != null) ...[
+                  _buildScheduledTravelCard(colors, isDark),
+                  const SizedBox(height: 12),
+                ],
+
                 // 7. CAN-bus Pre-conditions Status Pill
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -799,31 +890,46 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
           Container(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF12141A) : Colors.white,
-              border: Border(top: BorderSide(color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0))),
+              color: isDark ? const Color(0xE611151F) : Colors.white.withValues(alpha: 0.9),
+              border: Border(top: BorderSide(color: isDark ? const Color(0x33FFFFFF) : const Color(0x1F000000))),
             ),
             child: SizedBox(
               width: double.infinity,
               height: 48,
-              child: ElevatedButton.icon(
-                onPressed: _applyChanges,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD2F835),
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  elevation: 0,
-                ),
-                icon: const Icon(Icons.send_rounded, size: 16, color: Colors.black),
-                label: Text(
-                  _acOn
-                      ? 'TURN ON CLIMATE (${_targetTemp.toStringAsFixed(1)}°C)'
-                      : 'TURN OFF CLIMATE',
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontWeight: FontWeight.w800,
-                    fontSize: 12.5,
-                    color: Colors.black,
-                    letterSpacing: 0.5,
+              child: ApplePressable(
+                onTap: _applyChanges,
+                pressedScale: 0.97,
+                enableHaptics: true,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD2F835),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFD2F835).withValues(alpha: 0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.send_rounded, size: 16, color: Colors.black),
+                      const SizedBox(width: 8),
+                      Text(
+                        _acOn
+                            ? 'TURN ON CLIMATE (${_targetTemp.toStringAsFixed(1)}°C)'
+                            : 'TURN OFF CLIMATE',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12.5,
+                          color: Colors.black,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -831,7 +937,9 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
           ),
         ],
       ),
-    );
+    ),
+  ),
+);
   }
 
   Widget _buildTempStepButton({
@@ -840,9 +948,10 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
     required VoidCallback onTap,
     required AppColors colors,
   }) {
-    return InkWell(
+    return ApplePressable(
       onTap: enabled ? onTap : null,
-      borderRadius: BorderRadius.circular(16),
+      pressedScale: 0.90,
+      enableHaptics: true,
       child: Container(
         width: 44,
         height: 44,
@@ -873,12 +982,10 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
     required VoidCallback onTap,
   }) {
     return Expanded(
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap();
-        },
-        borderRadius: BorderRadius.circular(14),
+      child: ApplePressable(
+        onTap: onTap,
+        pressedScale: 0.93,
+        enableHaptics: true,
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
@@ -952,12 +1059,10 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                   final isSel = ventLevel == lvl;
                   return Padding(
                     padding: const EdgeInsets.only(left: 3),
-                    child: InkWell(
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        onVentChange(lvl);
-                      },
-                      borderRadius: BorderRadius.circular(6),
+                    child: ApplePressable(
+                      onTap: () => onVentChange(lvl),
+                      pressedScale: 0.90,
+                      enableHaptics: true,
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
                         decoration: BoxDecoration(
@@ -994,12 +1099,10 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                   final isSel = heatLevel == lvl;
                   return Padding(
                     padding: const EdgeInsets.only(left: 3),
-                    child: InkWell(
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        onHeatChange(lvl);
-                      },
-                      borderRadius: BorderRadius.circular(6),
+                    child: ApplePressable(
+                      onTap: () => onHeatChange(lvl),
+                      pressedScale: 0.90,
+                      enableHaptics: true,
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
                         decoration: BoxDecoration(
@@ -1021,6 +1124,148 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                     ),
                   );
                 }),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScheduledTravelCard(AppColors colors, bool isDark) {
+    const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    final timeLabel =
+        '${_schedTravelTime.hour.toString().padLeft(2, '0')}:${_schedTravelTime.minute.toString().padLeft(2, '0')}';
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colors.tileBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _schedTravelEnabled
+              ? const Color(0xFFD2F835).withValues(alpha: 0.45)
+              : colors.border,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.event_repeat_rounded,
+                size: 16,
+                color: _schedTravelEnabled ? const Color(0xFFD2F835) : colors.textMuted,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Advance Travel (Scheduled Departure)',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        color: colors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      'Pre-condition cabin automatically at $timeLabel',
+                      style: TextStyle(fontSize: 10, color: colors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              if (_schedTravelSaving)
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                _buildMiniToggle(
+                  value: _schedTravelEnabled,
+                  activeColor: const Color(0xFFD2F835),
+                  onChanged: (v) => _saveScheduledTravel(overrideEnabled: v),
+                  isDark: isDark,
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () async {
+                  final picked = await showTimePicker(
+                    context: context,
+                    initialTime: _schedTravelTime,
+                  );
+                  if (picked != null && mounted) {
+                    setState(() => _schedTravelTime = picked);
+                    await _saveScheduledTravel();
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: colors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.access_time_rounded, size: 13),
+                      const SizedBox(width: 5),
+                      Text(
+                        timeLabel,
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: colors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: List.generate(7, (idx) {
+                    final active = _schedTravelWeek[idx];
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _schedTravelWeek[idx] = !active;
+                        });
+                        _saveScheduledTravel();
+                      },
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: active
+                              ? const Color(0xFFD2F835)
+                              : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
+                        ),
+                        child: Text(
+                          dayLabels[idx],
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: active ? Colors.black : colors.textMuted,
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
               ),
             ],
           ),

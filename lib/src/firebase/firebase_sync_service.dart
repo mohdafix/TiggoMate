@@ -26,6 +26,12 @@ class FirebaseSyncService {
     }
   }
 
+  /// Vehicle Scope ID for Firestore backup & cross-reinstall recovery (e.g. 'VRT3342')
+  String get vehicleScopeId {
+    final plate = AuthService().currentUser.carPlate.replaceAll(' ', '').toUpperCase();
+    return plate.isNotEmpty ? plate : 'VRT3342';
+  }
+
   /// Active User ID for Firestore collection scoping
   String? get currentUserId {
     try {
@@ -34,7 +40,7 @@ class FirebaseSyncService {
     } catch (_) {}
 
     final authProfile = AuthService().currentUser;
-    if (authProfile.isAuthenticated && !authProfile.isGuest) {
+    if (authProfile.uid.isNotEmpty) {
       return authProfile.uid;
     }
     return null;
@@ -44,6 +50,15 @@ class FirebaseSyncService {
     if (!isFirebaseAvailable) return null;
     try {
       return FirebaseFirestore.instance.collection('users').doc(uid);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  DocumentReference<Map<String, dynamic>>? _vehicleDoc(String vScope) {
+    if (!isFirebaseAvailable) return null;
+    try {
+      return FirebaseFirestore.instance.collection('vehicles').doc(vScope);
     } catch (_) {
       return null;
     }
@@ -125,49 +140,83 @@ class FirebaseSyncService {
 
   /// Push a recorded TripRecord to Firestore
   Future<void> syncTrip(TripRecord trip) async {
+    if (!isFirebaseAvailable) return;
+    final vScope = vehicleScopeId;
     final uid = currentUserId;
-    if (uid == null) return;
+
+    final tripMap = trip.toJson();
+    tripMap['updatedAt'] = FieldValue.serverTimestamp();
+    tripMap['vehicleId'] = vScope;
 
     try {
-      final userRef = _userDoc(uid);
-      if (userRef == null) return;
-
-      final tripMap = trip.toJson();
-      tripMap['updatedAt'] = FieldValue.serverTimestamp();
-
-      await userRef.collection('trips').doc(trip.id).set(
-            tripMap,
-            SetOptions(merge: true),
-          );
-      debugPrint('[FirebaseSync] Trip synced: ${trip.title} (${trip.distanceKm} km)');
+      final vRef = _vehicleDoc(vScope);
+      if (vRef != null) {
+        await vRef.collection('trips').doc(trip.id).set(
+              tripMap,
+              SetOptions(merge: true),
+            );
+        debugPrint('[FirebaseSync] Trip backed up to vehicle cloud ($vScope): ${trip.title} (${trip.distanceKm} km)');
+      }
     } catch (e) {
-      debugPrint('[FirebaseSync] Trip sync error: $e');
+      debugPrint('[FirebaseSync] Vehicle trip sync note: $e');
+    }
+
+    if (uid != null) {
+      try {
+        final userRef = _userDoc(uid);
+        if (userRef != null) {
+          await userRef.collection('trips').doc(trip.id).set(
+                tripMap,
+                SetOptions(merge: true),
+              );
+        }
+      } catch (e) {
+        debugPrint('[FirebaseSync] User trip sync note: $e');
+      }
     }
   }
 
-  /// Fetch all cloud trips
+  /// Fetch all cloud trips (restores from both vehicle cloud and user profile)
   Future<List<TripRecord>> fetchTrips() async {
-    final uid = currentUserId;
-    if (uid == null) return [];
+    if (!isFirebaseAvailable) return [];
+    final vScope = vehicleScopeId;
+    final Map<String, TripRecord> results = {};
 
     try {
-      final userRef = _userDoc(uid);
-      if (userRef == null) return [];
-
-      final query = await userRef.collection('trips').get();
-      final List<TripRecord> results = [];
-      for (final doc in query.docs) {
-        try {
-          results.add(TripRecord.fromJson(doc.data()));
-        } catch (e) {
-          debugPrint('[FirebaseSync] Failed to parse trip doc ${doc.id}: $e');
+      final vRef = _vehicleDoc(vScope);
+      if (vRef != null) {
+        final query = await vRef.collection('trips').get();
+        for (final doc in query.docs) {
+          try {
+            results[doc.id] = TripRecord.fromJson(doc.data());
+          } catch (e) {
+            debugPrint('[FirebaseSync] Failed to parse vehicle trip ${doc.id}: $e');
+          }
         }
       }
-      return results;
     } catch (e) {
-      debugPrint('[FirebaseSync] Fetch trips error: $e');
-      return [];
+      debugPrint('[FirebaseSync] Fetch vehicle trips note: $e');
     }
+
+    final uid = currentUserId;
+    if (uid != null) {
+      try {
+        final userRef = _userDoc(uid);
+        if (userRef != null) {
+          final query = await userRef.collection('trips').get();
+          for (final doc in query.docs) {
+            try {
+              results[doc.id] = TripRecord.fromJson(doc.data());
+            } catch (_) {}
+          }
+        }
+      } catch (e) {
+        debugPrint('[FirebaseSync] Fetch user trips note: $e');
+      }
+    }
+
+    debugPrint('[FirebaseSync] Total restored trips from cloud: ${results.length}');
+    return results.values.toList();
   }
 
   // =========================================================================
@@ -176,49 +225,82 @@ class FirebaseSyncService {
 
   /// Push logged expense (Petrol / TNB Home AC / Public DC) to Firestore
   Future<void> syncExpense(ExpenseRecord expense) async {
+    if (!isFirebaseAvailable) return;
+    final vScope = vehicleScopeId;
     final uid = currentUserId;
-    if (uid == null) return;
+
+    final expMap = expense.toJson();
+    expMap['updatedAt'] = FieldValue.serverTimestamp();
+    expMap['vehicleId'] = vScope;
 
     try {
-      final userRef = _userDoc(uid);
-      if (userRef == null) return;
-
-      final expMap = expense.toJson();
-      expMap['updatedAt'] = FieldValue.serverTimestamp();
-
-      await userRef.collection('expenses').doc(expense.id).set(
-            expMap,
-            SetOptions(merge: true),
-          );
-      debugPrint('[FirebaseSync] Expense synced: ${expense.title} (RM ${expense.amountRm})');
+      final vRef = _vehicleDoc(vScope);
+      if (vRef != null) {
+        await vRef.collection('expenses').doc(expense.id).set(
+              expMap,
+              SetOptions(merge: true),
+            );
+        debugPrint('[FirebaseSync] Expense backed up to vehicle cloud ($vScope): ${expense.title} (RM ${expense.amountRm})');
+      }
     } catch (e) {
-      debugPrint('[FirebaseSync] Expense sync error: $e');
+      debugPrint('[FirebaseSync] Vehicle expense sync note: $e');
+    }
+
+    if (uid != null) {
+      try {
+        final userRef = _userDoc(uid);
+        if (userRef != null) {
+          await userRef.collection('expenses').doc(expense.id).set(
+                expMap,
+                SetOptions(merge: true),
+              );
+        }
+      } catch (e) {
+        debugPrint('[FirebaseSync] User expense sync note: $e');
+      }
     }
   }
 
-  /// Fetch all logged cloud expenses
+  /// Fetch all logged cloud expenses (restores from both vehicle cloud and user profile)
   Future<List<ExpenseRecord>> fetchExpenses() async {
-    final uid = currentUserId;
-    if (uid == null) return [];
+    if (!isFirebaseAvailable) return [];
+    final vScope = vehicleScopeId;
+    final Map<String, ExpenseRecord> results = {};
 
     try {
-      final userRef = _userDoc(uid);
-      if (userRef == null) return [];
-
-      final query = await userRef.collection('expenses').get();
-      final List<ExpenseRecord> results = [];
-      for (final doc in query.docs) {
-        try {
-          results.add(ExpenseRecord.fromJson(doc.data()));
-        } catch (e) {
-          debugPrint('[FirebaseSync] Failed to parse expense doc ${doc.id}: $e');
+      final vRef = _vehicleDoc(vScope);
+      if (vRef != null) {
+        final query = await vRef.collection('expenses').get();
+        for (final doc in query.docs) {
+          try {
+            results[doc.id] = ExpenseRecord.fromJson(doc.data());
+          } catch (e) {
+            debugPrint('[FirebaseSync] Failed to parse vehicle expense doc ${doc.id}: $e');
+          }
         }
       }
-      return results;
     } catch (e) {
-      debugPrint('[FirebaseSync] Fetch expenses error: $e');
-      return [];
+      debugPrint('[FirebaseSync] Fetch vehicle expenses note: $e');
     }
+
+    final uid = currentUserId;
+    if (uid != null) {
+      try {
+        final userRef = _userDoc(uid);
+        if (userRef != null) {
+          final query = await userRef.collection('expenses').get();
+          for (final doc in query.docs) {
+            try {
+              results[doc.id] = ExpenseRecord.fromJson(doc.data());
+            } catch (_) {}
+          }
+        }
+      } catch (e) {
+        debugPrint('[FirebaseSync] Fetch user expenses note: $e');
+      }
+    }
+
+    return results.values.toList();
   }
 
   // =========================================================================
@@ -227,59 +309,97 @@ class FirebaseSyncService {
 
   /// Sync user vehicle settings to Firestore
   Future<void> syncSettings(AppSettings settings) async {
+    if (!isFirebaseAvailable) return;
+    final vScope = vehicleScopeId;
     final uid = currentUserId;
-    if (uid == null) return;
+
+    final settingsMap = {
+      'ownerName': settings.ownerName,
+      'carPlateNumber': settings.carPlateNumber,
+      'vehicleNickname': settings.vehicleNickname,
+      'vehicleSkinKey': settings.vehicleSkinKey,
+      'tnbTariff': settings.tnbTariff,
+      'fuelPrice': settings.fuelPrice,
+      'carLinkoStatus': settings.carLinkoStatus,
+      'aiModel': settings.aiModel,
+      'aiProvider': settings.aiProvider,
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
 
     try {
-      final userRef = _userDoc(uid);
-      if (userRef == null) return;
-
-      await userRef.collection('settings').doc('vehicle').set({
-        'ownerName': settings.ownerName,
-        'carPlateNumber': settings.carPlateNumber,
-        'vehicleNickname': settings.vehicleNickname,
-        'vehicleSkinKey': settings.vehicleSkinKey,
-        'tnbTariff': settings.tnbTariff,
-        'fuelPrice': settings.fuelPrice,
-        'carLinkoStatus': settings.carLinkoStatus,
-        'aiModel': settings.aiModel,
-        'aiProvider': settings.aiProvider,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      debugPrint('[FirebaseSync] Vehicle settings synced for ${settings.carPlateNumber}');
+      final vRef = _vehicleDoc(vScope);
+      if (vRef != null) {
+        await vRef.collection('settings').doc('vehicle').set(settingsMap, SetOptions(merge: true));
+        debugPrint('[FirebaseSync] Settings backed up to vehicle cloud ($vScope)');
+      }
     } catch (e) {
-      debugPrint('[FirebaseSync] Settings sync error: $e');
+      debugPrint('[FirebaseSync] Vehicle settings sync note: $e');
+    }
+
+    if (uid != null) {
+      try {
+        final userRef = _userDoc(uid);
+        if (userRef != null) {
+          await userRef.collection('settings').doc('vehicle').set(settingsMap, SetOptions(merge: true));
+        }
+      } catch (e) {
+        debugPrint('[FirebaseSync] User settings sync note: $e');
+      }
     }
   }
 
   /// Fetch vehicle settings from Firestore
   Future<AppSettings?> fetchSettings() async {
-    final uid = currentUserId;
-    if (uid == null) return null;
+    if (!isFirebaseAvailable) return null;
+    final vScope = vehicleScopeId;
 
     try {
-      final userRef = _userDoc(uid);
-      if (userRef == null) return null;
-
-      final doc = await userRef.collection('settings').doc('vehicle').get();
-      if (doc.exists && doc.data() != null) {
-        final d = doc.data()!;
-        return AppSettings(
-          ownerName: d['ownerName'] as String? ?? 'Chery Owner',
-          carPlateNumber: d['carPlateNumber'] as String? ?? 'VAG 7777',
-          vehicleNickname: d['vehicleNickname'] as String? ?? 'Chery Tiggo 7 PHEV CSH',
-          aiApiKey: '',
-          aiModel: d['aiModel'] as String? ?? 'gpt-4o-mini',
-          aiHost: 'http://10.0.2.2:8088',
-          aiProvider: d['aiProvider'] as String? ?? 'OpenRouter',
-          carLinkoStatus: d['carLinkoStatus'] as String? ?? 'Unactivated',
-          tnbTariff: (d['tnbTariff'] as num?)?.toDouble() ?? 0.57,
-          fuelPrice: (d['fuelPrice'] as num?)?.toDouble() ?? 2.05,
-          vehicleSkinKey: d['vehicleSkinKey'] as String? ?? 'khaki_white',
-        );
+      final vRef = _vehicleDoc(vScope);
+      if (vRef != null) {
+        final doc = await vRef.collection('settings').doc('vehicle').get();
+        if (doc.exists && doc.data() != null) {
+          final d = doc.data()!;
+          return AppSettings(
+            ownerName: d['ownerName'] as String? ?? 'Chery Owner',
+            carPlateNumber: d['carPlateNumber'] as String? ?? 'VRT 3342',
+            vehicleNickname: d['vehicleNickname'] as String? ?? 'Chery Tiggo 7 PHEV CSH',
+            aiApiKey: '',
+            aiModel: d['aiModel'] as String? ?? 'gpt-4o-mini',
+            aiHost: 'http://10.0.2.2:8088',
+            aiProvider: d['aiProvider'] as String? ?? 'OpenRouter',
+            carLinkoStatus: d['carLinkoStatus'] as String? ?? 'Unactivated',
+            tnbTariff: (d['tnbTariff'] as num?)?.toDouble() ?? 0.57,
+            fuelPrice: (d['fuelPrice'] as num?)?.toDouble() ?? 2.05,
+            vehicleSkinKey: d['vehicleSkinKey'] as String? ?? 'khaki_white',
+          );
+        }
       }
-    } catch (e) {
-      debugPrint('[FirebaseSync] Fetch settings error: $e');
+    } catch (_) {}
+
+    final uid = currentUserId;
+    if (uid != null) {
+      try {
+        final userRef = _userDoc(uid);
+        if (userRef != null) {
+          final doc = await userRef.collection('settings').doc('vehicle').get();
+          if (doc.exists && doc.data() != null) {
+            final d = doc.data()!;
+            return AppSettings(
+              ownerName: d['ownerName'] as String? ?? 'Chery Owner',
+              carPlateNumber: d['carPlateNumber'] as String? ?? 'VRT 3342',
+              vehicleNickname: d['vehicleNickname'] as String? ?? 'Chery Tiggo 7 PHEV CSH',
+              aiApiKey: '',
+              aiModel: d['aiModel'] as String? ?? 'gpt-4o-mini',
+              aiHost: 'http://10.0.2.2:8088',
+              aiProvider: d['aiProvider'] as String? ?? 'OpenRouter',
+              carLinkoStatus: d['carLinkoStatus'] as String? ?? 'Unactivated',
+              tnbTariff: (d['tnbTariff'] as num?)?.toDouble() ?? 0.57,
+              fuelPrice: (d['fuelPrice'] as num?)?.toDouble() ?? 2.05,
+              vehicleSkinKey: d['vehicleSkinKey'] as String? ?? 'khaki_white',
+            );
+          }
+        }
+      } catch (_) {}
     }
     return null;
   }
@@ -379,6 +499,61 @@ class FirebaseSyncService {
       }
     } catch (e) {
       debugPrint('[FirebaseSync] Fetch telemetry snapshot error: $e');
+    }
+    return null;
+  }
+
+  /// Sync dated electricity tariff & fuel price book (vehicles + users dual-write).
+  Future<void> syncPriceBook(Map<String, dynamic> priceBookPayload) async {
+    if (!isFirebaseAvailable) return;
+    final payload = {
+      ...priceBookPayload,
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+    try {
+      final vRef = _vehicleDoc(vehicleScopeId);
+      if (vRef != null) {
+        await vRef.collection('settings').doc('priceBook').set(payload, SetOptions(merge: true));
+      }
+    } catch (e) {
+      debugPrint('[FirebaseSync] Vehicle priceBook sync note: $e');
+    }
+    final uid = currentUserId;
+    if (uid != null) {
+      try {
+        final userRef = _userDoc(uid);
+        if (userRef != null) {
+          await userRef.collection('settings').doc('priceBook').set(payload, SetOptions(merge: true));
+        }
+      } catch (e) {
+        debugPrint('[FirebaseSync] User priceBook sync note: $e');
+      }
+    }
+  }
+
+  /// Fetch dated electricity tariff & fuel price book from Firestore.
+  Future<Map<String, dynamic>?> fetchPriceBook() async {
+    if (!isFirebaseAvailable) return null;
+    try {
+      final vRef = _vehicleDoc(vehicleScopeId);
+      if (vRef != null) {
+        final doc = await vRef.collection('settings').doc('priceBook').get();
+        if (doc.exists && doc.data() != null) {
+          return doc.data();
+        }
+      }
+    } catch (_) {}
+    final uid = currentUserId;
+    if (uid != null) {
+      try {
+        final userRef = _userDoc(uid);
+        if (userRef != null) {
+          final doc = await userRef.collection('settings').doc('priceBook').get();
+          if (doc.exists && doc.data() != null) {
+            return doc.data();
+          }
+        }
+      } catch (_) {}
     }
     return null;
   }

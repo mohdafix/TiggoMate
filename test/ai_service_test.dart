@@ -53,5 +53,19 @@ void main() {
       expect(config.model, 'gpt-4o');
       expect(config.headers['authorization'], 'Bearer sk-proj-xyz123');
     });
+
+    test('routes to Direct OpenAI correctly even when custom host text is left in settings', () {
+      final config = AiConfigResolver.resolve(
+        apiKey: 'sk-proj-xyz123',
+        provider: 'Direct OpenAI',
+        modelInput: 'gpt-5-nano',
+        customHost: 'https://router.kedaimurah.my/v1',
+      );
+
+      expect(config.endpoint, 'https://api.openai.com/v1/chat/completions');
+      expect(config.model, 'gpt-5-nano');
+      expect(config.providerName, 'OpenAI');
+      expect(config.headers['authorization'], 'Bearer sk-proj-xyz123');
+    });
   });
 }

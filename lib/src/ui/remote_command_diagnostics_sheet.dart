@@ -102,6 +102,10 @@ class _RemoteCommandDiagnosticsSheetState extends State<RemoteCommandDiagnostics
     buffer.writeln('--- TiggoMate Remote Opcode Diagnostic Log ---');
     buffer.writeln('Date: ${DateTime.now().toIso8601String()}');
     buffer.writeln('Vehicle ID: ${widget.repository.vehicleId ?? "Unbound"}');
+    buffer.writeln('VIN: ${widget.repository.vin ?? "MISSING"}');
+    buffer.writeln('User ID: ${widget.repository.userId ?? "MISSING"}');
+    buffer.writeln('Device SN: ${widget.repository.deviceSn ?? "MISSING"}');
+    buffer.writeln('77 Wakeup Init: $_sendWakeupHandshake | Legacy 2301: $_send0x23Init');
     buffer.writeln('----------------------------------------------');
     for (final l in _logs) {
       final t = '${l.time.hour.toString().padLeft(2, '0')}:${l.time.minute.toString().padLeft(2, '0')}:${l.time.second.toString().padLeft(2, '0')}.${l.time.millisecond.toString().padLeft(3, '0')}';
@@ -219,27 +223,32 @@ class _RemoteCommandDiagnosticsSheetState extends State<RemoteCommandDiagnostics
                   _OpcodeButton('A/C ON', CarLinkoOpcodes.acOn, colors.evTeal),
                   _OpcodeButton('A/C OFF', CarLinkoOpcodes.acOff, Colors.grey),
                   _OpcodeButton('A/C OFF (Alt)', CarLinkoOpcodes.acOffAlt, Colors.blueGrey),
+                  _OpcodeButton('A/C 22.0°C', CarLinkoOpcodes.acTemperature(22.0), Colors.lightGreenAccent),
                   _OpcodeButton('Quick Cool ON', CarLinkoOpcodes.quickCool, Colors.cyan),
                   _OpcodeButton('Quick Cool OFF', CarLinkoOpcodes.quickCoolOff, Colors.cyan.shade800),
                   _OpcodeButton('Quick Heat ON', CarLinkoOpcodes.quickHeat, Colors.orange),
                   _OpcodeButton('Quick Heat OFF', CarLinkoOpcodes.quickHeatOff, Colors.deepOrange.shade800),
+                  _OpcodeButton('Driver Vent L1', CarLinkoOpcodes.driverSeatVentL1, Colors.lightBlueAccent),
+                  _OpcodeButton('Pass Vent L1', CarLinkoOpcodes.passengerSeatVentL1, Colors.lightBlue),
+                  _OpcodeButton('Driver Heat L1', CarLinkoOpcodes.driverSeatHeatL1, Colors.deepOrangeAccent),
+                  _OpcodeButton('Rear-L Heat L1', CarLinkoOpcodes.rearLeftSeatHeatL1, Colors.orangeAccent),
                   _OpcodeButton('Front Defrost', CarLinkoOpcodes.defogOn, Colors.teal),
                   _OpcodeButton('Air Purifier', CarLinkoOpcodes.airPurifyOn, Colors.tealAccent),
                   _OpcodeButton('Steering Heat', CarLinkoOpcodes.steeringHeatOn, Colors.amber),
+                  _OpcodeButton('Perm / Wake 7801', CarLinkoOpcodes.perm7801, Colors.purpleAccent),
                 ]),
                 const SizedBox(height: 16),
 
                 _buildGroupHeader('Windows & Sunroof', Icons.window_rounded, colors),
                 _buildOpcodeGrid([
-                  _OpcodeButton('Vent 20mm', CarLinkoOpcodes.windowsVent, Colors.lightBlue),
+                  _OpcodeButton('Windows Vent (20mm)', CarLinkoOpcodes.windowsVent, Colors.lightBlue),
                   _OpcodeButton('Windows Open', CarLinkoOpcodes.windowsOpen, Colors.indigo),
                   _OpcodeButton('Windows Close', CarLinkoOpcodes.windowsClose, Colors.blueGrey),
-                  _OpcodeButton('Close Alt 1', '740600', Colors.cyan),
-                  _OpcodeButton('Close Alt 2 (Unvent)', '740E01', Colors.teal),
-                  _OpcodeButton('Close Alt 3', '740501', Colors.blueGrey.shade700),
                   _OpcodeButton('Sunroof Open', CarLinkoOpcodes.sunroofOpen, Colors.amber),
                   _OpcodeButton('Sunroof Tilt', CarLinkoOpcodes.sunroofTilt, Colors.orange),
                   _OpcodeButton('Sunroof Close', CarLinkoOpcodes.sunroofClose, Colors.grey),
+                  _OpcodeButton('Curtain Close (00)', '740F00', Colors.purple),
+                  _OpcodeButton('Curtain Open (01)', '740F01', Colors.purpleAccent),
                 ]),
                 const SizedBox(height: 16),
 
@@ -286,7 +295,7 @@ class _RemoteCommandDiagnosticsSheetState extends State<RemoteCommandDiagnostics
               Icon(Icons.tune_rounded, size: 16, color: colors.evTeal),
               const SizedBox(width: 6),
               Text(
-                'Handshake Configuration',
+                'Handshake & Crypto Configuration',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
@@ -294,6 +303,50 @@ class _RemoteCommandDiagnosticsSheetState extends State<RemoteCommandDiagnostics
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.black26 : const Color(0xFFE2E8F0),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'VIN: ${widget.repository.vin ?? "MISSING"}',
+                      style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: widget.repository.vin != null ? colors.textPrimary : Colors.redAccent),
+                    ),
+                    Text(
+                      'UID: ${widget.repository.userId ?? "MISSING"}',
+                      style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: widget.repository.userId != null ? colors.textPrimary : Colors.redAccent),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'T-Box: ${widget.repository.deviceSn ?? "MISSING"}',
+                      style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: colors.textMuted),
+                    ),
+                    Text(
+                      widget.repository.vin != null && widget.repository.userId != null ? 'AES-128-ECB Active' : 'Cleartext (Missing params)',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: widget.repository.vin != null && widget.repository.userId != null ? colors.evTeal : Colors.orangeAccent,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 6),
           Row(
@@ -308,7 +361,7 @@ class _RemoteCommandDiagnosticsSheetState extends State<RemoteCommandDiagnostics
                       style: TextStyle(fontSize: 12, color: colors.textPrimary),
                     ),
                     Text(
-                      'Official Chery app behavior before commands',
+                      'Official Chery app & j5-ev-dashboard flow: fires 77 + 600ms wake delay',
                       style: TextStyle(fontSize: 10, color: colors.textMuted),
                     ),
                   ],

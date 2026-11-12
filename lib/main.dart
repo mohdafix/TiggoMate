@@ -14,6 +14,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'src/ai/ai_service.dart';
 import 'src/carlinko/vehicle_repository.dart';
+import 'src/carlinko/carlinko_ble_controller.dart';
 import 'src/carlinko/vehicle_skin.dart';
 import 'src/mytnb/mytnb_api.dart';
 
@@ -73,6 +74,7 @@ void main() async {
   unawaited(VehicleAlertNotifier.requestPermission());
 
   unawaited(BluetoothDrivingTrackerService.instance.init());
+  unawaited(CarLinkoBleController().init());
   runApp(const TiggoMateApp());
 }
 
@@ -1002,18 +1004,25 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
         : (kmLeft / 52.7).round().clamp(1, 365);
     final nextServiceInfo = 'Next Scheduled Service: Minor Service (10k) in $kmLeft km / ~$daysLeft days';
 
+    final liveEvKm = telemetry.electricRangeKm > 0 ? telemetry.electricRangeKm : (telemetry.batteryPct * 0.85).round();
+    final liveFuelKm = telemetry.fuelRangeKm;
+    final liveTotalKm = telemetry.totalRangeKm > 0 ? telemetry.totalRangeKm : (liveEvKm + liveFuelKm);
+
     final liveStatus = [
+      'Live Total Combined Range: $liveTotalKm km (EV: $liveEvKm km + Petrol: $liveFuelKm km)',
+      'Traction Battery SoC: ${telemetry.batteryPct}% ($liveEvKm km EV range remaining)',
+      'Fuel Tank: ${telemetry.fuelCapacityPct}% ($liveFuelKm km petrol range, current consumption: ${telemetry.fuelConsumptionL100km > 0 ? "${telemetry.fuelConsumptionL100km.toStringAsFixed(1)} L/100km" : "7.5 L/100km"})',
       'Doors: ${telemetry.doorsOpen ? "OPEN / AJAR" : "All Doors Closed & Secured"}',
       '12V Auxiliary Battery: ${telemetry.volt12 > 0 ? "${telemetry.volt12.toStringAsFixed(2)}V" : "12.82V (Healthy)"}',
-      'Traction Battery SoC: ${telemetry.batteryPct}% (~${(telemetry.batteryPct * 0.85).round()} km EV range)',
-      'Fuel Remaining: ${telemetry.fuelCapacityPct}% (~${telemetry.fuelRangeKm > 0 ? telemetry.fuelRangeKm : 740} km petrol range, ${telemetry.fuelConsumptionL100km > 0 ? "${telemetry.fuelConsumptionL100km.toStringAsFixed(1)} L/100km" : "6.1 L/100km"})',
       'Tyre Pressures (Cold Target 230 kPa): FL ${telemetry.tyreFlPressureKpa.round()} kPa, FR ${telemetry.tyreFrPressureKpa.round()} kPa, RL ${telemetry.tyreRlPressureKpa.round()} kPa, RR ${telemetry.tyreRrPressureKpa.round()} kPa',
       'Cabin Climate / AC: ${telemetry.acOn ? "ON (${telemetry.acTemp}°C)" : "OFF"}',
       'Windows: ${telemetry.windowsOpen ? "Open" : "Closed"}',
       'Sunroof: ${telemetry.sunroofOpen ? "Open" : "Closed"}',
       'Transmission State: ${telemetry.isParked ? "Parked (P)" : "Drive / Moving"}',
-      if (telemetry.locationName.isNotEmpty && telemetry.locationName != 'Pending Car Bind')
-        'Current Location: ${telemetry.locationName} (${telemetry.latitude != 0.0 ? "${telemetry.latitude.toStringAsFixed(5)}, ${telemetry.longitude.toStringAsFixed(5)}" : ""})',
+      if (telemetry.hasLocation && telemetry.locationName.isNotEmpty && telemetry.locationName != 'Pending Car Bind')
+        'Current Vehicle GPS: ${telemetry.locationName} (${telemetry.latitude.toStringAsFixed(5)}, ${telemetry.longitude.toStringAsFixed(5)})'
+      else
+        'Current Vehicle GPS: Pending satellite fix from Chery T-Box',
     ].join('\n- ');
 
     // 1. Direct Cloud AI Call with FULL Live Telematics Grounding
@@ -1053,6 +1062,10 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
 
         Map<String, dynamic>? action;
         String cleanText = aiReply;
+
+        if (cleanText.isEmpty || cleanText.startsWith('No response generated from')) {
+          throw Exception('Empty or unparsed AI response, falling back to grounded telemetry.');
+        }
 
         final actionRegex = RegExp(r'\[ACTION:\s*([a-zA-Z0-9_]+)\s*\|\s*([^|]+)\s*\|\s*([^\]]+)\]');
         final match = actionRegex.firstMatch(aiReply);
