@@ -862,12 +862,15 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     required String failureMessage,
     VoidCallback? onRevert,
   }) async {
+    HapticFeedback.lightImpact();
     final result = await widget.repository.sendRemoteCommandWithResult(command);
     if (!mounted) return;
     if (result.success) {
+      HapticFeedback.mediumImpact();
       final codeTag = (result.code != null && result.code != '0000') ? ' [${result.code}]' : '';
       _showNotification('$successMessage$codeTag • ${result.message ?? "Accepted"} (${result.latencyMs}ms)');
     } else {
+      HapticFeedback.heavyImpact();
       onRevert?.call();
       final errDetail = (result.code != null && result.code!.isNotEmpty)
           ? ' [${result.code}: ${result.message ?? "Error"}]'
@@ -4324,37 +4327,6 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                InkWell(
-                  onTap: () {
-                    RemoteCommandDiagnosticsSheet.show(
-                      context,
-                      repository: widget.repository,
-                    );
-                  },
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.troubleshoot_rounded, size: 13, color: colors.evTeal),
-                        const SizedBox(width: 5),
-                        Text(
-                          'CAN-bus Opcode Diagnostics & Tester',
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
-                            color: colors.evTeal,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                        const SizedBox(width: 3),
-                        Icon(Icons.chevron_right_rounded, size: 14, color: colors.evTeal),
-                      ],
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -4849,11 +4821,17 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     final double battProgress = isBound ? (_telemetry.batteryPct / 100.0).clamp(0.0, 1.0) : 0.0;
     final String evRangeText = isBound ? '${_telemetry.electricRangeKm} km' : '-- km';
     final String totalRangeText = isBound ? '${_telemetry.totalRangeKm} km' : '-- km';
-    final int estimatedFuelPct = isBound
-        ? ((_telemetry.fuelRangeKm / 1020.0) * 100).clamp(0, 100).round()
+    final int displayFuelPct = isBound
+        ? (_telemetry.fuelCapacityPct > 0
+            ? _telemetry.fuelCapacityPct
+            : ((_telemetry.fuelRangeKm / 850.0) * 100).clamp(0, 100).round())
         : 0;
-    final String fuelText = isBound ? '$estimatedFuelPct% Fuel' : '-- % Fuel';
-    final double fuelProgress = isBound ? (_telemetry.fuelRangeKm / 838.0).clamp(0.0, 1.0) : 0.0;
+    final String fuelText = isBound ? '$displayFuelPct% Fuel' : '-- % Fuel';
+    final double fuelProgress = isBound
+        ? (_telemetry.fuelCapacityPct > 0
+            ? (_telemetry.fuelCapacityPct / 100.0).clamp(0.0, 1.0)
+            : (_telemetry.fuelRangeKm / 838.0).clamp(0.0, 1.0))
+        : 0.0;
     final String fuelRangeText = isBound ? '${_telemetry.fuelRangeKm} km' : '-- km';
 
     return Container(
@@ -4953,7 +4931,11 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        isBound && _telemetry.isCharging ? '⚡ 3.3 kW AC' : '18.3 kWh LFP',
+                        isBound && _telemetry.isCharging
+                            ? (_telemetry.chargePowerKw > 0
+                                ? '⚡ ${_telemetry.chargePowerKw.toStringAsFixed(1)} kW'
+                                : '⚡ 3.3 kW AC')
+                            : '19.27 kWh LFP',
                         style: TextStyle(
                           fontSize: 8.5,
                           fontWeight: FontWeight.w600,

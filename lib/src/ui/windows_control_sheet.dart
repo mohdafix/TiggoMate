@@ -77,10 +77,14 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
     required String action,
     required String opcode,
     required String label,
+    VoidCallback? onOptimistic,
+    VoidCallback? onRevert,
     VoidCallback? onSuccess,
   }) async {
     if (_isTransmitting) return;
-    HapticFeedback.mediumImpact();
+    HapticFeedback.lightImpact();
+
+    onOptimistic?.call();
 
     setState(() {
       _isTransmitting = true;
@@ -94,12 +98,15 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
       if (!mounted) return;
 
       if (res.success) {
+        HapticFeedback.mediumImpact();
         setState(() {
           _statusFeedback = '✓ $label executed successfully';
           _lastSuccess = true;
           onSuccess?.call();
         });
       } else {
+        HapticFeedback.heavyImpact();
+        onRevert?.call();
         final errDetail = (res.code != null && res.code!.isNotEmpty)
             ? ' [${res.code}: ${res.message ?? "Error"}]'
             : (res.message != null ? ' (${res.message})' : '');
@@ -110,6 +117,8 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
       }
     } catch (e) {
       if (!mounted) return;
+      HapticFeedback.heavyImpact();
+      onRevert?.call();
       setState(() {
         _statusFeedback = '⚠️ Error sending $label: $e';
         _lastSuccess = false;
@@ -254,15 +263,20 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                   activeColor: const Color(0xFF00E5FF),
                   isSelected: _isVented,
                   isBusy: _isTransmitting && _activeAction == 'win_vent',
-                  onTap: () => _fireCommand(
-                    action: 'win_vent',
-                    opcode: CarLinkoOpcodes.windowsVent,
-                    label: 'Vent (20mm)',
-                    onSuccess: () {
-                      _isVented = true;
-                      widget.onWindowsChanged?.call(true);
-                    },
-                  ),
+                  onTap: () {
+                    final prev = _isVented;
+                    _fireCommand(
+                      action: 'win_vent',
+                      opcode: CarLinkoOpcodes.windowsVent,
+                      label: 'Vent (20mm)',
+                      onOptimistic: () => setState(() => _isVented = true),
+                      onRevert: () => setState(() => _isVented = prev),
+                      onSuccess: () {
+                        _isVented = true;
+                        widget.onWindowsChanged?.call(true);
+                      },
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: 10),
@@ -274,15 +288,20 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                   activeColor: const Color(0xFFFF9F1C),
                   isSelected: false,
                   isBusy: _isTransmitting && _activeAction == 'win_open',
-                  onTap: () => _fireCommand(
-                    action: 'win_open',
-                    opcode: CarLinkoOpcodes.windowsOpen,
-                    label: 'Open Windows',
-                    onSuccess: () {
-                      _isVented = true;
-                      widget.onWindowsChanged?.call(true);
-                    },
-                  ),
+                  onTap: () {
+                    final prev = _isVented;
+                    _fireCommand(
+                      action: 'win_open',
+                      opcode: CarLinkoOpcodes.windowsOpen,
+                      label: 'Open Windows',
+                      onOptimistic: () => setState(() => _isVented = true),
+                      onRevert: () => setState(() => _isVented = prev),
+                      onSuccess: () {
+                        _isVented = true;
+                        widget.onWindowsChanged?.call(true);
+                      },
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: 10),
@@ -294,15 +313,20 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                   activeColor: colors.evTeal,
                   isSelected: !_isVented,
                   isBusy: _isTransmitting && _activeAction == 'win_close',
-                  onTap: () => _fireCommand(
-                    action: 'win_close',
-                    opcode: CarLinkoOpcodes.windowsClose,
-                    label: 'Close Windows',
-                    onSuccess: () {
-                      _isVented = false;
-                      widget.onWindowsChanged?.call(false);
-                    },
-                  ),
+                  onTap: () {
+                    final prev = _isVented;
+                    _fireCommand(
+                      action: 'win_close',
+                      opcode: CarLinkoOpcodes.windowsClose,
+                      label: 'Close Windows',
+                      onOptimistic: () => setState(() => _isVented = false),
+                      onRevert: () => setState(() => _isVented = prev),
+                      onSuccess: () {
+                        _isVented = false;
+                        widget.onWindowsChanged?.call(false);
+                      },
+                    );
+                  },
                 ),
               ),
             ],
@@ -331,16 +355,28 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                   activeColor: Colors.amber,
                   isSelected: _activeSunroofMode == 'open',
                   isBusy: _isTransmitting && _activeAction == 'roof_open',
-                  onTap: () => _fireCommand(
-                    action: 'roof_open',
-                    opcode: CarLinkoOpcodes.sunroofOpen,
-                    label: 'Open Sunroof',
-                    onSuccess: () {
-                      _activeSunroofMode = 'open';
-                      _isSunroofOpen = true;
-                      widget.onSunroofChanged?.call(true);
-                    },
-                  ),
+                  onTap: () {
+                    final prevMode = _activeSunroofMode;
+                    final prevOpen = _isSunroofOpen;
+                    _fireCommand(
+                      action: 'roof_open',
+                      opcode: CarLinkoOpcodes.sunroofOpen,
+                      label: 'Open Sunroof',
+                      onOptimistic: () => setState(() {
+                        _activeSunroofMode = 'open';
+                        _isSunroofOpen = true;
+                      }),
+                      onRevert: () => setState(() {
+                        _activeSunroofMode = prevMode;
+                        _isSunroofOpen = prevOpen;
+                      }),
+                      onSuccess: () {
+                        _activeSunroofMode = 'open';
+                        _isSunroofOpen = true;
+                        widget.onSunroofChanged?.call(true);
+                      },
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: 10),
@@ -352,16 +388,28 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                   activeColor: Colors.amber,
                   isSelected: _activeSunroofMode == 'tilt',
                   isBusy: _isTransmitting && _activeAction == 'roof_tilt',
-                  onTap: () => _fireCommand(
-                    action: 'roof_tilt',
-                    opcode: CarLinkoOpcodes.sunroofTilt,
-                    label: 'Tilt Sunroof',
-                    onSuccess: () {
-                      _activeSunroofMode = 'tilt';
-                      _isSunroofOpen = true;
-                      widget.onSunroofChanged?.call(true);
-                    },
-                  ),
+                  onTap: () {
+                    final prevMode = _activeSunroofMode;
+                    final prevOpen = _isSunroofOpen;
+                    _fireCommand(
+                      action: 'roof_tilt',
+                      opcode: CarLinkoOpcodes.sunroofTilt,
+                      label: 'Tilt Sunroof',
+                      onOptimistic: () => setState(() {
+                        _activeSunroofMode = 'tilt';
+                        _isSunroofOpen = true;
+                      }),
+                      onRevert: () => setState(() {
+                        _activeSunroofMode = prevMode;
+                        _isSunroofOpen = prevOpen;
+                      }),
+                      onSuccess: () {
+                        _activeSunroofMode = 'tilt';
+                        _isSunroofOpen = true;
+                        widget.onSunroofChanged?.call(true);
+                      },
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: 10),
@@ -373,16 +421,28 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                   activeColor: colors.evTeal,
                   isSelected: _activeSunroofMode == 'closed',
                   isBusy: _isTransmitting && _activeAction == 'roof_close',
-                  onTap: () => _fireCommand(
-                    action: 'roof_close',
-                    opcode: CarLinkoOpcodes.sunroofClose,
-                    label: 'Close Sunroof',
-                    onSuccess: () {
-                      _activeSunroofMode = 'closed';
-                      _isSunroofOpen = false;
-                      widget.onSunroofChanged?.call(false);
-                    },
-                  ),
+                  onTap: () {
+                    final prevMode = _activeSunroofMode;
+                    final prevOpen = _isSunroofOpen;
+                    _fireCommand(
+                      action: 'roof_close',
+                      opcode: CarLinkoOpcodes.sunroofClose,
+                      label: 'Close Sunroof',
+                      onOptimistic: () => setState(() {
+                        _activeSunroofMode = 'closed';
+                        _isSunroofOpen = false;
+                      }),
+                      onRevert: () => setState(() {
+                        _activeSunroofMode = prevMode;
+                        _isSunroofOpen = prevOpen;
+                      }),
+                      onSuccess: () {
+                        _activeSunroofMode = 'closed';
+                        _isSunroofOpen = false;
+                        widget.onSunroofChanged?.call(false);
+                      },
+                    );
+                  },
                 ),
               ),
             ],

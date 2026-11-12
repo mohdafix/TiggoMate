@@ -393,6 +393,164 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               children: [
+                // 0. Smart Climate & Pre-Conditioning Presets
+                Row(
+                  children: [
+                    Expanded(
+                      child: ApplePressable(
+                        onTap: () {
+                          HapticFeedback.mediumImpact();
+                          setState(() {
+                            _acOn = true;
+                            _targetTemp = 22.0;
+                            _durationMin = 10;
+                            _rapidCool = false;
+                            _fanGear = 0;
+                          });
+                          _applyChanges();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD2F835).withValues(alpha: isDark ? 0.12 : 0.08),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: const Color(0xFFD2F835).withValues(alpha: 0.35),
+                              width: 1.2,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.timer_outlined, size: 16, color: Color(0xFFD2F835)),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    '10m Pre-Cool',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: colors.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '22°C • Depart ready',
+                                style: TextStyle(fontSize: 10, color: colors.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ApplePressable(
+                        onTap: () async {
+                          HapticFeedback.mediumImpact();
+                          setState(() {
+                            _acOn = true;
+                            _targetTemp = 20.0;
+                            _durationMin = 10;
+                            _fanGear = 5;
+                          });
+                          widget.repository?.sendRemoteCommandWithResult('740600');
+                          _applyChanges();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00E5FF).withValues(alpha: isDark ? 0.12 : 0.08),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: const Color(0xFF00E5FF).withValues(alpha: 0.35),
+                              width: 1.2,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.air_rounded, size: 16, color: Color(0xFF00E5FF)),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Heat Purge',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: colors.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Vent + Max air',
+                                style: TextStyle(fontSize: 10, color: colors.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ApplePressable(
+                        onTap: () {
+                          HapticFeedback.mediumImpact();
+                          setState(() {
+                            _acOn = true;
+                            _frontDefrost = true;
+                            _rearDefrost = true;
+                            _targetTemp = 24.0;
+                          });
+                          _applyChanges();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF9100).withValues(alpha: isDark ? 0.12 : 0.08),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: const Color(0xFFFF9100).withValues(alpha: 0.35),
+                              width: 1.2,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.waves_rounded, size: 16, color: Color(0xFFFF9100)),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Demist',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: colors.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Front + Rear',
+                                style: TextStyle(fontSize: 10, color: colors.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
                 // 1. Digital Temperature Display with Minus / Plus
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),

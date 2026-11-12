@@ -414,7 +414,9 @@ class _EnergyScreenState extends State<EnergyScreen> {
                       border: Border.all(color: borderCol),
                     ),
                     child: Text(
-                      widget.isCharging ? 'CHARGING 3.3 kW' : 'PLUGGED · IDLE',
+                      widget.telemetry.chargePowerKw > 0
+                          ? 'CHARGING ${widget.telemetry.chargePowerKw.toStringAsFixed(1)} kW'
+                          : (widget.isCharging ? 'CHARGING 3.3 kW' : 'PLUGGED · IDLE'),
                       style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 10,
@@ -426,7 +428,106 @@ class _EnergyScreenState extends State<EnergyScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+
+              // 1.5 Chery PHEV Dual-Power Range Summary Bar
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: cardCol,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: borderCol),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.electric_bolt, size: 12, color: limeAccent),
+                              const SizedBox(width: 4),
+                              Text(
+                                'EV ${widget.telemetry.electricRangeKm} km',
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: limeAccent,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '19.27 kWh LFP',
+                            style: TextStyle(fontSize: 10, color: textMuted),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(width: 1, height: 28, color: borderCol),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.local_gas_station, size: 12, color: Color(0xFFFF9F1C)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Fuel ${widget.telemetry.fuelRangeKm} km',
+                                  style: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFFFF9F1C),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '60L Tank • Hybrid',
+                              style: TextStyle(fontSize: 10, color: textMuted),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Container(width: 1, height: 28, color: borderCol),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '${widget.telemetry.totalRangeKm} km',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              color: textPrimary,
+                            ),
+                          ),
+                          Text(
+                            'TOTAL RANGE',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.6,
+                              color: textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
 
               // 2. Big SoC Display & Target
               Row(

@@ -889,9 +889,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             _buildSettingTile(
               leading: Icon(Icons.troubleshoot_rounded, color: t.accent, size: 22),
-              title: 'Remote Opcode Diagnostics',
-              subtitle: 'Test candidate CAN-bus opcodes & monitor live T-Box response codes',
-              trailing: Icon(Icons.chevron_right_rounded, color: t.ink3, size: 20),
+              title: 'Advanced CAN Lab & Remote Diagnostics',
+              subtitle: 'Test candidate opcodes, AES-128 handshake & inspect live T-Box frames',
+              trailing: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: t.accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: t.accent.withValues(alpha: 0.4), width: 1),
+                ),
+                child: Text(
+                  'LAB',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: t.accent,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
               onTap: () {
                 RemoteCommandDiagnosticsSheet.show(
                   context,

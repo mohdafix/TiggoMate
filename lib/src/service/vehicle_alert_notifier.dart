@@ -11,10 +11,15 @@ const String _kChannelId = 'tm_vehicle_alerts';
 const String _kChannelName = 'Vehicle Alerts';
 const String _kChannelDesc = 'Door and 12V battery alerts from your car';
 
+const String _kLiveActivityChannelId = 'tm_live_activity';
+const String _kLiveActivityChannelName = 'Live Activity & Charging';
+const String _kLiveActivityChannelDesc = 'Persistent status during active charging and cabin climate pre-conditioning';
+
 const String _kDoorOpenFlagKey = 'tm_alert_door_open_flag';
 const String _kDoorLockedFlagKey = 'tm_alert_door_locked_flag';
 const String _kIsChargingFlagKey = 'tm_alert_is_charging_flag';
 const String _kLowVoltFlagKey = 'tm_alert_low_volt_flag';
+const String _kWasDrivingFlagKey = 'tm_alert_was_driving_flag';
 
 const double _kLowVoltThreshold = 12.0;
 // Hysteresis above the trigger threshold so a voltage hovering right at
@@ -38,13 +43,19 @@ class VehicleAlertNotifier {
     const settings = InitializationSettings(android: androidInit);
     try {
       await _plugin.initialize(settings);
-      await _plugin
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(const AndroidNotificationChannel(
+      final androidPlatform = _plugin
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      await androidPlatform?.createNotificationChannel(const AndroidNotificationChannel(
         _kChannelId,
         _kChannelName,
         description: _kChannelDesc,
         importance: Importance.high,
+      ));
+      await androidPlatform?.createNotificationChannel(const AndroidNotificationChannel(
+        _kLiveActivityChannelId,
+        _kLiveActivityChannelName,
+        description: _kLiveActivityChannelDesc,
+        importance: Importance.low,
       ));
       _pluginReady = true;
     } catch (e) {
@@ -141,6 +152,26 @@ class VehicleAlertNotifier {
       await prefs.setBool(_kIsChargingFlagKey, t.isCharging);
     }
 
+    // 4. Post-Parking Security Check (doors unlocked or windows open when parked)
+    final wasDriving = prefs.getBool(_kWasDrivingFlagKey) ?? false;
+    final isDrivingNow = !t.isParked || t.speedKmH > 5;
+    if (wasDriving && !isDrivingNow) {
+      // Just parked: check if car is left unsecured
+      if (!t.doorsLocked || t.windowsOpen) {
+        final List<String> unsecuredParts = [];
+        if (!t.doorsLocked) unsecuredParts.add('doors unlocked');
+        if (t.windowsOpen) unsecuredParts.add('windows open');
+        await _raiseAlert(
+          id: 1010,
+          title: '⚠️ Security Notice: $cleanPlate',
+          message: 'Vehicle parked with ${unsecuredParts.join(" and ")}. Tap to review and secure.',
+          icon: Icons.shield_outlined,
+        );
+      }
+    }
+    await prefs.setBool(_kWasDrivingFlagKey, isDrivingNow);
+
+    // 5. 12V Aux Battery Monitor
     if (t.volt12 > 0) {
       final wasLow = prefs.getBool(_kLowVoltFlagKey) ?? false;
       if (!wasLow && t.volt12 < _kLowVoltThreshold) {
@@ -156,6 +187,9 @@ class VehicleAlertNotifier {
         await prefs.setBool(_kLowVoltFlagKey, false);
       }
     }
+
+    // 6. Persistent Live Activity Notifications (Charging & Climate Pre-cooling)
+    await _handleLiveOngoingNotifications(t, cleanPlate: cleanPlate, carModel: carModel);
 
     // Local Smart Perimeter Guard monitoring
     final localFenceStr = prefs.getString('tm_local_geofence');
@@ -251,6 +285,81 @@ class VehicleAlertNotifier {
       );
     } catch (e) {
       debugPrint('VehicleAlertNotifier: in-app alert record failed: $e');
+    }
+  }
+
+  static Future<void> _handleLiveOngoingNotifications(
+    VehicleTelemetry t, {
+    required String cleanPlate,
+    required String carModel,
+  }) async {
+    await _ensurePlugin();
+
+    // A. Active EV Charging Notification (Ongoing status card)
+    if (t.isCharging) {
+      final powerStr = t.chargePowerKw > 0 ? '${t.chargePowerKw.toStringAsFixed(1)} kW' : 'AC Charging';
+      final remainStr = (t.chargeRemainMin != null && t.chargeRemainMin! > 0 && t.chargeRemainMin! < 1000)
+          ? ' • ~${t.chargeRemainMin} mins to full'
+          : '';
+      final socStr = t.batteryPct > 0 ? '${t.batteryPct}%' : 'Charging';
+
+      try {
+        await _plugin.show(
+          2001,
+          '⚡ Charging $cleanPlate ($socStr)',
+          '$powerStr$remainStr • Tiggo 7 PHEV connected',
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              _kLiveActivityChannelId,
+              _kLiveActivityChannelName,
+              channelDescription: _kLiveActivityChannelDesc,
+              importance: Importance.low,
+              priority: Priority.low,
+              ongoing: true,
+              autoCancel: false,
+              onlyAlertOnce: true,
+              showWhen: true,
+            ),
+          ),
+        );
+      } catch (e) {
+        debugPrint('VehicleAlertNotifier: ongoing charging notification error: $e');
+      }
+    } else {
+      try {
+        await _plugin.cancel(2001);
+      } catch (_) {}
+    }
+
+    // B. Active Climate Pre-Conditioning Notification (Ongoing status card)
+    if (t.acOn) {
+      final tempStr = t.acTemp > 0 ? '${t.acTemp}°C target' : 'Target: 22°C';
+      try {
+        await _plugin.show(
+          2002,
+          '❄️ Climate Pre-cooling Active • $cleanPlate',
+          'A/C active ($tempStr) • Auto timer running',
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              _kLiveActivityChannelId,
+              _kLiveActivityChannelName,
+              channelDescription: _kLiveActivityChannelDesc,
+              importance: Importance.low,
+              priority: Priority.low,
+              ongoing: true,
+              autoCancel: false,
+              onlyAlertOnce: true,
+              showWhen: true,
+            ),
+          ),
+        );
+      } catch (e) {
+        debugPrint('VehicleAlertNotifier: ongoing climate notification error: $e');
+      }
+    } else {
+      try {
+        await _plugin.cancel(2002);
+      } catch (_) {}
     }
   }
 }
