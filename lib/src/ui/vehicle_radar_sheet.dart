@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../carlinko/vehicle_telemetry.dart';
 import '../carlinko/vehicle_repository.dart';
 import '../service/phone_parking_location.dart';
+import '../service/trip_planner_service.dart';
 import '../theme/app_theme.dart';
 import 'app_notification.dart';
 import 'apple_design_widgets.dart';
@@ -198,6 +199,12 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
   final TextEditingController _fenceNameCtrl = TextEditingController(text: 'Home Perimeter');
   LatLng? _customFenceCenter;
   final MapController _geofenceMapController = MapController();
+
+  // Tab 3: Smart EV Route & Highway Charger Planner
+  MalaysianPresetDestination? _selectedPreset;
+  PlannedRouteResult? _plannedRoute;
+  bool _isCalculatingRoute = false;
+  final MapController _plannerMapController = MapController();
 
   Timer? _liveLocateTimer;
 
@@ -421,6 +428,43 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     return '${diff.inDays}d ago';
+  }
+
+  Future<void> _calculateRouteForPreset(MalaysianPresetDestination preset) async {
+    setState(() {
+      _selectedPreset = preset;
+      _isCalculatingRoute = true;
+    });
+
+    final double startLat = (widget.telemetry.latitude.abs() > 0.01)
+        ? widget.telemetry.latitude
+        : (_phonePosition?.latitude ?? 3.1390);
+    final double startLon = (widget.telemetry.longitude.abs() > 0.01)
+        ? widget.telemetry.longitude
+        : (_phonePosition?.longitude ?? 101.6869);
+
+    final res = await TripPlannerService.instance.planRoute(
+      origin: LatLng(startLat, startLon),
+      destination: preset.location,
+      destinationName: preset.name,
+      currentSoc: widget.telemetry.batteryPct > 0 ? widget.telemetry.batteryPct : 80,
+      consumptionKwh100: widget.telemetry.energyConsumptionKwh100km > 0
+          ? widget.telemetry.energyConsumptionKwh100km
+          : 16.8,
+    );
+
+    if (mounted) {
+      setState(() {
+        _plannedRoute = res;
+        _isCalculatingRoute = false;
+      });
+      try {
+        _plannerMapController.move(
+          LatLng((startLat + preset.location.latitude) / 2, (startLon + preset.location.longitude) / 2),
+          8.0,
+        );
+      } catch (_) {}
+    }
   }
 
   @override
@@ -838,6 +882,55 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                                       fontSize: 11,
                                       fontWeight: _activeRadarTab == 2 ? FontWeight.bold : FontWeight.normal,
                                       color: _activeRadarTab == 2 ? colors.textPrimary : colors.textMuted,
+                                    ),
+                                    maxLines: 1,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          setState(() => _activeRadarTab = 3);
+                          if (_selectedPreset == null && kMalaysianPresets.isNotEmpty) {
+                            _calculateRouteForPreset(kMalaysianPresets.first);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          decoration: BoxDecoration(
+                            color: _activeRadarTab == 3
+                                ? (isDark ? const Color(0xFF1F2937) : Colors.white)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: _activeRadarTab == 3 && !isDark
+                                ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]
+                                : null,
+                          ),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.alt_route_rounded,
+                                    size: 14,
+                                    color: _activeRadarTab == 3 ? const Color(0xFF00E5FF) : colors.textMuted,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Trip Planner',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: _activeRadarTab == 3 ? FontWeight.bold : FontWeight.normal,
+                                      color: _activeRadarTab == 3 ? colors.textPrimary : colors.textMuted,
                                     ),
                                     maxLines: 1,
                                   ),
@@ -1500,14 +1593,363 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                     const SizedBox(height: 10),
                   ],
                 ],
-              ] else ...[
+              ] else if (_activeRadarTab == 2) ...[
                 // ---------------- 5. CHERY T-BOX GEOFENCE GUARD ----------------
                 _buildGeofenceTab(colors, isDark, lat, lon),
+              ] else ...[
+                // ---------------- 6. SMART TRIP & CHARGER PLANNER --------------
+                _buildTripPlannerTab(colors, isDark, lat, lon),
               ],
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildTripPlannerTab(AppColors colors, bool isDark, double lat, double lon) {
+    final route = _plannedRoute;
+    final isCalc = _isCalculatingRoute;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 1. Destination Preset Selector Chips
+        Text(
+          'DESTINATION CORRIDOR (MALAYSIA)',
+          style: TextStyle(fontSize: 10, letterSpacing: 0.8, fontWeight: FontWeight.bold, color: colors.textMuted),
+        ),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: kMalaysianPresets.map((preset) {
+              final isSel = _selectedPreset?.name == preset.name;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: FilterChip(
+                  label: Text(preset.name),
+                  selected: isSel,
+                  onSelected: (val) => _calculateRouteForPreset(preset),
+                  selectedColor: const Color(0xFF00E5FF).withValues(alpha: 0.2),
+                  checkmarkColor: const Color(0xFF00E5FF),
+                  backgroundColor: colors.tileBg,
+                  labelStyle: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                    color: isSel ? const Color(0xFF00E5FF) : colors.textPrimary,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    side: BorderSide(
+                      color: isSel ? const Color(0xFF00E5FF) : colors.border,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // 2. Interactive Route Polyline Map
+        Container(
+          height: 220,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: colors.border),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            children: [
+              FlutterMap(
+                mapController: _plannerMapController,
+                options: MapOptions(
+                  initialCenter: _selectedPreset != null
+                      ? LatLng((lat + _selectedPreset!.location.latitude) / 2, (lon + _selectedPreset!.location.longitude) / 2)
+                      : LatLng(lat != 0 ? lat : 3.1390, lon != 0 ? lon : 101.6869),
+                  initialZoom: 8.0,
+                ),
+                children: [
+                  TileLayer(
+                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.tiggomate.tiggomate_app',
+                  ),
+                  if (route != null && route.polyline.isNotEmpty)
+                    PolylineLayer(
+                      polylines: [
+                        Polyline(
+                          points: route.polyline,
+                          strokeWidth: 4.5,
+                          color: const Color(0xFF00E5FF),
+                        ),
+                      ],
+                    ),
+                  MarkerLayer(
+                    markers: [
+                      // Car start marker
+                      Marker(
+                        point: LatLng(lat != 0 ? lat : 3.1390, lon != 0 ? lon : 101.6869),
+                        width: 32,
+                        height: 32,
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF0F172A),
+                            shape: BoxShape.circle,
+                            boxShadow: [BoxShadow(color: Colors.black45, blurRadius: 4)],
+                          ),
+                          child: const Icon(Icons.directions_car, color: Color(0xFF00E5FF), size: 18),
+                        ),
+                      ),
+                      // Destination marker
+                      if (_selectedPreset != null)
+                        Marker(
+                          point: _selectedPreset!.location,
+                          width: 32,
+                          height: 32,
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFE11D48),
+                              shape: BoxShape.circle,
+                              boxShadow: [BoxShadow(color: Colors.black45, blurRadius: 4)],
+                            ),
+                            child: const Icon(Icons.flag_rounded, color: Colors.white, size: 18),
+                          ),
+                        ),
+                      // Recommended DC Fast Charger Marker
+                      if (route?.recommendedStop != null)
+                        Marker(
+                          point: route!.recommendedStop!.location,
+                          width: 36,
+                          height: 36,
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFFFB300),
+                              shape: BoxShape.circle,
+                              boxShadow: [BoxShadow(color: Colors.black45, blurRadius: 4)],
+                            ),
+                            child: const Icon(Icons.bolt, color: Colors.black, size: 22),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+              if (isCalc)
+                Container(
+                  color: Colors.black38,
+                  child: const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF00E5FF)),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // 3. Trip Feasibility & Powertrain Breakdown Card
+        if (route != null) ...[
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: colors.tileBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: route.canReachPureEv ? const Color(0xFF00E5FF).withValues(alpha: 0.5) : colors.border,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          route.destinationName,
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colors.textPrimary),
+                        ),
+                        Text(
+                          '${route.distanceKm} km • ~${route.durationMinutes} min drive',
+                          style: TextStyle(fontSize: 12, color: colors.textSecondary),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: (route.canReachPureEv ? const Color(0xFF00E5FF) : const Color(0xFFFFB300)).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        route.canReachPureEv ? '🟢 PURE EV' : '⚡ HYBRID CRUISE',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: route.canReachPureEv ? const Color(0xFF00E5FF) : const Color(0xFFFFB300),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Divider(height: 1, thickness: 0.6, color: colors.border),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Available EV Range', style: TextStyle(fontSize: 11, color: colors.textMuted)),
+                          const SizedBox(height: 2),
+                          Text('${route.evRangeAvailableKm} km', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: colors.textPrimary)),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(route.canReachPureEv ? 'Arrival Battery' : 'Pure EV Share', style: TextStyle(fontSize: 11, color: colors.textMuted)),
+                          const SizedBox(height: 2),
+                          Text(
+                            route.canReachPureEv ? '${route.projectedArrivalSoc.toStringAsFixed(0)}%' : '${route.electricShareKm} km',
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF00E5FF)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Hybrid Share', style: TextStyle(fontSize: 11, color: colors.textMuted)),
+                          const SizedBox(height: 2),
+                          Text(
+                            route.canReachPureEv ? '0 km' : '${route.hybridShareKm} km',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: colors.textPrimary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  route.canReachPureEv
+                      ? '⚡ 100% Zero-Emissions Trip! You will arrive at ${route.destinationName} with approximately ${route.projectedArrivalSoc.toStringAsFixed(0)}% battery remaining.'
+                      : '🔋 Pure EV for the first ${route.electricShareKm} km. Beyond that, the Chery 1.5L Turbo Dedicated Hybrid Transmission engages automatically. Combined petrol + EV range exceeds 1,000 km.',
+                  style: TextStyle(fontSize: 11.5, color: colors.textSecondary, height: 1.35),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // 4. Highway DC Fast Charger Recommendation
+          if (route.recommendedStop != null) ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: colors.tileBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFFFB300).withValues(alpha: 0.4)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFB300).withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.bolt, color: Color(0xFFFFB300), size: 18),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'RECOMMENDED HIGHWAY CHARGER',
+                              style: TextStyle(fontSize: 9.5, letterSpacing: 0.6, fontWeight: FontWeight.bold, color: colors.textMuted),
+                            ),
+                            Text(
+                              route.recommendedStop!.name,
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: colors.textPrimary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${route.recommendedStop!.chargerInfo} • Stop for ~${route.recommendedStop!.suggestedChargeMin} min to reach ${route.recommendedStop!.targetSoc.toStringAsFixed(0)}% SoC.',
+                    style: TextStyle(fontSize: 11.5, color: colors.textSecondary),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ApplePressable(
+                          onTap: () async {
+                            final lat = route.recommendedStop!.location.latitude;
+                            final lon = route.recommendedStop!.location.longitude;
+                            final uri = Uri.parse('https://waze.com/ul?ll=$lat,$lon&navigate=yes');
+                            if (await canLaunchUrl(uri)) await launchUrl(uri);
+                          },
+                          pressedScale: 0.95,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF33CCFF).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFF33CCFF).withValues(alpha: 0.4)),
+                            ),
+                            child: const Center(
+                              child: Text('Open in Waze', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF33CCFF))),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ApplePressable(
+                          onTap: () async {
+                            final lat = route.recommendedStop!.location.latitude;
+                            final lon = route.recommendedStop!.location.longitude;
+                            final uri = Uri.parse('geo:$lat,$lon?q=$lat,$lon');
+                            if (await canLaunchUrl(uri)) await launchUrl(uri);
+                          },
+                          pressedScale: 0.95,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: colors.evTeal.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: colors.evTeal.withValues(alpha: 0.4)),
+                            ),
+                            child: Center(
+                              child: Text('Google Maps', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: colors.evTeal)),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ],
     );
   }
 

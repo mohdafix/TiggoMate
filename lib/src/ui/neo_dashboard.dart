@@ -32,6 +32,7 @@ import 'energy_screen.dart';
 import '../mytnb/mytnb_api.dart';
 import 'mytnb_connect_dialog.dart';
 import '../service/bluetooth_driving_tracker_service.dart';
+import '../service/battery_health_service.dart';
 
 class NeoDashboard extends StatefulWidget {
   final VehicleRepository repository;
@@ -777,6 +778,15 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             steeringHeat ? CarLinkoOpcodes.steeringHeatOn : CarLinkoOpcodes.steeringHeatOff,
             successMessage: steeringHeat ? '🔥 Heated Steering Wheel ON' : 'Heated Steering Wheel OFF',
             failureMessage: '⚠️ Heated steering wheel command failed',
+          );
+        }
+
+        // Air Purifier / CN95 Filter (CAN opcode 742501 / 742500)
+        if (airPurifier != null && airPurifier != previousTelemetry.airPurifier) {
+          _sendCommandAndReport(
+            airPurifier ? CarLinkoOpcodes.airPurifyOn : CarLinkoOpcodes.airPurifyOff,
+            successMessage: airPurifier ? '🌿 Air Purifier (CN95) ON' : 'Air Purifier OFF',
+            failureMessage: '⚠️ Air purifier command failed',
           );
         }
       },
@@ -1674,17 +1684,27 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         ],
                       ),
                       const SizedBox(height: 5),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Voltage', style: TextStyle(fontFamily: 'monospace', fontSize: 10.5, color: textMuted)),
-                          Text(
-                            _telemetry.volt12 > 0
-                                ? '${_telemetry.volt12.toStringAsFixed(2)} V'
-                                : '-- V',
-                            style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold, color: voltAccent),
-                          ),
-                        ],
+                      InkWell(
+                        onTap: () => _showBatteryHealthModal(context),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Text('Voltage', style: TextStyle(fontFamily: 'monospace', fontSize: 10.5, color: textMuted)),
+                                const SizedBox(width: 4),
+                                Icon(Icons.info_outline, size: 11, color: voltAccent),
+                              ],
+                            ),
+                            Text(
+                              _telemetry.volt12 > 0
+                                  ? '${_telemetry.volt12.toStringAsFixed(2)} V'
+                                  : '-- V',
+                              style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold, color: voltAccent),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -3082,26 +3102,312 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             padding: const EdgeInsets.symmetric(vertical: 9),
             child: Divider(height: 1, thickness: 0.6, color: colors.borderSubtle),
           ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Voltage',
-                style: TextStyle(fontSize: 13, color: colors.textSecondary),
-              ),
-              Text(
-                _telemetry.volt12 > 0
-                    ? '${_telemetry.volt12.toStringAsFixed(2)} V'
-                    : '-- V',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: colors.textPrimary),
-              ),
-            ],
+          InkWell(
+            onTap: () => _showBatteryHealthModal(context),
+            borderRadius: BorderRadius.circular(8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Voltage',
+                      style: TextStyle(fontSize: 13, color: colors.textSecondary),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(Icons.info_outline, size: 13, color: colors.evTeal),
+                  ],
+                ),
+                Text(
+                  _telemetry.volt12 > 0
+                      ? '${_telemetry.volt12.toStringAsFixed(2)} V'
+                      : '-- V',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: colors.textPrimary),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     ),
   );
 }
+
+  void _showBatteryHealthModal(BuildContext context) {
+    final colors = AppColors(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final battService = BatteryHealthService.instance;
+    final voltStatus = battService.getVolt12Status(_telemetry.volt12);
+    final min7d = battService.getMinVolt12Last7Days(_telemetry.volt12);
+    final socDrain = battService.parkedSocDrainPerDay;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? const Color(0xFF0F141C) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            final curLfpStatus = battService.lfpStatus;
+            final curDaysSince100 = battService.daysSinceLast100;
+
+            Color voltColor;
+            switch (voltStatus) {
+              case Volt12HealthStatus.healthy:
+                voltColor = const Color(0xFF10B981);
+                break;
+              case Volt12HealthStatus.fair:
+                voltColor = const Color(0xFFF59E0B);
+                break;
+              case Volt12HealthStatus.low:
+                voltColor = const Color(0xFFF97316);
+                break;
+              case Volt12HealthStatus.critical:
+                voltColor = const Color(0xFFEF4444);
+                break;
+            }
+
+            Color lfpColor;
+            switch (curLfpStatus) {
+              case LfpBalanceStatus.balanced:
+                lfpColor = const Color(0xFF10B981);
+                break;
+              case LfpBalanceStatus.dueSoon:
+                lfpColor = const Color(0xFFF59E0B);
+                break;
+              case LfpBalanceStatus.overdue:
+                lfpColor = const Color(0xFFEF4444);
+                break;
+            }
+
+            return Padding(
+              padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(modalCtx).padding.bottom + 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: colors.textMuted.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.battery_saver_rounded, color: colors.evTeal, size: 22),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Battery & Cell Health Guardian',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: colors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.pop(modalCtx),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 1. 12V Auxiliary Battery Card
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: colors.tileBg,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: voltColor.withValues(alpha: 0.35)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.bolt, size: 18, color: voltColor),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '12V Auxiliary Battery',
+                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: colors.textPrimary),
+                                ),
+                              ],
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: voltColor.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                voltStatus.label.toUpperCase(),
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: voltColor),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Live Voltage', style: TextStyle(fontSize: 11, color: colors.textMuted)),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _telemetry.volt12 > 0 ? '${_telemetry.volt12.toStringAsFixed(2)} V' : '-- V',
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: voltColor),
+                                ),
+                              ],
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('7-Day Lowest', style: TextStyle(fontSize: 11, color: colors.textMuted)),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${min7d.toStringAsFixed(2)} V',
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colors.textPrimary),
+                                ),
+                              ],
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Parked Drain', style: TextStyle(fontSize: 11, color: colors.textMuted)),
+                                const SizedBox(height: 2),
+                                Text(
+                                  socDrain != null
+                                      ? '${socDrain.toStringAsFixed(1)}% / day'
+                                      : 'Normal (<1%)',
+                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: colors.textPrimary),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Powers T-Box 4G modem & hybrid startup contactors. Healthy resting voltage is 12.4V - 12.8V.',
+                          style: TextStyle(fontSize: 11, color: colors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // 2. LFP Traction Pack Cell Balancing Card
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: colors.tileBg,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: lfpColor.withValues(alpha: 0.35)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.balance_rounded, size: 18, color: lfpColor),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'LFP Cell Balance (18.3 kWh)',
+                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: colors.textPrimary),
+                                ),
+                              ],
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: lfpColor.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                curLfpStatus.label.toUpperCase(),
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: lfpColor),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Last 100% Top-Off', style: TextStyle(fontSize: 11, color: colors.textMuted)),
+                                const SizedBox(height: 2),
+                                Text(
+                                  curDaysSince100 == 0 ? 'Today' : '$curDaysSince100 days ago',
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: lfpColor),
+                                ),
+                              ],
+                            ),
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: colors.evTeal.withValues(alpha: 0.15),
+                                foregroundColor: colors.evTeal,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              onPressed: () async {
+                                await battService.mark100PercentChargedNow();
+                                setModalState(() {});
+                                if (mounted) {
+                                  AppNotification.show(
+                                    context,
+                                    message: '✅ Marked 100% LFP charge & cell balance today!',
+                                    type: NotificationType.success,
+                                    icon: Icons.check_circle_rounded,
+                                  );
+                                }
+                              },
+                              icon: const Icon(Icons.check, size: 14),
+                              label: const Text('Mark 100% Today', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Chery Tiggo 7 PHEV uses LFP chemistry. Because LFP voltage is flat between 20-80%, charge to 100% on AC once a week so the BMS can top-balance individual cells.',
+                          style: TextStyle(fontSize: 11, color: colors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
   Future<void> _showRawHexDialog(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
@@ -4679,17 +4985,21 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Icon(Icons.battery_charging_full, size: 16, color: colors.evTeal),
-                          const SizedBox(width: 6),
-                          Text(
-                            widget.repository.isVehicleBound && _telemetry.volt12 > 0
-                                ? '12V Aux: ${_telemetry.volt12.toStringAsFixed(2)}V (Healthy)'
-                                : '12V Aux: -- V (Pending Bind)',
-                            style: TextStyle(fontSize: 12, color: colors.textSecondary),
-                          ),
-                        ],
+                      InkWell(
+                        onTap: () => _showBatteryHealthModal(context),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Row(
+                          children: [
+                            Icon(Icons.battery_charging_full, size: 16, color: colors.evTeal),
+                            const SizedBox(width: 6),
+                            Text(
+                              widget.repository.isVehicleBound && _telemetry.volt12 > 0
+                                  ? '12V: ${_telemetry.volt12.toStringAsFixed(2)}V (Health)'
+                                  : '12V Aux: -- V (Pending Bind)',
+                              style: TextStyle(fontSize: 12, color: colors.textSecondary),
+                            ),
+                          ],
+                        ),
                       ),
                       Row(
                         children: [

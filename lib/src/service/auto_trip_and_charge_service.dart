@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -8,6 +9,7 @@ import '../carlinko/vehicle_telemetry.dart';
 import '../firebase/firebase_sync_service.dart';
 import '../ui/app_notification.dart';
 import '../ui/trips_logbook_screen.dart';
+import 'battery_health_service.dart';
 import 'price_book_service.dart';
 
 /// In-flight state of an ongoing vehicle driving trip.
@@ -228,6 +230,9 @@ class AutoTripAndChargeService extends ChangeNotifier {
     double? tnbTariff,
     double? fuelPrice,
   }) {
+    // Forward to battery health & LFP cell balancing monitor
+    BatteryHealthService.instance.processTelemetry(t);
+
     if (!t.isBound || t.odometerKm <= 0) {
       return;
     }
@@ -583,6 +588,9 @@ class AutoTripAndChargeService extends ChangeNotifier {
         ? '🚗 Trip ($fromStr)'
         : '🚗 $fromStr ➔ $toStr';
 
+    final double petrolEquivCost = (distKm / 12.0) * 2.05; // 12 km/L baseline @ RM2.05/L RON95
+    final double savedRm = math.max(0.0, petrolEquivCost - costRm);
+
     final now = DateTime.now();
     final tripRecord = TripRecord(
       id: 'auto_trip_${now.millisecondsSinceEpoch}',
@@ -596,7 +604,7 @@ class AutoTripAndChargeService extends ChangeNotifier {
       petrolLitres: 0.0,
       costRm: double.parse(costRm.toStringAsFixed(2)),
       avgSpeedKmh: double.parse(avgSpeed.toStringAsFixed(1)),
-      highwayNote: '${avgSpeed.toStringAsFixed(0)} km/h avg • ${socDrop > 0 ? '$socDrop% battery used' : 'Hybrid cruise'}',
+      highwayNote: '${avgSpeed.toStringAsFixed(0)} km/h avg • Saved RM ${savedRm.toStringAsFixed(2)} vs petrol',
       routePoints: const [
         Offset(0.15, 0.50),
         Offset(0.35, 0.40),
@@ -624,6 +632,15 @@ class AutoTripAndChargeService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Non-linear charging efficiency formula ported from GodrezJr2/j5-ev-dashboard:
+  /// Evaluates current taper and cell balancing (91% up to 85% SoC, tapering to 85.5% at 100%).
+  static double chargeEfficiency(int? socEnd) {
+    if (socEnd == null) return 0.89;
+    if (socEnd >= 95) return 0.855;
+    if (socEnd <= 85) return 0.91;
+    return 0.91 + (0.855 - 0.91) * (socEnd - 85) / 10.0;
+  }
+
   Future<void> _finalizeCharge(InFlightCharge c, {double? tnbTariff}) async {
     final socGain = c.maxSoc - c.startSoc;
     final durSec = c.lastRiseTs.difference(c.startTs).inSeconds;
@@ -638,13 +655,16 @@ class AutoTripAndChargeService extends ChangeNotifier {
       return; // Ignore fractional test ticks
     }
 
+    final double eff = chargeEfficiency(c.maxSoc);
+    final double meteredKwh = kwhAdded / eff; // Delivered energy drawn from wall/HPC
+
     final bool isPublic = c.isDcFast || c.peakKw > 22.0;
     final double unitRate = PriceBookService.instance.rateForCharge(
       c.startTs,
       isDc: isPublic,
       fallback: isPublic ? 1.30 : (tnbTariff ?? 0.57),
     );
-    final double amountRm = kwhAdded * unitRate;
+    final double amountRm = meteredKwh * unitRate;
 
     final now = DateTime.now();
     final expense = ExpenseRecord(
@@ -667,7 +687,7 @@ class AutoTripAndChargeService extends ChangeNotifier {
       VehicleAlertItem(
         id: 'charge_${now.millisecondsSinceEpoch}',
         title: 'Auto Charge Logged',
-        message: '${expense.title} • +${expense.units} kWh (RM ${expense.amountRm.toStringAsFixed(2)})',
+        message: '${expense.title} • +${expense.units} kWh stored (${meteredKwh.toStringAsFixed(1)} kWh metered @ ${(eff * 100).toStringAsFixed(0)}% eff) • RM ${expense.amountRm.toStringAsFixed(2)}',
         timestamp: now,
         type: NotificationType.success,
         icon: Icons.bolt_rounded,
