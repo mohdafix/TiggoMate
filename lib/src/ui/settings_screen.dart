@@ -20,6 +20,7 @@ import '../service/bluetooth_driving_tracker_service.dart';
 import '../service/price_book_service.dart';
 import '../service/background_guardian_service.dart';
 import '../service/vehicle_alert_notifier.dart';
+import '../service/smart_wrist_key_service.dart';
 
 // Re-export AppSettings and SettingsService so existing callers keep working seamlessly
 class AppSettings {
@@ -165,6 +166,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isIgnoringBattery = false;
   bool _isXiaomi = false;
   bool _isGuardianEnabled = true;
+  bool _isWristKeyEnabled = true;
 
   AppTokens get t => context.tokens;
 
@@ -241,6 +243,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _isIgnoringBattery = isIgnoring;
           _isXiaomi = isXiaomi;
           _isGuardianEnabled = isGuardian;
+          _isWristKeyEnabled = SmartWristKeyService.isEnabled;
         });
       }
     } catch (_) {}
@@ -1231,6 +1234,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               onTap: _showBackgroundPushDialog,
+            ),
+          ]),
+
+          // Smartwatch & Wrist Key (Huawei Fit / Wear OS)
+          _group('Smartwatch & Wrist Key (Huawei Fit / Wear OS)', [
+            _switchRow(
+              Icons.watch_rounded,
+              'Wrist Quick Key Notification',
+              'Mirrors interactive controls (Unlock, Lock, A/C, Trunk) to your Huawei Watch Fit, GT, Wear OS, and status bar.',
+              _isWristKeyEnabled,
+              (val) async {
+                setState(() => _isWristKeyEnabled = val);
+                await SmartWristKeyService.setEnabled(val);
+                if (val) {
+                  await SmartWristKeyService.updateWristKey(AppVehicleRepository.instance.currentTelemetry);
+                }
+              },
             ),
           ]),
 

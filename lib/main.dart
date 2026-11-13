@@ -27,6 +27,7 @@ import 'src/theme/app_theme.dart';
 
 import 'src/ui/app_notification.dart';
 import 'src/service/voice_assistant_service.dart';
+import 'src/service/smart_wrist_key_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'src/ui/setup_intro_screen.dart';
 import 'src/ui/settings_screen.dart';
@@ -241,6 +242,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     await VehicleSkinManager.instance.init();
     final s = await SettingsService.load();
     await _myTnbRepo.init();
+    unawaited(SmartWristKeyService.init().then((_) {
+      SmartWristKeyService.updateWristKey(_vehicleRepo.currentTelemetry);
+    }));
 
     // Try to restore a real CarLinko session (saved token) first, so the
     // user isn't forced to log in again every cold start. This runs in the

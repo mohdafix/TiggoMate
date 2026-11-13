@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../carlinko/vehicle_telemetry.dart';
 import '../ui/app_notification.dart';
+import 'smart_wrist_key_service.dart';
 
 const String _kChannelId = 'tm_vehicle_alerts';
 const String _kChannelName = 'Vehicle Alerts';
@@ -81,6 +82,7 @@ class VehicleAlertNotifier {
   /// hysteresis on the voltage check so it doesn't flap at the threshold.
   static Future<void> checkAndNotify(VehicleTelemetry t) async {
     if (!t.isBound) return;
+    SmartWristKeyService.updateWristKey(t);
     final prefs = await SharedPreferences.getInstance();
 
     final rawPlate = prefs.getString('tm_car_plate') ?? 'VRT 3342';
