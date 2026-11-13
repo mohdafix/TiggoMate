@@ -18,6 +18,8 @@ import 'remote_command_diagnostics_sheet.dart';
 import '../firebase/firebase_sync_service.dart';
 import '../service/bluetooth_driving_tracker_service.dart';
 import '../service/price_book_service.dart';
+import '../service/background_guardian_service.dart';
+import '../service/vehicle_alert_notifier.dart';
 
 // Re-export AppSettings and SettingsService so existing callers keep working seamlessly
 class AppSettings {
@@ -160,6 +162,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _vehicleAnomalyAlert = true;
   bool _batteryAnomalyAlert = true;
   int _unreadCloudNotices = 0;
+  bool _isIgnoringBattery = false;
+  bool _isXiaomi = false;
+  bool _isGuardianEnabled = true;
 
   AppTokens get t => context.tokens;
 
@@ -226,6 +231,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
         });
       }
     } catch (_) {}
+
+    try {
+      final isIgnoring = await BackgroundGuardianService.instance.isIgnoringBatteryOptimizations();
+      final isXiaomi = await BackgroundGuardianService.instance.isXiaomiDevice();
+      final isGuardian = await BackgroundGuardianService.instance.isGuardianEnabled();
+      if (mounted) {
+        setState(() {
+          _isIgnoringBattery = isIgnoring;
+          _isXiaomi = isXiaomi;
+          _isGuardianEnabled = isGuardian;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _showCloudActivitySheet() async {
@@ -246,6 +264,198 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onRatesUpdated: () {
           if (mounted) setState(() {});
         },
+      ),
+    );
+  }
+
+  Future<void> _showBackgroundPushDialog() async {
+    final t = context.tokens;
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          decoration: BoxDecoration(
+            color: t.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 38,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: t.ink3.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: t.accent.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Icons.notifications_active_rounded, color: t.accent, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '24/7 Background Push & Alerts',
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: t.ink),
+                        ),
+                        Text(
+                          'Receive alarms & warnings without opening app',
+                          style: TextStyle(fontSize: 11.5, color: t.ink2),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Status Banner
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _isIgnoringBattery ? t.ok.withValues(alpha: 0.12) : const Color(0xFFFF9100).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _isIgnoringBattery ? t.ok.withValues(alpha: 0.4) : const Color(0xFFFF9100).withValues(alpha: 0.4),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _isIgnoringBattery ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                      color: _isIgnoringBattery ? t.ok : const Color(0xFFFF9100),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _isIgnoringBattery
+                            ? 'Battery Optimization: Unrestricted\nAndroid will not freeze TiggoMate in background.'
+                            : 'Battery Optimization: Restricted\nAndroid may delay or block alerts when app is closed.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _isIgnoringBattery ? t.ok : const Color(0xFFFF9100),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Action 1: Request ignore battery optimizations
+              if (!_isIgnoringBattery) ...[
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    await BackgroundGuardianService.instance.requestIgnoreBatteryOptimizations();
+                    final updated = await BackgroundGuardianService.instance.isIgnoringBatteryOptimizations();
+                    setSheetState(() => _isIgnoringBattery = updated);
+                    if (mounted) setState(() => _isIgnoringBattery = updated);
+                  },
+                  icon: const Icon(Icons.battery_charging_full_rounded, size: 18),
+                  label: const Text('1. Allow Background Running (No Restrictions)'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: t.accent,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+
+              // Action 2: Xiaomi / HyperOS Autostart
+              if (_isXiaomi) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: t.surface2,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: t.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.phone_android_rounded, size: 16, color: t.accent),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Xiaomi HyperOS / MIUI Setup',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: t.ink),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '1. Turn ON "Autostart"\n2. In "Battery saver", select "No restrictions"',
+                        style: TextStyle(fontSize: 11.5, color: t.ink2, height: 1.4),
+                      ),
+                    ],
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await BackgroundGuardianService.instance.openAutostartSettings();
+                  },
+                  icon: const Icon(Icons.settings_outlined, size: 18),
+                  label: const Text('Open HyperOS / MIUI Autostart Settings'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: t.ink,
+                    side: BorderSide(color: t.border),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+
+              // Action 3: Send Test Notification
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await VehicleAlertNotifier.raiseSystemNotification(
+                    id: 9999,
+                    title: 'TiggoMate 24/7 Guardian Active',
+                    message: '✓ Background push notifications are active! You will receive alerts without opening the app.',
+                    icon: Icons.notifications_active_rounded,
+                  );
+                  AppNotification.show(
+                    context,
+                    message: '🔔 Test notification sent to status bar!',
+                    type: NotificationType.success,
+                  );
+                },
+                icon: const Icon(Icons.notifications_outlined, size: 18),
+                label: const Text('Send Test Status Bar Alert'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: t.ink,
+                  side: BorderSide(color: t.border),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -974,6 +1184,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   setState(() => _batteryAnomalyAlert = !val);
                 }
               },
+            ),
+          ]),
+
+          // 24/7 Background Push & Vehicle Guardian
+          _group('24/7 Background Push & Alert Guardian', [
+            _switchRow(
+              Icons.shield_rounded,
+              '24/7 Vehicle Guardian Mode',
+              'Ensures door/window security, low 12V battery, charging status, and cloud notices trigger without opening the app.',
+              _isGuardianEnabled,
+              (val) async {
+                setState(() => _isGuardianEnabled = val);
+                await BackgroundGuardianService.instance.setGuardianEnabled(
+                  val,
+                  vehicleName: widget.settings.vehicleNickname.isNotEmpty
+                      ? widget.settings.vehicleNickname
+                      : 'Chery Tiggo 7 PHEV',
+                );
+              },
+            ),
+            _buildSettingTile(
+              leading: Icon(
+                Icons.battery_saver_rounded,
+                color: _isIgnoringBattery ? t.ok : const Color(0xFFFF9100),
+                size: 22,
+              ),
+              title: 'Background Push & Autostart Permissions',
+              subtitle: _isIgnoringBattery
+                  ? '🟢 Unrestricted: Android will not freeze background alerts'
+                  : '⚠️ Android / HyperOS may freeze alerts when app closed • Tap to allow',
+              trailing: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: (_isIgnoringBattery ? t.ok : const Color(0xFFFF9100)).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  _isIgnoringBattery ? 'ACTIVE' : 'ACTION REQUIRED',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.bold,
+                    color: _isIgnoringBattery ? t.ok : const Color(0xFFFF9100),
+                  ),
+                ),
+              ),
+              onTap: _showBackgroundPushDialog,
             ),
           ]),
 

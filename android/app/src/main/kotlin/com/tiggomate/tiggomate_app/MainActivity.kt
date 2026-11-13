@@ -1,9 +1,14 @@
 package com.tiggomate.tiggomate_app
 
 import android.app.Activity
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -175,6 +180,101 @@ class MainActivity : FlutterActivity() {
                     } catch (e: Exception) {
                         result.success(emptyList<Map<String, String>>())
                     }
+                }
+                else -> result.notImplemented()
+            }
+        }
+
+        // 4. Battery Optimization & Autostart Management Channel
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.tiggomate/battery_optimization").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "isIgnoringBatteryOptimizations" -> {
+                    val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+                    val isIgnoring = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        pm?.isIgnoringBatteryOptimizations(packageName) ?: false
+                    } else {
+                        true
+                    }
+                    result.success(isIgnoring)
+                }
+                "requestIgnoreBatteryOptimizations" -> {
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                data = Uri.parse("package:$packageName")
+                            }
+                            startActivity(intent)
+                            result.success(true)
+                        } else {
+                            result.success(true)
+                        }
+                    } catch (e: Exception) {
+                        try {
+                            val fallback = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                            startActivity(fallback)
+                            result.success(true)
+                        } catch (e2: Exception) {
+                            result.error("ERROR", e2.localizedMessage, null)
+                        }
+                    }
+                }
+                "openAutostartSettings" -> {
+                    val manufacturer = Build.MANUFACTURER.lowercase()
+                    val intent = Intent()
+                    try {
+                        when {
+                            manufacturer.contains("xiaomi") || manufacturer.contains("redmi") || manufacturer.contains("poco") -> {
+                                intent.component = ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity")
+                            }
+                            manufacturer.contains("huawei") || manufacturer.contains("honor") -> {
+                                intent.component = ComponentName("com.huawei.systemmanager", "com.huawei.systemmanager.optimize.process.ProtectActivity")
+                            }
+                            manufacturer.contains("oppo") || manufacturer.contains("realme") -> {
+                                intent.component = ComponentName("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity")
+                            }
+                            manufacturer.contains("vivo") -> {
+                                intent.component = ComponentName("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity")
+                            }
+                            manufacturer.contains("samsung") -> {
+                                intent.component = ComponentName("com.samsung.android.lool", "com.samsung.android.sm.ui.battery.BatteryActivity")
+                            }
+                            else -> {
+                                intent.action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+                                intent.data = Uri.parse("package:$packageName")
+                            }
+                        }
+                        startActivity(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        try {
+                            val fallback = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.parse("package:$packageName")
+                            }
+                            startActivity(fallback)
+                            result.success(true)
+                        } catch (e2: Exception) {
+                            result.error("ERROR", e2.localizedMessage, null)
+                        }
+                    }
+                }
+                "getManufacturer" -> {
+                    result.success(mapOf(
+                        "manufacturer" to Build.MANUFACTURER,
+                        "brand" to Build.BRAND,
+                        "model" to Build.MODEL
+                    ))
+                }
+                "startGuardianService" -> {
+                    val name = call.argument<String>("vehicleName") ?: "Chery Tiggo"
+                    TiggoMateForegroundService.startGuardian(this, name)
+                    result.success(true)
+                }
+                "stopGuardianService" -> {
+                    TiggoMateForegroundService.stop(this)
+                    result.success(true)
+                }
+                "isGuardianRunning" -> {
+                    result.success(TiggoMateForegroundService.isGuardianRunning)
                 }
                 else -> result.notImplemented()
             }

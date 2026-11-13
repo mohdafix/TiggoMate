@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 
@@ -63,7 +64,7 @@ class LocationTrackerService {
         _kTaskName,
         _kTaskName,
         frequency: const Duration(minutes: 15),
-        existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
+        existingWorkPolicy: ExistingPeriodicWorkPolicy.update,
         constraints: Constraints(networkType: NetworkType.connected),
       );
     } catch (e) {
@@ -127,6 +128,13 @@ class LocationTrackerService {
         } catch (e) {
           debugPrint('LocationTrackerService: alert check failed: $e');
         }
+
+        // Official Chery CarLinko server-side cloud notices
+        try {
+          await _syncCloudNotices(client, vehicleId, prefs);
+        } catch (e) {
+          debugPrint('LocationTrackerService: cloud notice sync failed: $e');
+        }
       }
 
       // The 73-byte telemetry blob never carries GPS — use the real locate
@@ -150,6 +158,51 @@ class LocationTrackerService {
       await prefs.setString(_kHistoryKey, jsonEncode(trimmed.map((e) => e.toJson()).toList()));
     } catch (e) {
       debugPrint('LocationTrackerService.captureOnce failed: $e');
+    }
+  }
+
+  /// Syncs official Chery CarLinko cloud notices while app is closed
+  /// and raises real system notifications for any new alerts.
+  static Future<void> _syncCloudNotices(
+    CarLinkoClient client,
+    String vehicleId,
+    SharedPreferences prefs,
+  ) async {
+    final notices = await client.getCloudNotifications(vehicleId, page: 1, size: 8);
+    if (notices.isEmpty) return;
+
+    final lastSeenId = prefs.getInt('tm_last_seen_cloud_notice_id') ?? 0;
+    int maxId = lastSeenId;
+
+    for (final notice in notices) {
+      final rawId = notice['id'];
+      final noticeId = (rawId is num) ? rawId.toInt() : int.tryParse(rawId?.toString() ?? '') ?? 0;
+      if (noticeId > maxId) {
+        maxId = noticeId;
+      }
+
+      // Only notify if notice is newer than the recorded watermark
+      if (lastSeenId > 0 && noticeId > lastSeenId) {
+        final title = notice['title']?.toString() ??
+            notice['noticeTitle']?.toString() ??
+            notice['operatingName']?.toString() ??
+            'Chery Tiggo Cloud Alert';
+        final content = notice['content']?.toString() ??
+            notice['noticeContent']?.toString() ??
+            notice['resultMsg']?.toString() ??
+            '';
+
+        await VehicleAlertNotifier.raiseSystemNotification(
+          id: noticeId != 0 ? noticeId : (DateTime.now().millisecondsSinceEpoch % 100000),
+          title: title,
+          message: content.isNotEmpty ? content : 'New vehicle alert from CarLinko cloud',
+          icon: Icons.notifications_active_outlined,
+        );
+      }
+    }
+
+    if (maxId > lastSeenId) {
+      await prefs.setInt('tm_last_seen_cloud_notice_id', maxId);
     }
   }
 }

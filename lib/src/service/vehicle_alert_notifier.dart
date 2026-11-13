@@ -241,11 +241,22 @@ class VehicleAlertNotifier {
     }
   }
 
+  /// Public method to raise an immediate system status bar notification
+  /// and record it in the in-app alert log. Callable from any isolate or background worker.
+  static Future<void> raiseSystemNotification({
+    required int id,
+    required String title,
+    required String message,
+    required IconData icon,
+    NotificationType type = NotificationType.warning,
+  }) => _raiseAlert(id: id, title: title, message: message, icon: icon, type: type);
+
   static Future<void> _raiseAlert({
     required int id,
     required String title,
     required String message,
     required IconData icon,
+    NotificationType type = NotificationType.warning,
   }) async {
     await _ensurePlugin();
     try {

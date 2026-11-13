@@ -4,6 +4,7 @@ import 'src/service/service_appointment_manager.dart';
 import 'src/service/location_tracker_service.dart';
 import 'src/service/vehicle_alert_notifier.dart';
 import 'src/service/bluetooth_driving_tracker_service.dart';
+import 'src/service/background_guardian_service.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -65,13 +66,20 @@ void main() async {
     debugPrint('VehicleAlertsManager.init warning: $e');
   }
 
-  // Background GPS tracker (~every 15 min, independent of the app being
+  // Background GPS tracker & Cloud Notice Sync (~every 15 min, independent of the app being
   // open). No-ops quickly inside the task itself if no car is bound yet.
   unawaited(LocationTrackerService.initializeAndSchedule());
 
   // Android 13+ requires this prompt before a local notification (door
   // ajar / low 12V alerts) can actually show.
   unawaited(VehicleAlertNotifier.requestPermission());
+
+  // Check 24/7 Background Vehicle Guardian Service
+  unawaited(BackgroundGuardianService.instance.isGuardianEnabled().then((enabled) {
+    if (enabled) {
+      BackgroundGuardianService.instance.setGuardianEnabled(true);
+    }
+  }));
 
   unawaited(BluetoothDrivingTrackerService.instance.init());
   unawaited(CarLinkoBleController().init());
