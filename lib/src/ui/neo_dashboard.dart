@@ -44,6 +44,7 @@ class NeoDashboard extends StatefulWidget {
   final String? vehicleSkinKey;
   final VoidCallback onOpenSettings;
   final VoidCallback onOpenAssistant;
+  final void Function({bool startVoice})? onOpenAssistantWithVoice;
 
   const NeoDashboard({
     super.key,
@@ -56,6 +57,7 @@ class NeoDashboard extends StatefulWidget {
     this.vehicleSkinKey,
     required this.onOpenSettings,
     required this.onOpenAssistant,
+    this.onOpenAssistantWithVoice,
   });
 
   @override
@@ -88,6 +90,15 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
   void _handleSkinChanged() {
     if (mounted) {
       setState(() {});
+    }
+  }
+
+  void _openVoiceAssistant({bool startVoice = true}) {
+    HapticFeedback.mediumImpact();
+    if (widget.onOpenAssistantWithVoice != null) {
+      widget.onOpenAssistantWithVoice!(startVoice: startVoice);
+    } else {
+      widget.onOpenAssistant();
     }
   }
 
@@ -1287,6 +1298,15 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     ),
                     const SizedBox(width: 4),
 
+                    IconButton(
+                      icon: const Icon(Icons.mic_rounded, color: Color(0xFF06B6D4), size: 22),
+                      tooltip: 'TiggoMate Voice Assistant',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      onPressed: () => _openVoiceAssistant(startVoice: true),
+                    ),
+                    const SizedBox(width: 4),
+
                     // Menu icon (Burger)
                     PopupMenuButton<String>(
                       tooltip: 'Vehicle Tools & Settings',
@@ -1300,6 +1320,9 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       ),
                       onSelected: (val) {
                         switch (val) {
+                          case 'voice_hud':
+                            _openVoiceAssistant(startVoice: true);
+                            break;
                           case 'skin_studio':
                             _showVehicleSkinStudioModal();
                             break;
@@ -1329,6 +1352,16 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         }
                       },
                       itemBuilder: (ctx) => [
+                        PopupMenuItem(
+                          value: 'voice_hud',
+                          child: const Row(
+                            children: [
+                              Icon(Icons.graphic_eq_rounded, size: 18, color: Color(0xFF06B6D4)),
+                              SizedBox(width: 10),
+                              Text('AI Voice Assistant', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
                         PopupMenuItem(
                           value: 'skin_studio',
                           child: Row(
@@ -1827,7 +1860,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             // 6. BOTTOM AI COMMAND PROMPT BAR -- deep-links into the merged
             // Assistant tab instead of opening a separate chat sheet.
             GestureDetector(
-              onTap: widget.onOpenAssistant,
+              onTap: () => _openVoiceAssistant(startVoice: false),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
@@ -1857,6 +1890,26 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       ),
                     ),
                     const SizedBox(width: 8),
+                    // DasHub-Style Voice Assistant Mic Action
+                    GestureDetector(
+                      onTap: () => _openVoiceAssistant(startVoice: true),
+                      child: Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF06B6D4).withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: const Color(0xFF06B6D4).withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.mic_rounded,
+                          size: 16,
+                          color: Color(0xFF06B6D4),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(

@@ -6,8 +6,6 @@ import 'src/service/vehicle_alert_notifier.dart';
 import 'src/service/bluetooth_driving_tracker_service.dart';
 import 'src/service/background_guardian_service.dart';
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -28,6 +26,7 @@ import 'src/ui/login_screen.dart';
 import 'src/theme/app_theme.dart';
 
 import 'src/ui/app_notification.dart';
+import 'src/service/voice_assistant_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'src/ui/setup_intro_screen.dart';
 import 'src/ui/settings_screen.dart';
@@ -208,6 +207,7 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
+  bool _startVoiceOnAssistantOpen = false;
   AppSettings _settings = const AppSettings();
   final VehicleRepository _vehicleRepo = AppVehicleRepository.instance;
   final MyTnbRepository _myTnbRepo = MyTnbRepository();
@@ -310,10 +310,20 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         vehicleSkinKey: _settings.vehicleSkinKey,
         onOpenSettings: _openSettings,
         onOpenAssistant: () => setState(() => _currentIndex = 1),
+        onOpenAssistantWithVoice: ({bool startVoice = false}) {
+          setState(() {
+            _currentIndex = 1;
+            _startVoiceOnAssistantOpen = startVoice;
+          });
+        },
       ),
       AssistantTab(
         settings: _settings,
         onOpenSettings: _openSettings,
+        startVoiceImmediately: _startVoiceOnAssistantOpen,
+        onVoiceStarted: () {
+          if (mounted) setState(() => _startVoiceOnAssistantOpen = false);
+        },
       ),
       TripsLogbookScreen(
         tnbTariff: _settings.tnbTariff,
@@ -769,10 +779,15 @@ class MarkdownMessageView extends StatelessWidget {
 class AssistantTab extends StatefulWidget {
   final AppSettings settings;
   final VoidCallback onOpenSettings;
+  final bool startVoiceImmediately;
+  final VoidCallback? onVoiceStarted;
+
   const AssistantTab({
     super.key,
     required this.settings,
     required this.onOpenSettings,
+    this.startVoiceImmediately = false,
+    this.onVoiceStarted,
   });
 
   @override
@@ -783,6 +798,7 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<Map<String, dynamic>> _messages = [];
+  final VoiceAssistantService _voiceService = VoiceAssistantService.instance;
   bool _loading = false;
   bool _isListening = false;
   TripRecord? _lastTrip;
@@ -803,6 +819,40 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
   void initState() {
     super.initState();
     _loadInitialData();
+    _voiceService.addListener(_onVoiceServiceUpdated);
+    if (widget.startVoiceImmediately) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _startListening();
+        widget.onVoiceStarted?.call();
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant AssistantTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.startVoiceImmediately && !oldWidget.startVoiceImmediately) {
+      _startListening();
+      widget.onVoiceStarted?.call();
+    }
+  }
+
+  void _onVoiceServiceUpdated() {
+    if (!mounted) return;
+    final phase = _voiceService.phase;
+    final listening = phase == VoiceAssistantPhase.listening;
+    if (_isListening != listening) {
+      setState(() => _isListening = listening);
+    } else {
+      setState(() {});
+    }
+
+    if (phase == VoiceAssistantPhase.success) {
+      final text = _voiceService.finalText.trim();
+      if (text.isNotEmpty) {
+        _sendMessage(text, fromVoice: true);
+      }
+    }
   }
 
   void _loadInitialData() {
@@ -823,6 +873,7 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
 
   @override
   void dispose() {
+    _voiceService.removeListener(_onVoiceServiceUpdated);
     _listenPulseCtrl.dispose();
     _thinkingDotsCtrl.dispose();
     _telemetrySub?.cancel();
@@ -843,114 +894,52 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
     });
   }
 
-  Future<void> _listenVoice() async {
+  Future<void> _startListening() async {
     HapticFeedback.mediumImpact();
-    setState(() => _isListening = true);
+    await _voiceService.startListening(lang: 'en-MY');
+  }
 
-    try {
-      final recognized = await VoiceRecognitionService.startListening();
-      if (!mounted) return;
-      setState(() => _isListening = false);
-
-      if (recognized != null && recognized.trim().isNotEmpty) {
-        _controller.text = recognized;
-        HapticFeedback.lightImpact();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.mic, color: Color(0xFFD2F835), size: 18),
-                const SizedBox(width: 8),
-                Expanded(child: Text('Heard: "$recognized"')),
-              ],
-            ),
-            duration: const Duration(seconds: 2),
-            backgroundColor: const Color(0xFF131922),
-          ),
-        );
-        _sendMessage(recognized);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No speech recognized. Tap mic to try again or type below.'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isListening = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Voice Recognition: $e'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+  Future<void> _toggleVoice() async {
+    HapticFeedback.mediumImpact();
+    if (_isListening) {
+      await _voiceService.stopListening();
+    } else {
+      await _startListening();
     }
   }
 
-  Map<String, dynamic>? _matchActionFromPrompt(String text) {
+  Map<String, dynamic>? _matchActionFromPrompt(String text, {bool fromVoice = false}) {
+    final telemetry = AppVehicleRepository.instance.currentTelemetry;
+    final cmd = VoiceAssistantService.parseCommand(text, telemetry);
+    if (cmd.opcode != null) {
+      return {
+        'id': cmd.type.name,
+        'title': cmd.title,
+        'desc': cmd.description,
+        'opcode': cmd.opcode,
+        'icon': _getIconForAction(cmd.type.name),
+        'autoExecute': fromVoice,
+      };
+    }
     final lower = text.toLowerCase();
-    if (lower.contains('open') && (lower.contains('window') || lower.contains('tingkap'))) {
-      return {
-        'id': 'windows_open',
-        'title': 'Open All Windows',
-        'desc': 'Lowers all 4 power windows for cabin heat escape',
-        'icon': Icons.window_outlined,
-      };
-    } else if (lower.contains('close') && (lower.contains('window') || lower.contains('tingkap'))) {
-      return {
-        'id': 'windows_close',
-        'title': 'Close All Windows',
-        'desc': 'Fully closes and seals all 4 windows with anti-pinch protection',
-        'icon': Icons.window_rounded,
-      };
-    } else if (lower.contains('aircond') || lower.contains('ac') || lower.contains('cool') || lower.contains('climate')) {
-      if (lower.contains('off') || lower.contains('stop') || lower.contains('tutup')) {
-        return {
-          'id': 'climate_off',
-          'title': 'Turn Off A/C & Climate',
-          'desc': 'Shuts down compressor and ventilation fans',
-          'icon': Icons.power_settings_new_rounded,
-        };
-      } else {
-        return {
-          'id': 'climate_on',
-          'title': 'Pre-cool Cabin (22°C)',
-          'desc': 'Activates high-voltage A/C compressor and cabin pre-conditioning',
-          'icon': Icons.ac_unit_rounded,
-        };
-      }
-    } else if (lower.contains('engine') || lower.contains('enjin')) {
+    if (lower.contains('engine') || lower.contains('enjin')) {
       if (lower.contains('stop') || lower.contains('off') || lower.contains('mati')) {
         return {
           'id': 'engine_stop',
           'title': 'Remote Engine Stop',
           'desc': 'Stops the 1.5T hybrid engine safely',
+          'opcode': CarLinkoOpcodes.engineStop,
           'icon': Icons.power_settings_new_rounded,
+          'autoExecute': fromVoice,
         };
       } else {
         return {
           'id': 'engine_start',
           'title': 'Remote Engine Pre-Warm',
           'desc': 'Starts 1.5T engine for 10-minute powertrain pre-warming',
+          'opcode': CarLinkoOpcodes.engineStart,
           'icon': Icons.key_rounded,
-        };
-      }
-    } else if (lower.contains('lock') || lower.contains('kunci')) {
-      if (lower.contains('unlock') || lower.contains('buka')) {
-        return {
-          'id': 'unlock',
-          'title': 'Unlock Doors',
-          'desc': 'Unlocks central locking system',
-          'icon': Icons.lock_open_rounded,
-        };
-      } else {
-        return {
-          'id': 'lock',
-          'title': 'Lock Vehicle Doors',
-          'desc': 'Secures all doors and arms alarm system',
-          'icon': Icons.lock_outline_rounded,
+          'autoExecute': fromVoice,
         };
       }
     }
@@ -959,29 +948,47 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
 
   IconData _getIconForAction(String actionId) {
     switch (actionId) {
-      case 'windows_open':
+      case 'windowVent':
       case 'windows_vent':
+      case 'windowsOpen':
+      case 'windows_open':
         return Icons.window_outlined;
+      case 'windowsClose':
       case 'windows_close':
         return Icons.window_rounded;
+      case 'climateOn':
       case 'climate_on':
         return Icons.ac_unit_rounded;
+      case 'climateOff':
       case 'climate_off':
         return Icons.power_settings_new_rounded;
+      case 'airPurifierOn':
+      case 'air_purifier':
+        return Icons.air_rounded;
+      case 'lockDoors':
       case 'door_lock':
       case 'lock':
         return Icons.lock_outline_rounded;
+      case 'unlockDoors':
       case 'door_unlock':
       case 'unlock':
         return Icons.lock_open_rounded;
+      case 'sunroofOpen':
+      case 'sunroofClose':
       case 'sunroof_open':
       case 'sunroof_close':
         return Icons.roofing_rounded;
+      case 'trunkOpen':
       case 'trunk_open':
         return Icons.sensor_door_outlined;
+      case 'findCar':
+      case 'find_car':
+        return Icons.volume_up_rounded;
       case 'engine_start':
+      case 'engineStart':
         return Icons.key_rounded;
       case 'engine_stop':
+      case 'engineStop':
         return Icons.power_settings_new_rounded;
       case 'schedule_charging':
         return Icons.ev_station_rounded;
@@ -992,7 +999,57 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
     }
   }
 
-  Future<void> _sendMessage(String text) async {
+  String? _getOpcodeForActionId(String id) {
+    switch (id) {
+      case 'windowVent':
+        return CarLinkoOpcodes.windowsVent;
+      case 'windowsOpen':
+      case 'windows_open':
+        return CarLinkoOpcodes.windowsOpen;
+      case 'windowsClose':
+      case 'windows_close':
+        return CarLinkoOpcodes.windowsClose;
+      case 'climateOn':
+      case 'climate_on':
+        return CarLinkoOpcodes.acOn;
+      case 'climateOff':
+      case 'climate_off':
+        return CarLinkoOpcodes.acOff;
+      case 'sunroofOpen':
+      case 'sunroof_open':
+        return CarLinkoOpcodes.sunroofOpen;
+      case 'sunroofClose':
+      case 'sunroof_close':
+        return CarLinkoOpcodes.sunroofClose;
+      case 'trunkOpen':
+      case 'trunk_open':
+        return CarLinkoOpcodes.trunkOpen;
+      case 'airPurifierOn':
+      case 'air_purifier':
+        return CarLinkoOpcodes.airPurifyOn;
+      case 'lockDoors':
+      case 'door_lock':
+      case 'lock':
+        return CarLinkoOpcodes.lock;
+      case 'unlockDoors':
+      case 'door_unlock':
+      case 'unlock':
+        return CarLinkoOpcodes.unlock;
+      case 'findCar':
+      case 'find_car':
+        return CarLinkoOpcodes.findCar;
+      case 'engine_start':
+      case 'engineStart':
+        return CarLinkoOpcodes.engineStart;
+      case 'engine_stop':
+      case 'engineStop':
+        return CarLinkoOpcodes.engineStop;
+      default:
+        return null;
+    }
+  }
+
+  Future<void> _sendMessage(String text, {bool fromVoice = false}) async {
     if (text.trim().isEmpty) return;
     _controller.clear();
 
@@ -1084,10 +1141,11 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
             'title': match.group(2)!.trim(),
             'desc': match.group(3)!.trim(),
             'icon': _getIconForAction(actId),
+            'autoExecute': fromVoice,
           };
           cleanText = aiReply.replaceFirst(match.group(0)!, '').trim();
         } else {
-          action = _matchActionFromPrompt(text);
+          action = _matchActionFromPrompt(text, fromVoice: fromVoice);
         }
 
         setState(() {
@@ -1115,7 +1173,7 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
     final q = text.toLowerCase();
     String answer;
     List<Map<String, dynamic>> citations = [];
-    Map<String, dynamic>? action = _matchActionFromPrompt(text);
+    Map<String, dynamic>? action = _matchActionFromPrompt(text, fromVoice: fromVoice);
 
     if (q.contains("battery") || q.contains("soc") || q.contains("charge") || q.contains("range") || q.contains("bateri")) {
       answer = "### Vehicle Battery & Range Telematics\n\n"
@@ -1713,24 +1771,14 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
                                 title: action['title'] as String? ?? 'Action',
                                 description: action['desc'] as String? ?? '',
                                 icon: (action['icon'] as IconData?) ?? Icons.bolt_rounded,
-                                onExecute: (id) async {
-  final opcode = id == 'windows_open'
-      ? CarLinkoOpcodes.windowsOpen
-      : id == 'windows_close'
-          ? CarLinkoOpcodes.windowsClose
-          : id == 'climate_on'
-              ? CarLinkoOpcodes.acOn
-              : id == 'climate_off'
-                  ? CarLinkoOpcodes.acOff
-                  : id == 'engine_start'
-                      ? CarLinkoOpcodes.engineStart
-                      : id == 'engine_stop'
-                          ? CarLinkoOpcodes.engineStop
-                          : id == 'lock'
-                              ? CarLinkoOpcodes.lock
-                              : CarLinkoOpcodes.unlock;
-  await AppVehicleRepository.instance.sendRemoteCommand(opcode);
-},
+                                opcode: action['opcode'] as String?,
+                                autoExecute: action['autoExecute'] as bool? ?? false,
+                                onExecute: (id, op) async {
+                                  final opcode = op ?? _getOpcodeForActionId(id);
+                                  if (opcode != null) {
+                                    await AppVehicleRepository.instance.sendRemoteCommand(opcode);
+                                  }
+                                },
                                 cardCol: isDark ? const Color(0xFF0A0B0E) : const Color(0xFFF1F5F9),
                                 borderCol: borderCol,
                                 limeAccent: accent,
@@ -1795,6 +1843,96 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
               ),
             ),
 
+            // Real-Time In-Car Voice Listening HUD Banner (Merged Assistant)
+            if (_isListening)
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF131922) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF06B6D4).withValues(alpha: 0.6), width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF06B6D4).withValues(alpha: 0.15),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    _buildEqualizerBars(const Color(0xFF06B6D4), _voiceService.rmsLevel),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 7,
+                                height: 7,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF06B6D4),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Listening... (English / Bahasa Melayu)',
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF06B6D4),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            _voiceService.partialText.isNotEmpty
+                                ? '"${_voiceService.partialText}"'
+                                : 'Speak a vehicle command or question...',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: _voiceService.partialText.isNotEmpty ? FontWeight.w700 : FontWeight.w500,
+                              color: _voiceService.partialText.isNotEmpty
+                                  ? (isDark ? Colors.white : const Color(0xFF111827))
+                                  : textMuted,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        _voiceService.cancelListening();
+                      },
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: borderCol),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: textMuted),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             // 3. Chat Input Bar matching Screenshot
             Container(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -1811,7 +1949,7 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
                         color: isDark ? const Color(0xFF131922) : const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                          color: _isListening ? const Color(0xFFFF5252) : borderCol,
+                          color: _isListening ? const Color(0xFF06B6D4) : borderCol,
                           width: _isListening ? 1.5 : 1.0,
                         ),
                       ),
@@ -1823,11 +1961,11 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
                         ),
                         decoration: InputDecoration(
                           hintText: _isListening
-                              ? 'Listening... Speak command now'
+                              ? 'Listening... Speak command or question'
                               : 'Ask about your Tiggo 7...',
                           hintStyle: TextStyle(
                             color: _isListening
-                                ? const Color(0xFFFF5252)
+                                ? const Color(0xFF06B6D4)
                                 : (isDark ? const Color(0xFF525A6C) : const Color(0xFF9CA3AF)),
                             fontSize: 13,
                             fontWeight: _isListening ? FontWeight.w600 : FontWeight.normal,
@@ -1835,7 +1973,7 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                         ),
-                        onSubmitted: _sendMessage,
+                        onSubmitted: (t) => _sendMessage(t, fromVoice: false),
                       ),
                     ),
                   ),
@@ -1843,7 +1981,7 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
 
                   // Voice Mic Button with wave animation
                   InkWell(
-                    onTap: _listenVoice,
+                    onTap: _toggleVoice,
                     borderRadius: BorderRadius.circular(24),
                     child: SizedBox(
                       width: 48,
@@ -1856,19 +1994,19 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
                             alignment: Alignment.center,
                             children: [
                               if (_isListening) ...[
-                                _PulseRing(progress: t, color: const Color(0xFFFF5252)),
-                                _PulseRing(progress: (t + 0.5) % 1.0, color: const Color(0xFFFF5252)),
+                                _PulseRing(progress: t, color: const Color(0xFF06B6D4)),
+                                _PulseRing(progress: (t + 0.5) % 1.0, color: const Color(0xFF06B6D4)),
                               ],
                               Container(
                                 width: 44,
                                 height: 44,
                                 decoration: BoxDecoration(
                                   color: _isListening
-                                      ? const Color(0xFFFF5252)
+                                      ? const Color(0xFF06B6D4)
                                       : (isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0)),
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: _isListening ? const Color(0xFFFF5252) : borderCol,
+                                    color: _isListening ? const Color(0xFF06B6D4) : borderCol,
                                   ),
                                 ),
                                 child: Center(
@@ -1904,7 +2042,7 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
                     ),
                     child: IconButton(
                       icon: const Icon(Icons.send_rounded, size: 20, color: Color(0xFF0A0B0E)),
-                      onPressed: () => _sendMessage(_controller.text),
+                      onPressed: () => _sendMessage(_controller.text, fromVoice: false),
                     ),
                   ),
                 ],
@@ -1913,6 +2051,25 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildEqualizerBars(Color color, double rms) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(7, (i) {
+        final base = [8.0, 12.0, 16.0, 20.0, 16.0, 12.0, 8.0][i];
+        final h = (base + rms * 14.0).clamp(4.0, 24.0);
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 1.5),
+          width: 3.5,
+          height: h,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        );
+      }),
     );
   }
 }
@@ -1924,7 +2081,9 @@ class _ActionExecutionCard extends StatefulWidget {
   final String title;
   final String description;
   final IconData icon;
-  final Function(String id)? onExecute;
+  final String? opcode;
+  final bool autoExecute;
+  final Future<void> Function(String id, String? opcode)? onExecute;
   final Color cardCol;
   final Color borderCol;
   final Color limeAccent;
@@ -1936,6 +2095,8 @@ class _ActionExecutionCard extends StatefulWidget {
     required this.title,
     required this.description,
     required this.icon,
+    this.opcode,
+    this.autoExecute = false,
     this.onExecute,
     required this.cardCol,
     required this.borderCol,
@@ -1950,9 +2111,73 @@ class _ActionExecutionCard extends StatefulWidget {
 
 class _ActionExecutionCardState extends State<_ActionExecutionCard> {
   bool _executed = false;
+  bool _executing = false;
+  int _countdown = 3;
+  Timer? _countdownTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autoExecute) {
+      _startCountdown();
+    }
+  }
+
+  void _startCountdown() {
+    _countdown = 3;
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_countdown > 1) {
+        setState(() => _countdown--);
+      } else {
+        timer.cancel();
+        _executeAction();
+      }
+    });
+  }
+
+  void _cancelCountdown() {
+    _countdownTimer?.cancel();
+    _countdownTimer = null;
+    if (mounted) {
+      setState(() => _countdown = 0);
+    }
+  }
+
+  Future<void> _executeAction() async {
+    _countdownTimer?.cancel();
+    _countdownTimer = null;
+    if (_executed || _executing) return;
+
+    setState(() => _executing = true);
+    HapticFeedback.heavyImpact();
+    try {
+      await widget.onExecute?.call(widget.actionId, widget.opcode);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _executing = false;
+          _executed = true;
+          _countdown = 0;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _countdownTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isCountingDown = _countdownTimer != null && _countdown > 0 && !_executed && !_executing;
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       padding: const EdgeInsets.all(12),
@@ -1960,7 +2185,9 @@ class _ActionExecutionCardState extends State<_ActionExecutionCard> {
         color: widget.cardCol,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: _executed ? const Color(0xFF10B981) : widget.limeAccent.withValues(alpha: 0.6),
+          color: _executed
+              ? const Color(0xFF10B981)
+              : (isCountingDown ? const Color(0xFF06B6D4) : widget.limeAccent.withValues(alpha: 0.6)),
           width: 1.2,
         ),
       ),
@@ -1972,13 +2199,18 @@ class _ActionExecutionCardState extends State<_ActionExecutionCard> {
               Container(
                 padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  color: (_executed ? const Color(0xFF10B981) : widget.limeAccent).withValues(alpha: 0.15),
+                  color: (_executed
+                          ? const Color(0xFF10B981)
+                          : (isCountingDown ? const Color(0xFF06B6D4) : widget.limeAccent))
+                      .withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   _executed ? Icons.check_circle_outline_rounded : widget.icon,
                   size: 18,
-                  color: _executed ? const Color(0xFF10B981) : widget.limeAccent,
+                  color: _executed
+                      ? const Color(0xFF10B981)
+                      : (isCountingDown ? const Color(0xFF06B6D4) : widget.limeAccent),
                 ),
               ),
               const SizedBox(width: 10),
@@ -2002,39 +2234,90 @@ class _ActionExecutionCardState extends State<_ActionExecutionCard> {
                   ],
                 ),
               ),
+              if (isCountingDown)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF06B6D4).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF06B6D4).withValues(alpha: 0.4)),
+                  ),
+                  child: Text(
+                    '${_countdown}s',
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF06B6D4),
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _executed
-                  ? null
-                  : () {
-                      HapticFeedback.heavyImpact();
-                      widget.onExecute?.call(widget.actionId);
-                      setState(() => _executed = true);
-                    },
-              icon: Icon(
-                _executed ? Icons.check : Icons.send_rounded,
-                size: 15,
-                color: _executed ? Colors.white70 : const Color(0xFF0A0B0E),
-              ),
-              label: Text(
-                _executed ? 'Executed ✓ (Transmitted to CarLinko T-Box)' : 'Confirm & Execute Action',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+          if (isCountingDown)
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _cancelCountdown,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      side: BorderSide(color: widget.borderCol),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: Text(
+                      'Cancel',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: widget.textMuted),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton.icon(
+                    onPressed: _executeAction,
+                    icon: const Icon(Icons.flash_on_rounded, size: 14, color: Color(0xFF0A0B0E)),
+                    label: Text(
+                      'Execute (${_countdown}s)',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0A0B0E)),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF06B6D4),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+              ],
+            )
+          else
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _executed || _executing ? null : _executeAction,
+                icon: Icon(
+                  _executed ? Icons.check : (_executing ? Icons.hourglass_top_rounded : Icons.send_rounded),
+                  size: 15,
                   color: _executed ? Colors.white70 : const Color(0xFF0A0B0E),
                 ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _executed ? const Color(0xFF10B981) : widget.limeAccent,
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                label: Text(
+                  _executed
+                      ? 'Executed ✓ (Transmitted to CarLinko T-Box)'
+                      : (_executing ? 'Transmitting to Vehicle...' : 'Confirm & Execute Action'),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: _executed ? Colors.white70 : const Color(0xFF0A0B0E),
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _executed ? const Color(0xFF10B981) : widget.limeAccent,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
