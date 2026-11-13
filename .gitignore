@@ -50,4 +50,6 @@ app.*.map.json
 /app/
 /carlinko/
 /j5-ev-dashboard/
+/scratch/
+*.zip
 .claude/ 
