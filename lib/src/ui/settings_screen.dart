@@ -596,8 +596,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Container(
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
-            color: t.surface,
-            borderRadius: BorderRadius.circular(18),
+            color: t.resolvedContainerLow,
+            borderRadius: BorderRadius.circular(AppTokens.rXl),
             border: Border.all(color: t.border),
           ),
           child: Material(
@@ -691,9 +691,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _showSkinPicker() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: t.surface,
+      backgroundColor: t.resolvedContainerLow,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppTokens.r2Xl)),
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
@@ -750,8 +750,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final cur = themeCtrl.themeMode;
     showModalBottomSheet(
       context: context,
-      backgroundColor: t.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      backgroundColor: t.resolvedContainerLow,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppTokens.r2Xl))),
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
@@ -796,8 +796,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     const providers = ['Auto-Detect', 'OpenRouter', 'Direct OpenAI', 'Google Gemini', 'Groq', 'Custom Backend'];
     showModalBottomSheet(
       context: context,
-      backgroundColor: t.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      backgroundColor: t.resolvedContainerLow,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppTokens.r2Xl))),
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
@@ -831,8 +831,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: t.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      backgroundColor: t.resolvedContainerLow,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppTokens.r2Xl))),
       builder: (ctx) {
         final currentCustom = BluetoothDrivingTrackerService.instance.customCarBtName;
         return SafeArea(
@@ -894,8 +894,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ];
     showModalBottomSheet(
       context: context,
-      backgroundColor: t.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      backgroundColor: t.resolvedContainerLow,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppTokens.r2Xl))),
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),

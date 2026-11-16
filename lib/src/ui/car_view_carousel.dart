@@ -18,6 +18,7 @@ class CarViewCarousel extends StatefulWidget {
   /// Page to open on (lets the parent restore it after the card is rebuilt).
   final int initialPage;
   final ValueChanged<int>? onPageChanged;
+  final VoidCallback? onCarTap;
 
   const CarViewCarousel({
     super.key,
@@ -27,6 +28,7 @@ class CarViewCarousel extends StatefulWidget {
     required this.selectedSkinKey,
     this.initialPage = 0,
     this.onPageChanged,
+    this.onCarTap,
   });
 
   @override
@@ -140,6 +142,7 @@ class _CarViewCarouselState extends State<CarViewCarousel> {
                   selectedKey: widget.selectedSkinKey,
                   textMuted: textMuted,
                   textPrimary: textPrimary,
+                  onTap: widget.onCarTap,
                 ),
                 BlueprintCarStage(
                   telemetry: widget.telemetry,
@@ -179,57 +182,97 @@ class _VehicleLiveryPanel extends StatelessWidget {
   final String selectedKey;
   final Color textMuted;
   final Color textPrimary;
+  final VoidCallback? onTap;
 
   const _VehicleLiveryPanel({
     required this.selectedKey,
     required this.textMuted,
     required this.textPrimary,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final skin = getVehicleSkinByKey(selectedKey);
 
-    return Column(
-      children: [
-        // Hero render: the only place on the cyber dashboard where the skin is visible
-        Expanded(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            child: Image.asset(
-              skin.assetPath,
-              key: ValueKey(skin.key),
-              fit: BoxFit.contain,
-              errorBuilder: (_, _, _) =>
-                  Icon(Icons.directions_car_filled_outlined, size: 48, color: textMuted),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Column(
+        children: [
+          // Hero render: floating over subtle ambient glow and shadow
+          Expanded(
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned(
+                  bottom: 4,
+                  child: Container(
+                    width: 170,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(100),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF00E5FF).withValues(alpha: 0.18),
+                          blurRadius: 20,
+                          spreadRadius: 2,
+                        ),
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.35),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: Image.asset(
+                    skin.assetPath,
+                    key: ValueKey(skin.key),
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, _, _) =>
+                        Icon(Icons.directions_car_filled_outlined, size: 48, color: textMuted),
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          '${skin.name}${skin.isDualTone ? ' · DUAL TONE' : ''}'.toUpperCase(),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontFamily: 'monospace',
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.0,
-            color: textPrimary,
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                '${skin.name}${skin.isDualTone ? ' · DUAL TONE' : ''}'.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.0,
+                  color: textPrimary,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.info_outline, size: 12, color: textMuted),
+            ],
           ),
-        ),
-        const SizedBox(height: 4),
-        // The color itself is chosen in Settings/setup, not from this card.
-        Text(
-          'CHOOSE IN SETTINGS',
-          style: TextStyle(
-            fontFamily: 'monospace',
-            fontSize: 9.5,
-            letterSpacing: 1.0,
-            color: textMuted,
+          const SizedBox(height: 2),
+          Text(
+            'CHOOSE IN SETTINGS',
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.8,
+              color: textMuted,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

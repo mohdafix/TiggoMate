@@ -19,6 +19,7 @@ import 'src/mytnb/mytnb_api.dart';
 
 import 'src/ui/neo_dashboard.dart';
 import 'src/ui/chery_service_centres_screen.dart';
+import 'src/ai/chery_club_knowledge.dart';
 import 'src/ui/trips_logbook_screen.dart';
 import 'src/auth/auth_service.dart';
 import 'src/ui/login_screen.dart';
@@ -352,38 +353,36 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           children: pages,
         ),
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF0D0F14) : Colors.white,
-          border: Border(
-            top: BorderSide(
-              color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        bottom: true,
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+          decoration: BoxDecoration(
+            color: context.tokens.resolvedContainerLow.withValues(alpha: isDark ? 0.96 : 0.98),
+            borderRadius: BorderRadius.circular(AppTokens.rFull),
+            border: Border.all(
+              color: context.tokens.resolvedBorderSubtle,
               width: 1.0,
             ),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
-              blurRadius: 10,
-              offset: const Offset(0, -3),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          top: false,
-          bottom: true,
-          child: Padding(
-            padding: const EdgeInsets.only(top: 6, bottom: 8),
-            child: SizedBox(
-              height: 64,
-              child: Row(
-                children: [
-                  _buildCyberBottomNavItem(0, 'CAR', Icons.directions_car_outlined, Icons.directions_car),
-                  _buildCyberBottomNavItem(1, 'ASSISTANT', Icons.chat_bubble_outline, Icons.chat_bubble),
-                  _buildCyberBottomNavItem(2, 'LOG', Icons.route_outlined, Icons.route),
-                  _buildCyberBottomNavItem(3, 'SERVICE', Icons.build_outlined, Icons.build),
-                ],
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.10),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
               ),
+            ],
+          ),
+          child: SizedBox(
+            height: 58,
+            child: Row(
+              children: [
+                _buildCyberBottomNavItem(0, 'CAR', Icons.directions_car_outlined, Icons.directions_car),
+                _buildCyberBottomNavItem(1, 'ASSISTANT', Icons.chat_bubble_outline, Icons.chat_bubble),
+                _buildCyberBottomNavItem(2, 'LOG', Icons.route_outlined, Icons.route),
+                _buildCyberBottomNavItem(3, 'SERVICE', Icons.build_outlined, Icons.build),
+              ],
             ),
           ),
         ),
@@ -393,41 +392,38 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   Widget _buildCyberBottomNavItem(int index, String label, IconData unselectedIcon, IconData selectedIcon) {
     final isSelected = _currentIndex == index;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final accent = context.tokens.accent;
-    final textMuted = isDark ? const Color(0xFF717684) : const Color(0xFF64748B);
+    final t = context.tokens;
+    final selectedColor = t.isDark ? t.accent : (t.onAccentContainer ?? t.accent);
 
     return Expanded(
       child: InkWell(
         onTap: () => setState(() => _currentIndex = index),
+        borderRadius: BorderRadius.circular(AppTokens.rFull),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Top active indicator pill
             AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              height: 3,
-              width: isSelected ? 32 : 0,
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.fastOutSlowIn,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
               decoration: BoxDecoration(
-                color: isSelected ? accent : Colors.transparent,
-                borderRadius: BorderRadius.circular(2),
+                color: isSelected ? t.resolvedAccentContainer : Colors.transparent,
+                borderRadius: BorderRadius.circular(AppTokens.rFull),
+              ),
+              child: Icon(
+                isSelected ? selectedIcon : unselectedIcon,
+                size: 22,
+                color: isSelected ? selectedColor : t.ink2,
               ),
             ),
-            const SizedBox(height: 6),
-            Icon(
-              isSelected ? selectedIcon : unselectedIcon,
-              size: 24,
-              color: isSelected ? accent : textMuted,
-            ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             Text(
               label,
               style: TextStyle(
-                fontFamily: 'monospace',
                 fontSize: 11,
                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                 letterSpacing: 0.8,
-                color: isSelected ? accent : textMuted,
+                color: isSelected ? selectedColor : t.ink2,
               ),
             ),
           ],
@@ -1262,13 +1258,19 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
       answer = "Prepared climate command for your Tiggo 7 PHEV (${widget.settings.carPlateNumber}). The high-voltage compressor will cool the cabin before you board.";
       citations = [{"document": "CarLinko Telematics System", "section": "Thermal Comfort", "page": 1}];
     } else {
-      answer = "I understand you are asking about: \"$text\".\n\nYour Chery Tiggo 7 PHEV CSH is equipped with an intelligent dedicated hybrid system (3DHT, 240 kW / 545 Nm, 18.3 kWh battery).\n\n"
-          "- **Current Odometer:** **$currentKm km**\n"
-          "- **Battery SoC:** **${telemetry.batteryPct}%**\n"
-          "- **Tyres:** **FL ${telemetry.tyreFlPressureKpa.round()} kPa | FR ${telemetry.tyreFrPressureKpa.round()} kPa**\n"
-          "- **Doors:** ${telemetry.doorsOpen ? 'Door Ajar ⚠️' : 'Closed & Secured ✓'}\n"
-          "- **Next Service:** $nextServiceInfo";
-      citations = [{"document": "Chery Tiggo 7 PHEV Telematics", "section": "Vehicle Live State", "page": 1}];
+      final clubMatch = CheryClubKnowledge.matchQuestion(text);
+      if (clubMatch != null) {
+        answer = clubMatch.detailedAdvice;
+        citations = [{"document": clubMatch.source, "section": clubMatch.category, "page": 1}];
+      } else {
+        answer = "I understand you are asking about: \"$text\".\n\nYour Chery Tiggo 7 PHEV CSH is equipped with an intelligent dedicated hybrid system (3DHT, 240 kW / 545 Nm, 18.3 kWh battery).\n\n"
+            "- **Current Odometer:** **$currentKm km**\n"
+            "- **Battery SoC:** **${telemetry.batteryPct}%**\n"
+            "- **Tyres:** **FL ${telemetry.tyreFlPressureKpa.round()} kPa | FR ${telemetry.tyreFrPressureKpa.round()} kPa**\n"
+            "- **Doors:** ${telemetry.doorsOpen ? 'Door Ajar ⚠️' : 'Closed & Secured ✓'}\n"
+            "- **Next Service:** $nextServiceInfo";
+        citations = [{"document": "Chery Tiggo 7 PHEV Telematics", "section": "Vehicle Live State", "page": 1}];
+      }
     }
 
     setState(() {
@@ -1285,16 +1287,17 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
 
 
   void _showHabitsDetail(BuildContext context, bool isDark) {
-    final bgCol = isDark ? const Color(0xFF131922) : Colors.white;
-    final textPrimary = isDark ? Colors.white : const Color(0xFF0A0B0E);
-    final textMuted = isDark ? const Color(0xFF717684) : const Color(0xFF64748B);
-    final accent = context.tokens.accent;
+    final t = context.tokens;
+    final bgCol = t.resolvedContainerLow;
+    final textPrimary = t.ink;
+    final textMuted = t.ink2;
+    final accent = t.accent;
 
     showModalBottomSheet(
       context: context,
       backgroundColor: bgCol,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppTokens.r2Xl)),
       ),
       builder: (ctx) => Padding(
         padding: const EdgeInsets.all(20),
@@ -1360,12 +1363,12 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
     return Expanded(
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppTokens.rLg),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: cardCol,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppTokens.rLg),
             border: Border.all(color: borderCol, width: 1.0),
           ),
           child: Column(
@@ -1417,12 +1420,12 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(AppTokens.rFull),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: cardCol,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppTokens.rFull),
           border: Border.all(color: borderCol, width: 1.0),
         ),
         child: Center(
@@ -1430,7 +1433,7 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
             label,
             style: TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
               color: textPrimary,
             ),
           ),
@@ -1442,12 +1445,13 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgCol = isDark ? const Color(0xFF0A0B0E) : const Color(0xFFF6F8FA);
-    final cardCol = isDark ? const Color(0xFF131922) : Colors.white;
-    final borderCol = isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0);
-    final textMuted = isDark ? const Color(0xFF717684) : const Color(0xFF64748B);
-    final textPrimary = isDark ? Colors.white : const Color(0xFF0A0B0E);
-    final accent = context.tokens.accent;
+    final t = context.tokens;
+    final bgCol = t.bg;
+    final cardCol = t.resolvedContainerLow;
+    final borderCol = t.border;
+    final textMuted = t.ink2;
+    final textPrimary = t.ink;
+    final accent = t.accent;
 
     final telemetry = AppVehicleRepository.instance.currentTelemetry;
 
@@ -1488,7 +1492,7 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0A0B0E) : Colors.white,
+                color: t.resolvedContainerLow,
                 border: Border(bottom: BorderSide(color: borderCol)),
               ),
               child: Row(
@@ -1508,41 +1512,48 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
                       ),
                     ],
                   ),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: accent.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          widget.settings.aiApiKey.trim().isNotEmpty
-                              ? 'Live • ${widget.settings.aiModel}'
-                              : 'Live • claude-haiku-4.5',
-                          style: TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.bold,
-                            color: accent,
+                  Flexible(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: t.resolvedAccentContainer,
+                              borderRadius: BorderRadius.circular(AppTokens.rFull),
+                            ),
+                            child: Text(
+                              widget.settings.aiApiKey.trim().isNotEmpty
+                                  ? 'Live • ${widget.settings.aiModel}'
+                                  : 'Live • claude-haiku-4.5',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? accent : (t.onAccentContainer ?? accent),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      InkWell(
-                        onTap: widget.onOpenSettings,
-                        borderRadius: BorderRadius.circular(6),
-                        child: Container(
-                          padding: const EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF131922) : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: borderCol),
+                        const SizedBox(width: 8),
+                        InkWell(
+                          onTap: widget.onOpenSettings,
+                          borderRadius: BorderRadius.circular(AppTokens.rFull),
+                          child: Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: t.resolvedContainerHigh,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: borderCol),
+                            ),
+                            child: Icon(Icons.tune, color: accent, size: 16),
                           ),
-                          child: Icon(Icons.tune, color: accent, size: 16),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -1624,7 +1635,7 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: cardCol,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(AppTokens.rXl),
                       border: Border.all(color: borderCol),
                     ),
                     child: Column(
@@ -1737,19 +1748,19 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
                       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
                       child: Container(
                         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.85),
                         decoration: BoxDecoration(
                           color: isUser
-                              ? (isDark ? const Color(0xFF1E293B) : const Color(0xFF0F172A))
+                              ? (isDark ? t.resolvedContainerHigh : t.ink)
                               : cardCol,
-                          borderRadius: BorderRadius.circular(16).copyWith(
-                            bottomRight: isUser ? const Radius.circular(2) : const Radius.circular(16),
-                            bottomLeft: !isUser ? const Radius.circular(2) : const Radius.circular(16),
+                          borderRadius: BorderRadius.circular(18).copyWith(
+                            bottomRight: isUser ? const Radius.circular(4) : const Radius.circular(18),
+                            bottomLeft: !isUser ? const Radius.circular(4) : const Radius.circular(18),
                           ),
                           border: Border.all(
                             color: isUser
-                                ? (isDark ? const Color(0xFF334155) : const Color(0xFF1E293B))
+                                ? (isDark ? t.border : t.ink)
                                 : borderCol,
                             width: 1.0,
                           ),
@@ -1764,7 +1775,7 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
                                 height: 1.45,
                                 color: isUser
                                     ? Colors.white
-                                    : (isDark ? Colors.white.withValues(alpha: 0.95) : const Color(0xFF111827)),
+                                    : textPrimary,
                               ),
                               accentColor: isUser ? Colors.white : accent,
                             ),
@@ -1783,7 +1794,7 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
                                     await AppVehicleRepository.instance.sendRemoteCommand(opcode);
                                   }
                                 },
-                                cardCol: isDark ? const Color(0xFF0A0B0E) : const Color(0xFFF1F5F9),
+                                cardCol: t.resolvedContainerHigh,
                                 borderCol: borderCol,
                                 limeAccent: accent,
                                 textPrimary: textPrimary,
@@ -1793,10 +1804,10 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
                             if (citations != null && citations.isNotEmpty) ...[
                               const SizedBox(height: 8),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: accent.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(6),
+                                  color: accent.withValues(alpha: 0.10),
+                                  borderRadius: BorderRadius.circular(AppTokens.rFull),
                                   border: Border.all(
                                     color: accent.withValues(alpha: 0.35),
                                     width: 1.0,
@@ -1835,8 +1846,8 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
                           Text(
                             'AI Copilot is reasoning...',
                             style: TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 11.5,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
                               color: textMuted,
                             ),
                           ),
@@ -1853,8 +1864,8 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
                 margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF131922) : const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(16),
+                  color: t.resolvedContainerHigh,
+                  borderRadius: BorderRadius.circular(AppTokens.rXl),
                   border: Border.all(color: const Color(0xFF06B6D4).withValues(alpha: 0.6), width: 1.2),
                   boxShadow: [
                     BoxShadow(
@@ -1904,7 +1915,7 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
                               fontSize: 13,
                               fontWeight: _voiceService.partialText.isNotEmpty ? FontWeight.w700 : FontWeight.w500,
                               color: _voiceService.partialText.isNotEmpty
-                                  ? (isDark ? Colors.white : const Color(0xFF111827))
+                                  ? textPrimary
                                   : textMuted,
                             ),
                             maxLines: 2,
@@ -1919,12 +1930,12 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
                         HapticFeedback.lightImpact();
                         _voiceService.cancelListening();
                       },
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppTokens.rFull),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0),
-                          borderRadius: BorderRadius.circular(14),
+                          color: t.resolvedContainerHighest,
+                          borderRadius: BorderRadius.circular(AppTokens.rFull),
                           border: Border.all(color: borderCol),
                         ),
                         child: Text(
@@ -1941,7 +1952,7 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
             Container(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0A0B0E) : Colors.white,
+                color: t.resolvedContainerLow,
                 border: Border(top: BorderSide(color: borderCol)),
               ),
               child: Row(
@@ -1950,8 +1961,8 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
                     child: Container(
                       height: 48,
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF131922) : const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(24),
+                        color: t.resolvedContainer,
+                        borderRadius: BorderRadius.circular(AppTokens.rFull),
                         border: Border.all(
                           color: _isListening ? const Color(0xFF06B6D4) : borderCol,
                           width: _isListening ? 1.5 : 1.0,
@@ -1961,7 +1972,7 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
                         controller: _controller,
                         style: TextStyle(
                           fontSize: 13.5,
-                          color: isDark ? Colors.white : const Color(0xFF111827),
+                          color: textPrimary,
                         ),
                         decoration: InputDecoration(
                           hintText: _isListening
@@ -1970,7 +1981,7 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
                           hintStyle: TextStyle(
                             color: _isListening
                                 ? const Color(0xFF06B6D4)
-                                : (isDark ? const Color(0xFF525A6C) : const Color(0xFF9CA3AF)),
+                                : t.ink3,
                             fontSize: 13,
                             fontWeight: _isListening ? FontWeight.w600 : FontWeight.normal,
                           ),
@@ -1986,20 +1997,20 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
                   // Voice Mic Button with wave animation
                   InkWell(
                     onTap: _toggleVoice,
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(AppTokens.rFull),
                     child: SizedBox(
                       width: 48,
                       height: 48,
                       child: AnimatedBuilder(
                         animation: _listenPulseCtrl,
                         builder: (context, _) {
-                          final t = _listenPulseCtrl.value;
+                          final tProgress = _listenPulseCtrl.value;
                           return Stack(
                             alignment: Alignment.center,
                             children: [
                               if (_isListening) ...[
-                                _PulseRing(progress: t, color: const Color(0xFF06B6D4)),
-                                _PulseRing(progress: (t + 0.5) % 1.0, color: const Color(0xFF06B6D4)),
+                                _PulseRing(progress: tProgress, color: const Color(0xFF06B6D4)),
+                                _PulseRing(progress: (tProgress + 0.5) % 1.0, color: const Color(0xFF06B6D4)),
                               ],
                               Container(
                                 width: 44,
@@ -2007,7 +2018,7 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
                                 decoration: BoxDecoration(
                                   color: _isListening
                                       ? const Color(0xFF06B6D4)
-                                      : (isDark ? const Color(0xFF1E2636) : const Color(0xFFE2E8F0)),
+                                      : t.resolvedContainerHigh,
                                   shape: BoxShape.circle,
                                   border: Border.all(
                                     color: _isListening ? const Color(0xFF06B6D4) : borderCol,
@@ -2045,7 +2056,7 @@ class _AssistantTabState extends State<AssistantTab> with TickerProviderStateMix
                       ],
                     ),
                     child: IconButton(
-                      icon: const Icon(Icons.send_rounded, size: 20, color: Color(0xFF0A0B0E)),
+                      icon: Icon(Icons.send_rounded, size: 20, color: t.onAccent),
                       onPressed: () => _sendMessage(_controller.text, fromVoice: false),
                     ),
                   ),
@@ -3008,7 +3019,61 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+              padding: const EdgeInsets.fromLTRB(18, 14, 18, 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Service Center',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                          color: isDark ? Colors.white : const Color(0xFF0A0B0E),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Maintenance & repairs',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: isDark ? const Color(0xFF717684) : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1B202C) : const Color(0xFFE2E8F0),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: isDark ? const Color(0xFF2B3242) : const Color(0xFFD8DDE6)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.calendar_today_rounded, size: 12, color: context.tokens.accent),
+                        const SizedBox(width: 5),
+                        Text(
+                          'Chery Care',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
               child: _buildSubTabSwitcher(isDark),
             ),
             Expanded(

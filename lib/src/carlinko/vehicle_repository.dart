@@ -782,6 +782,38 @@ class LiveCarLinkoRepository implements VehicleRepository {
               parseCoord(loc['pointLng']) ??
               (loc['point'] is Map ? parseCoord(loc['point']['lng']) : null);
           address = (loc['address'] as String?)?.trim() ?? (loc['locationName'] as String?)?.trim();
+
+          // Ported CarLinko telemetry cellular signal strength parsing
+          int? parseSignalBars(dynamic val) {
+            if (val == null) return null;
+            final numVal = (val is num) ? val.toInt() : int.tryParse(val.toString().trim());
+            if (numVal == null) return null;
+            if (numVal >= 0 && numVal <= 4) return numVal;
+            if (numVal >= 5 && numVal <= 31) {
+              if (numVal >= 20) return 4;
+              if (numVal >= 15) return 3;
+              if (numVal >= 10) return 2;
+              return 1;
+            }
+            if (numVal < 0) {
+              if (numVal >= -75) return 4;
+              if (numVal >= -85) return 3;
+              if (numVal >= -100) return 2;
+              return 1;
+            }
+            return null;
+          }
+
+          final rawSig = loc['signal'] ?? loc['gsmSignal'] ?? loc['csq'] ?? loc['netSignal'] ?? loc['signalLevel'] ?? loc['networkSignal'];
+          final parsedBars = parseSignalBars(rawSig);
+          final parsedCsq = (rawSig is num) ? rawSig.toInt() : int.tryParse(rawSig?.toString() ?? '');
+
+          if (parsedBars != null || parsedCsq != null) {
+            _current = _current.copyWith(
+              cellularSignalBars: parsedBars ?? _current.cellularSignalBars,
+              cellularCsq: parsedCsq ?? _current.cellularCsq,
+            );
+          }
         } catch (e) {
           debugPrint('CarLinko locateDevice failed: $e');
           _lastLocateStatus = 'Locate error: $e';

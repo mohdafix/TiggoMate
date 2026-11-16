@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../theme/app_theme.dart';
+import '../theme/app_tokens.dart';
 import '../carlinko/carlinko_api.dart';
 import '../carlinko/vehicle_repository.dart';
 import '../carlinko/vehicle_telemetry.dart';
 import 'apple_design_widgets.dart';
 
-/// Full-Featured Windows, Panoramic Sunroof & Electric Sunshade Controller Sheet.
-/// Provides independent 1-tap controls for Windows, Sunroof Glass, and Electric Curtain.
+/// Unified Windows, Panoramic Sunroof & Electric Sunshade controller.
+///
+/// This single sheet replaces what used to be three separate, overlapping
+/// screens (a windows sheet, a sunroof sheet, and an unused window+sunroof
+/// variant). Every control from all three is kept here: 4-door window
+/// vent/open/close, sunroof open/tilt/close, and the sunshade curtain
+/// toggle — opened from both the "Windows" and "Sunroof" Control Center
+/// pods on the dashboard.
 class WindowsControlSheet extends StatefulWidget {
   final VehicleRepository repository;
   final VehicleTelemetry telemetry;
@@ -135,7 +141,9 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = AppColors(context);
+    final t = context.tokens;
+    final evAccent = t.accent; // single lime/accent colour, same as the dashboard
+    final sunroofAccent = t.warn; // warm amber, reserved for sunroof glass states
 
     return AppleSheetContainer(
       child: Column(
@@ -151,30 +159,30 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                   Container(
                     padding: const EdgeInsets.all(9),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00E5FF).withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(12),
+                      color: evAccent.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(AppTokens.rMd),
                     ),
-                    child: const Icon(Icons.sensor_window_rounded, size: 22, color: Color(0xFF00E5FF)),
+                    child: Icon(Icons.sensor_window_rounded, size: 22, color: evAccent),
                   ),
                   const SizedBox(width: 12),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Windows & Panoramic Sunroof',
+                        'Windows & Sunroof',
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.bold,
                           letterSpacing: -0.3,
-                          color: colors.textPrimary,
+                          color: t.ink,
                         ),
                       ),
                       Text(
-                        'Individual 1-Tap Actuation • Glazing & Shade',
+                        'Doors, panoramic glass & sunshade',
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w500,
-                          color: colors.textSecondary,
+                          color: t.ink2,
                         ),
                       ),
                     ],
@@ -182,7 +190,7 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                 ],
               ),
               IconButton(
-                icon: Icon(Icons.close_rounded, color: colors.textMuted),
+                icon: Icon(Icons.close_rounded, color: t.ink3),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
@@ -198,26 +206,26 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
               margin: const EdgeInsets.only(bottom: 14),
               decoration: BoxDecoration(
                 color: (_lastSuccess == true)
-                    ? Colors.green.withValues(alpha: 0.16)
+                    ? t.resolvedOkContainer
                     : (_lastSuccess == false)
-                        ? Colors.red.withValues(alpha: 0.16)
-                        : colors.tileBg,
-                borderRadius: BorderRadius.circular(12),
+                        ? t.resolvedDangerContainer
+                        : t.resolvedContainerHigh,
+                borderRadius: BorderRadius.circular(AppTokens.rMd),
                 border: Border.all(
                   color: (_lastSuccess == true)
-                      ? Colors.green.withValues(alpha: 0.45)
+                      ? t.ok.withValues(alpha: 0.45)
                       : (_lastSuccess == false)
-                          ? Colors.red.withValues(alpha: 0.45)
-                          : colors.border,
+                          ? t.danger.withValues(alpha: 0.45)
+                          : t.border,
                 ),
               ),
               child: Row(
                 children: [
                   if (_isTransmitting) ...[
-                    const SizedBox(
+                    SizedBox(
                       width: 14,
                       height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: evAccent),
                     ),
                     const SizedBox(width: 10),
                   ],
@@ -229,10 +237,10 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         color: (_lastSuccess == true)
-                            ? const Color(0xFF39FF14)
+                            ? t.ok
                             : (_lastSuccess == false)
-                                ? Colors.redAccent
-                                : colors.textPrimary,
+                                ? t.danger
+                                : t.ink,
                       ),
                     ),
                   ),
@@ -243,12 +251,12 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
 
           // 1. 4-Door Power Windows Section
           Text(
-            '4-DOOR POWER WINDOWS',
+            'WINDOWS',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.6,
-              color: colors.textMuted,
+              color: t.ink3,
             ),
           ),
           const SizedBox(height: 8),
@@ -257,10 +265,10 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
             children: [
               Expanded(
                 child: AppleControlTile(
-                  title: 'Vent (20mm)',
-                  subtitle: 'Heat Escape',
+                  title: 'Vent',
+                  subtitle: '20mm gap',
                   icon: Icons.air_rounded,
-                  activeColor: const Color(0xFF00E5FF),
+                  activeColor: evAccent,
                   isSelected: _isVented,
                   isBusy: _isTransmitting && _activeAction == 'win_vent',
                   onTap: () {
@@ -268,7 +276,7 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                     _fireCommand(
                       action: 'win_vent',
                       opcode: CarLinkoOpcodes.windowsVent,
-                      label: 'Vent (20mm)',
+                      label: 'Vent windows',
                       onOptimistic: () => setState(() => _isVented = true),
                       onRevert: () => setState(() => _isVented = prev),
                       onSuccess: () {
@@ -282,10 +290,10 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
               const SizedBox(width: 10),
               Expanded(
                 child: AppleControlTile(
-                  title: 'Open All',
+                  title: 'Open all',
                   subtitle: 'Lower 4x',
                   icon: Icons.vertical_align_bottom_rounded,
-                  activeColor: const Color(0xFFFF9F1C),
+                  activeColor: t.danger,
                   isSelected: false,
                   isBusy: _isTransmitting && _activeAction == 'win_open',
                   onTap: () {
@@ -293,7 +301,7 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                     _fireCommand(
                       action: 'win_open',
                       opcode: CarLinkoOpcodes.windowsOpen,
-                      label: 'Open Windows',
+                      label: 'Open windows',
                       onOptimistic: () => setState(() => _isVented = true),
                       onRevert: () => setState(() => _isVented = prev),
                       onSuccess: () {
@@ -307,10 +315,10 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
               const SizedBox(width: 10),
               Expanded(
                 child: AppleControlTile(
-                  title: 'Close All',
-                  subtitle: 'Sealed Flush',
+                  title: 'Close all',
+                  subtitle: 'Sealed',
                   icon: Icons.vertical_align_top_rounded,
-                  activeColor: colors.evTeal,
+                  activeColor: evAccent,
                   isSelected: !_isVented,
                   isBusy: _isTransmitting && _activeAction == 'win_close',
                   onTap: () {
@@ -318,7 +326,7 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                     _fireCommand(
                       action: 'win_close',
                       opcode: CarLinkoOpcodes.windowsClose,
-                      label: 'Close Windows',
+                      label: 'Close windows',
                       onOptimistic: () => setState(() => _isVented = false),
                       onRevert: () => setState(() => _isVented = prev),
                       onSuccess: () {
@@ -335,12 +343,12 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
 
           // 2. Panoramic Glass Roof Section
           Text(
-            'PANORAMIC SUNROOF GLASS',
+            'SUNROOF GLASS',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.6,
-              color: colors.textMuted,
+              color: t.ink3,
             ),
           ),
           const SizedBox(height: 8),
@@ -349,10 +357,10 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
             children: [
               Expanded(
                 child: AppleControlTile(
-                  title: 'Slide Open',
-                  subtitle: 'Full Sky View',
+                  title: 'Open',
+                  subtitle: 'Full sky',
                   icon: Icons.open_in_browser_rounded,
-                  activeColor: Colors.amber,
+                  activeColor: sunroofAccent,
                   isSelected: _activeSunroofMode == 'open',
                   isBusy: _isTransmitting && _activeAction == 'roof_open',
                   onTap: () {
@@ -361,7 +369,7 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                     _fireCommand(
                       action: 'roof_open',
                       opcode: CarLinkoOpcodes.sunroofOpen,
-                      label: 'Open Sunroof',
+                      label: 'Open sunroof',
                       onOptimistic: () => setState(() {
                         _activeSunroofMode = 'open';
                         _isSunroofOpen = true;
@@ -382,10 +390,10 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
               const SizedBox(width: 10),
               Expanded(
                 child: AppleControlTile(
-                  title: 'Tilt / Vent',
-                  subtitle: 'Highway Aero',
+                  title: 'Tilt',
+                  subtitle: 'Vent only',
                   icon: Icons.open_in_full_rounded,
-                  activeColor: Colors.amber,
+                  activeColor: sunroofAccent,
                   isSelected: _activeSunroofMode == 'tilt',
                   isBusy: _isTransmitting && _activeAction == 'roof_tilt',
                   onTap: () {
@@ -394,7 +402,7 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                     _fireCommand(
                       action: 'roof_tilt',
                       opcode: CarLinkoOpcodes.sunroofTilt,
-                      label: 'Tilt Sunroof',
+                      label: 'Tilt sunroof',
                       onOptimistic: () => setState(() {
                         _activeSunroofMode = 'tilt';
                         _isSunroofOpen = true;
@@ -415,10 +423,10 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
               const SizedBox(width: 10),
               Expanded(
                 child: AppleControlTile(
-                  title: 'Close Glass',
-                  subtitle: 'Weather Sealed',
+                  title: 'Close',
+                  subtitle: 'Sealed',
                   icon: Icons.wb_twilight_rounded,
-                  activeColor: colors.evTeal,
+                  activeColor: evAccent,
                   isSelected: _activeSunroofMode == 'closed',
                   isBusy: _isTransmitting && _activeAction == 'roof_close',
                   onTap: () {
@@ -427,7 +435,7 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                     _fireCommand(
                       action: 'roof_close',
                       opcode: CarLinkoOpcodes.sunroofClose,
-                      label: 'Close Sunroof',
+                      label: 'Close sunroof',
                       onOptimistic: () => setState(() {
                         _activeSunroofMode = 'closed';
                         _isSunroofOpen = false;
@@ -451,12 +459,12 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
 
           // 3. Electric Sunshade Curtain Section
           Text(
-            'ELECTRIC SUNSHADE CURTAIN',
+            'SUNSHADE CURTAIN',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.6,
-              color: colors.textMuted,
+              color: t.ink3,
             ),
           ),
           const SizedBox(height: 8),
@@ -464,9 +472,9 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: colors.tileBg,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: colors.border),
+              color: t.resolvedContainerHigh,
+              borderRadius: BorderRadius.circular(AppTokens.rLg),
+              border: Border.all(color: t.border),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -478,24 +486,24 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                           ? Icons.curtains_closed_rounded
                           : Icons.curtains_rounded,
                       size: 22,
-                      color: colors.textPrimary,
+                      color: t.ink,
                     ),
                     const SizedBox(width: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Sunshade Fabric Curtain',
+                          'Fabric curtain',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
                             letterSpacing: -0.2,
-                            color: colors.textPrimary,
+                            color: t.ink,
                           ),
                         ),
                         Text(
-                          _sunshadeCurtainClosed ? 'Curtain drawn (Max UV Block)' : 'Curtain retracted (Open sky)',
-                          style: TextStyle(fontSize: 10.5, color: colors.textMuted),
+                          _sunshadeCurtainClosed ? 'Drawn · blocks UV' : 'Retracted · open sky',
+                          style: TextStyle(fontSize: 10.5, color: t.ink3),
                         ),
                       ],
                     ),
@@ -503,7 +511,7 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                 ),
                 Switch.adaptive(
                   value: _sunshadeCurtainClosed,
-                  activeColor: colors.evTeal,
+                  activeColor: evAccent,
                   onChanged: (v) {
                     HapticFeedback.selectionClick();
                     setState(() => _sunshadeCurtainClosed = v);
@@ -518,25 +526,25 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
             decoration: BoxDecoration(
-              color: colors.tileBg,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: colors.border),
+              color: t.resolvedContainerHigh,
+              borderRadius: BorderRadius.circular(AppTokens.rMd),
+              border: Border.all(color: t.border),
             ),
             child: Row(
               children: [
-                Icon(Icons.touch_app_rounded, size: 16, color: colors.evTeal),
+                Icon(Icons.touch_app_rounded, size: 16, color: evAccent),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Instant 1-Tap: Directly communicates with your Tiggo 7 PHEV CAN gateway.',
-                    style: TextStyle(fontSize: 11.5, color: colors.textSecondary),
+                    'Each panel sends an instant command directly to the vehicle.',
+                    style: TextStyle(fontSize: 11.5, color: t.ink2),
                   ),
                 ),
               ],
             ),
           ),
-        ],
-      ),
+          ],
+        ),
     );
   }
 }

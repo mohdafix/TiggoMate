@@ -24,7 +24,6 @@ import 'widgets_shortcuts_sheet.dart';
 import '../widgets/home_widget_service.dart';
 import 'climate_control_sheet.dart';
 import 'windows_control_sheet.dart';
-import 'sunroof_control_sheet.dart';
 import 'remote_engine_sheet.dart';
 import 'remote_command_diagnostics_sheet.dart';
 import 'car_view_carousel.dart';
@@ -33,6 +32,10 @@ import '../mytnb/mytnb_api.dart';
 import 'mytnb_connect_dialog.dart';
 import '../service/bluetooth_driving_tracker_service.dart';
 import '../service/battery_health_service.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'tiggo_map_config.dart';
+import 'vehicle_details_sheet.dart';
 
 class NeoDashboard extends StatefulWidget {
   final VehicleRepository repository;
@@ -120,6 +123,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     _isWindowsVented = _telemetry.windowsOpen;
     _wasParked = _telemetry.isParked;
     VehicleSkinManager.instance.addListener(_handleSkinChanged);
+    TiggoMapConfig.init();
 
     // Initialize native Android Home Widget and App Shortcuts listeners
     HomeWidgetService.instance.init();
@@ -641,6 +645,15 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     );
   }
 
+  void _openVehicleDetailsSheet() {
+    VehicleDetailsSheet.show(
+      context,
+      telemetry: _telemetry,
+      carPlateNumber: widget.carPlateNumber,
+      vehicleNickname: widget.vehicleNickname,
+    );
+  }
+
   void _openClimateControlSheet() {
     ClimateControlSheet.show(
       context,
@@ -804,6 +817,104 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     );
   }
 
+  void _openDefrostSheet() {
+    ClimateControlSheet.show(
+      context,
+      telemetry: _telemetry,
+      repository: widget.repository,
+      isDefrostMode: true,
+      initialAcOn: true,
+      initialTempC: 28.0,
+      initialDurationMin: 10,
+      initialFrontDefrost: true,
+      initialRearDefrost: true,
+      onApply: (acOn, tempC, durationMin, {
+        bool? rapidCool,
+        bool? frontDefrost,
+        bool? rearDefrost,
+        bool? airPurifier,
+        int? fanGear,
+        int? seatHeatDriver,
+        int? seatVentDriver,
+        int? seatHeatPass,
+        int? seatVentPass,
+        bool? steeringHeat,
+      }) {
+        final previousAc = _isAcActive;
+        final previousTelemetry = _telemetry;
+        setState(() {
+          _isAcActive = acOn;
+          _telemetry = _telemetry.copyWith(
+            acOn: acOn,
+            acTemp: tempC.round(),
+            airDurationMin: durationMin,
+            rapidCool: rapidCool,
+            frontDefrost: frontDefrost,
+            rearDefrost: rearDefrost,
+            airPurifier: airPurifier,
+            fanGear: fanGear,
+            seatHeatDriver: seatHeatDriver,
+            seatVentDriver: seatVentDriver,
+            seatHeatPass: seatHeatPass,
+            seatVentPass: seatVentPass,
+            steeringHeat: steeringHeat,
+          );
+        });
+        _syncWidgetTelemetry();
+
+        final opcode = acOn
+            ? ((rapidCool == true) ? CarLinkoOpcodes.quickCool : CarLinkoOpcodes.acOn)
+            : CarLinkoOpcodes.acOff;
+
+        if (acOn != previousAc || (acOn && (rapidCool != previousTelemetry.rapidCool))) {
+          _sendCommandAndReport(
+            opcode,
+            successMessage: acOn
+                ? '💨 Defrost ON (${tempC.toStringAsFixed(1)}°C, ${durationMin}m)'
+                : '💨 Defrost OFF',
+            failureMessage: '⚠️ Defrost command failed',
+            onRevert: () {
+              setState(() {
+                _isAcActive = previousAc;
+                _telemetry = previousTelemetry;
+              });
+              _syncWidgetTelemetry();
+            },
+          );
+        }
+
+        if (acOn && (tempC.round() != previousTelemetry.acTemp || acOn != previousAc)) {
+          final tempOp = CarLinkoOpcodes.acTemperature(tempC);
+          _sendCommandAndReport(
+            tempOp,
+            successMessage: '🌡️ Defrost Temp: ${tempC.toStringAsFixed(1)}°C',
+            failureMessage: '⚠️ Temperature setpoint command failed',
+          );
+        }
+
+        if (durationMin != previousTelemetry.airDurationMin) {
+          widget.repository.setAirDuration(durationMin).catchError((_) => false);
+        }
+
+        if (frontDefrost != null && frontDefrost != previousTelemetry.frontDefrost) {
+          _sendCommandAndReport(
+            frontDefrost ? CarLinkoOpcodes.defogOn : CarLinkoOpcodes.defogOff,
+            successMessage: frontDefrost ? '💨 Front Defroster ON' : 'Front Defroster OFF',
+            failureMessage: '⚠️ Front defroster command failed',
+          );
+        }
+
+        if (rearDefrost != null && rearDefrost != previousTelemetry.rearDefrost) {
+          _sendCommandAndReport(
+            rearDefrost ? CarLinkoOpcodes.rearDefogOn : CarLinkoOpcodes.rearDefogOff,
+            successMessage: rearDefrost ? '♨️ Rear Window Defogger ON' : 'Rear Defogger OFF',
+            failureMessage: '⚠️ Rear defogger command failed',
+          );
+        }
+      },
+    );
+  }
+
   void _openWindowsControlSheet() {
     WindowsControlSheet.show(
       context,
@@ -827,24 +938,12 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     );
   }
 
-  void _openSunroofControlSheet() {
-    SunroofControlSheet.show(
-      context,
-      repository: widget.repository,
-      telemetry: _telemetry,
-      initialSunroofOpen: _telemetry.sunroofOpen,
-      onSunroofChanged: (isOpen) {
-        setState(() {
-          _telemetry = _telemetry.copyWith(sunroofOpen: isOpen);
-        });
-        _syncWidgetTelemetry();
-      },
-    );
-  }
+  // Sunroof now opens the same merged Windows & Sunroof sheet as the
+  // windows pod — there is only one screen for door glass + roof glass +
+  // sunshade, so the two Control Center pods both land in the same place.
+  void _openSunroofControlSheet() => _openWindowsControlSheet();
 
-  void _openWindowSunroofSheet() {
-    _openWindowsControlSheet();
-  }
+  void _openWindowSunroofSheet() => _openWindowsControlSheet();
 
   void _openRemoteEngineSheet() {
     RemoteEngineSheet.show(
@@ -1005,6 +1104,37 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
         successMessage: isStart ? '⚡ Engine Start / Ignition command sent' : '🛑 Engine Stop command sent',
         failureMessage: '⚠️ Engine command failed. Please retry.',
       );
+    } else if (action == 'defrost' || action == 'defrost_toggle') {
+      final isCurrentlyActive = _telemetry.frontDefrost || _telemetry.rearDefrost;
+      final willTurnOn = !isCurrentlyActive;
+      final previousTelemetry = _telemetry;
+      setState(() {
+        _telemetry = _telemetry.copyWith(
+          frontDefrost: willTurnOn,
+          rearDefrost: willTurnOn,
+          acOn: willTurnOn ? true : _telemetry.acOn,
+        );
+      });
+      _syncWidgetTelemetry();
+      await _sendCommandAndReport(
+        willTurnOn ? CarLinkoOpcodes.defogOn : CarLinkoOpcodes.defogOff,
+        successMessage: willTurnOn ? '💨 Front Defroster ON' : '💨 Defroster OFF',
+        failureMessage: '⚠️ Defrost command failed. Please retry.',
+        onRevert: () => setState(() => _telemetry = previousTelemetry),
+      );
+      if (willTurnOn) {
+        await _sendCommandAndReport(
+          CarLinkoOpcodes.rearDefogOn,
+          successMessage: '♨️ Rear Window Defogger ON',
+          failureMessage: '⚠️ Rear defogger command failed.',
+        );
+      } else {
+        await _sendCommandAndReport(
+          CarLinkoOpcodes.rearDefogOff,
+          successMessage: 'Rear Defogger OFF',
+          failureMessage: '⚠️ Rear defogger command failed.',
+        );
+      }
     } else if (action == 'schedule_charging') {
       _openSmartChargingSheet();
     } else if (action == 'check_tnb') {
@@ -1162,12 +1292,13 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
 
   Widget _buildCyberDashboard(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgCol = isDark ? const Color(0xFF0A0B0E) : const Color(0xFFF6F8FA);
-    final cardCol = isDark ? const Color(0xFF12141A) : Colors.white;
-    final borderCol = isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0);
-    final textMuted = isDark ? const Color(0xFF717684) : const Color(0xFF64748B);
-    final textPrimary = isDark ? Colors.white : const Color(0xFF0A0B0E);
-    final limeAccent = context.tokens.accent;
+    final t = context.tokens;
+    final bgCol = t.bg;
+    final cardCol = t.resolvedContainerLow;
+    final borderCol = t.border;
+    final textMuted = t.ink2;
+    final textPrimary = t.ink;
+    final limeAccent = t.accent;
     const orangeAccent = Color(0xFFFF6E40);
 
     final isBound = widget.repository.isVehicleBound;
@@ -1225,38 +1356,73 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             children: [
-            // 1. TOP HEADER: Model subtitle + Big Plate + Bell + Menu
+            // 1. TOP HEADER: Equinox "Welcome back!" + Owner Name + Plate Badge + Status Badges + Menu
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.vehicleNickname.isNotEmpty ? widget.vehicleNickname.toUpperCase() : 'CHERY TIGGO 7 PHEV · CSH',
-                      style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 1.4,
-                        color: textMuted,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              widget.vehicleNickname.isNotEmpty
+                                  ? widget.vehicleNickname.toUpperCase()
+                                  : 'CHERY TIGGO 7 PHEV CSH',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 1.1,
+                                color: textMuted,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1B202C) : const Color(0xFFE2E8F0),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: borderCol, width: 0.8),
+                            ),
+                            child: Text(
+                              widget.carPlateNumber.isNotEmpty ? widget.carPlateNumber : 'VRT 3342',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                color: limeAccent,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      widget.carPlateNumber.isNotEmpty ? widget.carPlateNumber : 'VRT 3342',
-                      style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 30,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                        color: textPrimary,
+                      const SizedBox(height: 2),
+                      Text(
+                        'Welcome, ${widget.ownerName.isNotEmpty && widget.ownerName != 'Chery Owner' ? widget.ownerName : 'MohdAfix'}',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                          color: textPrimary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildBluetoothStatusBadge(context, cardCol, borderCol, textPrimary, textMuted, limeAccent),
                     const SizedBox(width: 6),
@@ -1275,7 +1441,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                               padding: const EdgeInsets.all(6),
                               constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                               tooltip: 'Vehicle Alerts & History',
-                              icon: Icon(Icons.notifications_outlined, size: 22, color: textPrimary),
+                              icon: Icon(Icons.notifications_outlined, size: 21, color: textPrimary),
                               onPressed: () => VehicleAlertsSheet.show(context),
                             ),
                             if (unread > 0)
@@ -1296,23 +1462,14 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         );
                       },
                     ),
-                    const SizedBox(width: 4),
-
-                    IconButton(
-                      icon: const Icon(Icons.mic_rounded, color: Color(0xFF06B6D4), size: 22),
-                      tooltip: 'TiggoMate Voice Assistant',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                      onPressed: () => _openVoiceAssistant(startVoice: true),
-                    ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 2),
 
                     // Menu icon (Burger)
                     PopupMenuButton<String>(
                       tooltip: 'Vehicle Tools & Settings',
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                      icon: Icon(Icons.menu_rounded, size: 24, color: textPrimary),
+                      icon: Icon(Icons.menu_rounded, size: 23, color: textPrimary),
                       color: cardCol,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
@@ -1540,135 +1697,368 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
               selectedSkinKey: _selectedVehicleColorKey,
               initialPage: _carViewPage,
               onPageChanged: (i) => _carViewPage = i, // no setState needed
+              onCarTap: _openVehicleDetailsSheet,
             ),
             const SizedBox(height: 18),
 
-            // 4. TOTAL RANGE & DUAL ENERGY BAR (Tappable to open Energy Plan)
-            GestureDetector(
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => EnergyScreen(
-                      telemetry: _telemetry,
-                      isCharging: _telemetry.isCharging,
-                      tnbTariff: widget.tnbTariff,
-                      fuelPrice: widget.fuelPrice,
-                      repository: widget.repository,
-                    ),
-                  ),
-                );
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                color: Colors.transparent,
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Row(
+            // 4. MODERN OEM SPLIT ROW: Total Range Card + Live Location Mini Map Tile
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Left Card: Equinox "My Vehicle" Dual Energy Card
+                  Expanded(
+                    flex: 11,
+                    child: GestureDetector(
+                      onTap: _openVehicleDetailsSheet,
+                      child: Container(
+                        height: 104,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: cardCol,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: borderCol),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Flexible(
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          'TOTAL RANGE',
+                                          overflow: TextOverflow.ellipsis,
+                                          maxLines: 1,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 0.6,
+                                            color: textPrimary,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Icon(Icons.chevron_right, size: 14, color: limeAccent),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                RichText(
+                                  maxLines: 1,
+                                  overflow: TextOverflow.clip,
+                                  text: TextSpan(
+                                    style: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: textPrimary,
+                                    ),
+                                    children: [
+                                      TextSpan(text: totalRangeText),
+                                      TextSpan(
+                                        text: ' km',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w500,
+                                          color: textMuted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                             Text(
-                              'TOTAL RANGE',
+                              isBound ? 'Everything looks good' : 'Pending car link',
                               style: TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 1.2,
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w500,
                                 color: textMuted,
                               ),
                             ),
-                            const SizedBox(width: 4),
-                            Icon(Icons.chevron_right, size: 13, color: limeAccent),
-                          ],
-                        ),
-                        RichText(
-                          text: TextSpan(
-                            style: TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 26,
-                              fontWeight: FontWeight.w800,
-                              color: textPrimary,
-                            ),
-                            children: [
-                              TextSpan(text: totalRangeText),
-                              TextSpan(
-                                text: ' km',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: textMuted,
+
+                            // Dual Split Range Bar
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: SizedBox(
+                                height: 8,
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      flex: (evFraction * 100).round(),
+                                      child: Container(color: evBarCol),
+                                    ),
+                                    const SizedBox(width: 2),
+                                    Expanded(
+                                      flex: ((1.0 - evFraction) * 100).round(),
+                                      child: Container(color: fuelBarCol),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Dual Split Range Bar
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: SizedBox(
-                        height: 10,
-                        child: Row(
-                          children: [
-                            Expanded(
-                              flex: (evFraction * 100).round(),
-                              child: Container(color: evBarCol),
                             ),
-                            const SizedBox(width: 2),
-                            Expanded(
-                              flex: ((1.0 - evFraction) * 100).round(),
-                              child: Container(color: fuelBarCol),
+
+                            // Sub-row: ■ EV 24% · 22 km    ■ Fuel 71% · 664 km (Auto-scaling to prevent pixel overflow)
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 6,
+                                        height: 6,
+                                        decoration: BoxDecoration(color: evBarCol, shape: BoxShape.circle),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        evRangeText,
+                                        style: TextStyle(
+                                          fontFamily: 'monospace',
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: isBound ? evBarCol : textMuted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 6,
+                                        height: 6,
+                                        decoration: BoxDecoration(color: fuelBarCol, shape: BoxShape.circle),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        fuelRangeText,
+                                        style: TextStyle(
+                                          fontFamily: 'monospace',
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: hasFuelRange ? fuelBarCol : textMuted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                  ),
+                  const SizedBox(width: 8),
 
-                    // Sub-row: ■ EV 24% · 22 km    ■ Fuel 71% · 664 km
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
+                  // Right Card: Mini Live Map Tile with Real FlutterMap & Fallback (Chevy Equinox / Mazda Style)
+                  Expanded(
+                    flex: 6,
+                    child: GestureDetector(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        VehicleRadarSheet.show(
+                          context,
+                          telemetry: _telemetry,
+                          repository: widget.repository,
+                        );
+                      },
+                      child: Container(
+                        height: 104,
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          color: cardCol,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: borderCol),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.08),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Stack(
                           children: [
-                            Container(width: 8, height: 8, color: evBarCol),
-                            const SizedBox(width: 6),
-                            Text(
-                              evRangeText,
-                              style: TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w700,
-                                color: isBound ? evBarCol : textMuted,
+                            // 1. Live FlutterMap Render (Configurable Detailed Dark / Sat / Day)
+                            Positioned.fill(
+                              child: IgnorePointer(
+                                child: ValueListenableBuilder<TiggoMapStyle>(
+                                  valueListenable: TiggoMapConfig.activeStyle,
+                                  builder: (context, mapStyle, _) {
+                                    return mapStyle.wrapMap(
+                                      FlutterMap(
+                                        key: ValueKey('mini_map_${mapStyle.name}'),
+                                        options: MapOptions(
+                                          initialCenter: LatLng(
+                                            _telemetry.hasLocation ? _telemetry.latitude : 3.1272,
+                                            _telemetry.hasLocation ? _telemetry.longitude : 101.6600,
+                                          ),
+                                          initialZoom: 15.0,
+                                          interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+                                        ),
+                                        children: [
+                                          TileLayer(
+                                            urlTemplate: mapStyle.urlTemplate,
+                                            userAgentPackageName: 'com.tiggomate.tiggomate_app',
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+
+                            // 2. Subtle translucent gradient scrim so street details shine through while pin & badge pop
+                            Positioned.fill(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      cardCol.withValues(alpha: 0.15),
+                                      Colors.transparent,
+                                      cardCol.withValues(alpha: 0.45),
+                                    ],
+                                    stops: const [0.0, 0.45, 1.0],
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            // 3. Center Glowing Vehicle Pin
+                            Center(
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Container(
+                                    width: 22,
+                                    height: 22,
+                                    decoration: BoxDecoration(
+                                      color: limeAccent.withValues(alpha: 0.25),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  Container(
+                                    width: 14,
+                                    height: 14,
+                                    decoration: BoxDecoration(
+                                      color: limeAccent,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.black, width: 2),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: limeAccent.withValues(alpha: 0.5),
+                                          blurRadius: 6,
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Center(
+                                      child: Icon(Icons.directions_car, size: 8, color: Colors.black),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // 4. Clean Overlay Metadata
+                            Padding(
+                              padding: const EdgeInsets.all(8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withValues(alpha: 0.65),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          'MAP',
+                                          style: TextStyle(
+                                            fontFamily: 'monospace',
+                                            fontSize: 8.5,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.8,
+                                            color: limeAccent,
+                                          ),
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.all(3),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withValues(alpha: 0.6),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(Icons.near_me_rounded, size: 10, color: limeAccent),
+                                      ),
+                                    ],
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withValues(alpha: 0.75),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 5,
+                                          height: 5,
+                                          decoration: BoxDecoration(
+                                            color: isBound
+                                                ? (_telemetry.isParked ? const Color(0xFF4ADE80) : limeAccent)
+                                                : Colors.grey,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          isBound ? (_telemetry.isParked ? 'Parked' : 'Driving') : 'Offline',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: textPrimary,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 3),
+                                        Text(
+                                          '›',
+                                          style: TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: limeAccent,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
-                        Row(
-                          children: [
-                            Container(width: 8, height: 8, color: fuelBarCol),
-                            const SizedBox(width: 6),
-                            Text(
-                              fuelRangeText,
-                              style: TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w700,
-                                color: hasFuelRange ? fuelBarCol : textMuted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                      ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
             if (isBound) ...[
@@ -1754,16 +2144,54 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 ],
               ),
             ],
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
 
-            // 5. 6-GRID REMOTE CONTROL CARDS
+            // 5. EQUINOX CONTROL CENTER: 8 TACTILE ACTION PODS (4x2 GRID)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Control Center',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
+                        color: textPrimary,
+                      ),
+                    ),
+                    Text(
+                      'Remote controls',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w500,
+                        color: textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  'QUICK ACTIONS',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 9,
+                    letterSpacing: 0.8,
+                    color: textMuted.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // Row 1 (4 Pods: Doors, Climate, Windows, Trunk)
             Row(
               children: [
                 Expanded(
-                  child: _buildCyberRemoteCard(
+                  child: _buildEquinoxRemotePod(
                     title: 'DOORS',
                     value: !isBound ? '--' : (_isDoorsLocked ? 'Locked' : 'Unlocked'),
-                    icon: !isBound ? null : (_isDoorsLocked ? '🔒' : '🔓'),
                     isActive: isBound && _isDoorsLocked,
                     limeAccent: limeAccent,
                     cardCol: cardCol,
@@ -1775,10 +2203,9 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: _buildCyberRemoteCard(
+                  child: _buildEquinoxRemotePod(
                     title: 'CLIMATE',
                     value: !isBound ? '--' : (_isAcActive ? '${_telemetry.acTemp.clamp(16, 32)}°C' : 'Off → 22°'),
-                    icon: null,
                     isActive: _isAcActive,
                     limeAccent: limeAccent,
                     cardCol: cardCol,
@@ -1790,30 +2217,23 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: _buildCyberRemoteCard(
+                  child: _buildEquinoxRemotePod(
                     title: 'WINDOWS',
                     value: !isBound ? '--' : (_isWindowsVented ? 'Vented' : 'Closed'),
-                    icon: null,
                     isActive: _isWindowsVented,
                     limeAccent: limeAccent,
                     cardCol: cardCol,
                     borderCol: borderCol,
                     textMuted: textMuted,
                     textPrimary: textPrimary,
-                    onTap: _openWindowSunroofSheet,
+                    onTap: _openWindowsControlSheet,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            Row(
-              children: [
+                const SizedBox(width: 8),
                 Expanded(
-                  child: _buildCyberRemoteCard(
+                  child: _buildEquinoxRemotePod(
                     title: 'TRUNK',
                     value: !isBound ? '--' : (_isTrunkOpen ? 'Open' : 'Closed'),
-                    icon: null,
                     isActive: _isTrunkOpen,
                     limeAccent: limeAccent,
                     cardCol: cardCol,
@@ -1823,12 +2243,17 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     onTap: () => _handleRemoteCommand('trunk'),
                   ),
                 ),
-                const SizedBox(width: 8),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Row 2 (4 Pods: Locate, Sunroof, Defrost, Engine)
+            Row(
+              children: [
                 Expanded(
-                  child: _buildCyberRemoteCard(
+                  child: _buildEquinoxRemotePod(
                     title: 'LOCATE',
-                    value: isBound ? 'Find car' : '--',
-                    icon: null,
+                    value: isBound ? 'Horn/Flash' : '--',
                     isActive: false,
                     limeAccent: limeAccent,
                     cardCol: cardCol,
@@ -1840,10 +2265,37 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: _buildCyberRemoteCard(
+                  child: _buildEquinoxRemotePod(
+                    title: 'SUNROOF',
+                    value: !isBound ? '--' : (_telemetry.sunroofOpen ? 'Open' : 'Closed'),
+                    isActive: _telemetry.sunroofOpen,
+                    limeAccent: limeAccent,
+                    cardCol: cardCol,
+                    borderCol: borderCol,
+                    textMuted: textMuted,
+                    textPrimary: textPrimary,
+                    onTap: _openSunroofControlSheet,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildEquinoxRemotePod(
+                    title: 'DEFROST',
+                    value: !isBound ? '--' : ((_telemetry.frontDefrost || _telemetry.rearDefrost) ? 'Active' : 'Off'),
+                    isActive: _telemetry.frontDefrost || _telemetry.rearDefrost,
+                    limeAccent: limeAccent,
+                    cardCol: cardCol,
+                    borderCol: borderCol,
+                    textMuted: textMuted,
+                    textPrimary: textPrimary,
+                    onTap: _openDefrostSheet,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildEquinoxRemotePod(
                     title: 'ENGINE',
                     value: !isBound ? '--' : (_telemetry.engineOn ? 'Running' : 'Pre-cool'),
-                    icon: null,
                     isActive: _telemetry.engineOn,
                     limeAccent: limeAccent,
                     cardCol: cardCol,
@@ -1855,7 +2307,21 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 ),
               ],
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 12),
+
+            // Tactile Slide to Start Ignition Slider (Modern OEM)
+            _ModernSlideToStartBar(
+              limeAccent: limeAccent,
+              cardCol: cardCol,
+              borderCol: borderCol,
+              textPrimary: textPrimary,
+              textMuted: textMuted,
+              onSlideComplete: () {
+                HapticFeedback.heavyImpact();
+                _openRemoteEngineSheet();
+              },
+            ),
+            const SizedBox(height: 16),
 
             // 6. BOTTOM AI COMMAND PROMPT BAR -- deep-links into the merged
             // Assistant tab instead of opening a separate chat sheet.
@@ -2072,31 +2538,22 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
   ) {
     final isBound = widget.repository.isVehicleBound;
     final isCloud = widget.repository.isCloudConnected;
-    final lastSync = _telemetry.lastUpdated;
-    final syncAgeSec = DateTime.now().difference(lastSync).inSeconds;
-
-    int bars = 0;
-    if (isBound && isCloud) {
-      if (syncAgeSec < 180) {
-        bars = 4;
-      } else if (syncAgeSec < 600) {
-        bars = 3;
-      } else if (syncAgeSec < 3600) {
-        bars = 2;
-      } else {
-        bars = 1;
-      }
-    } else if (isCloud) {
-      bars = 1;
-    }
+    final bars = _telemetry.effectiveCellularBars;
+    final hasHwSignal = _telemetry.cellularSignalBars != null;
 
     const cyberCyan = Color(0xFF00E5FF);
-    final signalColor = bars >= 3 ? cyberCyan : (bars >= 2 ? const Color(0xFFFFB74D) : textMuted);
+    final signalColor = bars >= 3
+        ? cyberCyan
+        : (bars >= 2 ? const Color(0xFFFFB74D) : (bars == 1 ? Colors.orangeAccent : textMuted));
+
+    final tooltipMsg = isBound
+        ? (hasHwSignal
+            ? 'Telematics 4G LTE: ${bars}/4 bars (${_telemetry.cellularQualityLabel})${_telemetry.cellularCsq != null ? ' • CSQ ${_telemetry.cellularCsq}' : ''} • Live T-Box'
+            : 'Telematics 4G LTE: Connected ($bars/4 bars) • Synced ${_syncAgeText()} ago')
+        : 'Telematics: Awaiting car bind';
 
     return Tooltip(
-      message: isBound
-          ? 'Telematics 4G LTE: Connected ($bars/4 bars) • Synced ${_syncAgeText()} ago'
-          : 'Telematics: Awaiting car bind',
+      message: tooltipMsg,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -2109,7 +2566,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
               color: cardCol,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: isBound ? cyberCyan.withValues(alpha: 0.4) : borderCol,
+                color: isBound ? signalColor.withValues(alpha: 0.45) : borderCol,
                 width: 1.1,
               ),
             ),
@@ -2153,22 +2610,21 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
   }
 
   void _showBluetoothConnectionStatusModal(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final bgCol = isDark ? const Color(0xFF0D0F14) : const Color(0xFFF3F4F6);
-    final cardCol = isDark ? const Color(0xFF161922) : Colors.white;
-    final borderCol = isDark ? const Color(0xFF262C38) : const Color(0xFFE2E8F0);
-    final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
-    final textMuted = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final t = context.tokens;
+    final bgCol = t.resolvedContainerLow;
+    final cardCol = t.surface;
+    final borderCol = t.border;
+    final textPrimary = t.ink;
+    final textMuted = t.ink2;
     const cyberCyan = Color(0xFF00E5FF);
-    final limeAccent = isDark ? const Color(0xFFDFFF00) : const Color(0xFF65A30D);
+    final limeAccent = t.accent;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: bgCol,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppTokens.r2Xl)),
       ),
       builder: (ctx) {
         return ListenableBuilder(
@@ -2755,15 +3211,14 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
   }
 
   void _showCellularSignalStatusModal(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final bgCol = isDark ? const Color(0xFF0D0F14) : const Color(0xFFF3F4F6);
-    final cardCol = isDark ? const Color(0xFF161922) : Colors.white;
-    final borderCol = isDark ? const Color(0xFF262C38) : const Color(0xFFE2E8F0);
-    final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
-    final textMuted = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final t = context.tokens;
+    final bgCol = t.resolvedContainerLow;
+    final cardCol = t.surface;
+    final borderCol = t.border;
+    final textPrimary = t.ink;
+    final textMuted = t.ink2;
     const cyberCyan = Color(0xFF00E5FF);
-    final limeAccent = isDark ? const Color(0xFFDFFF00) : const Color(0xFF65A30D);
+    final limeAccent = t.accent;
 
     final isBound = widget.repository.isVehicleBound;
 
@@ -2772,7 +3227,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       isScrollControlled: true,
       backgroundColor: bgCol,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppTokens.r2Xl)),
       ),
       builder: (ctx) {
         return Padding(
@@ -2795,7 +3250,9 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    width: 44,
+                    height: 44,
+                    padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
                       color: (isBound ? cyberCyan : const Color(0xFFFFB74D)).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
@@ -2803,10 +3260,16 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         color: (isBound ? cyberCyan : const Color(0xFFFFB74D)).withValues(alpha: 0.35),
                       ),
                     ),
-                    child: Icon(
-                      Icons.cell_tower_rounded,
-                      color: isBound ? cyberCyan : const Color(0xFFFFB74D),
-                      size: 20,
+                    child: Image.asset(
+                      _telemetry.networkIconAsset,
+                      width: 28,
+                      height: 28,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => Icon(
+                        Icons.cell_tower_rounded,
+                        color: isBound ? cyberCyan : const Color(0xFFFFB74D),
+                        size: 22,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -2825,9 +3288,11 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                           ),
                         ),
                         Text(
-                          isBound ? '4G Cellular Live' : 'Awaiting Car Bind',
+                          isBound
+                              ? '${_telemetry.effectiveCellularBars}/4 Bars • ${_telemetry.cellularQualityLabel}'
+                              : 'Awaiting Car Bind',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 15,
                             fontWeight: FontWeight.w700,
                             color: textPrimary,
                           ),
@@ -2868,6 +3333,77 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Actual Signal Strength', style: TextStyle(fontSize: 12, color: textMuted)),
+                        Row(
+                          children: [
+                            Image.asset(
+                              _telemetry.networkIconAsset,
+                              width: 16,
+                              height: 16,
+                              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              isBound
+                                  ? '${_telemetry.effectiveCellularBars}/4 Bars (${_telemetry.cellularQualityLabel})'
+                                  : 'No Signal',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: _telemetry.effectiveCellularBars >= 3
+                                    ? cyberCyan
+                                    : (_telemetry.effectiveCellularBars == 2 ? const Color(0xFFFFB74D) : textMuted),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    if (_telemetry.cellularCsq != null) ...[
+                      const SizedBox(height: 8),
+                      Divider(color: borderCol.withValues(alpha: 0.5), height: 1),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Modem CSQ Level', style: TextStyle(fontSize: 12, color: textMuted)),
+                          Text(
+                            'CSQ ${_telemetry.cellularCsq} (~${-113 + (_telemetry.cellularCsq! * 2)} dBm)',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: cyberCyan,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Divider(color: borderCol.withValues(alpha: 0.5), height: 1),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Hardware Source', style: TextStyle(fontSize: 12, color: textMuted)),
+                        Text(
+                          _telemetry.cellularSignalBars != null ? 'T-Box Live CSQ / Telematics' : 'Cloud Sync Freshness',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Divider(color: borderCol.withValues(alpha: 0.5), height: 1),
+                    const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -2987,6 +3523,119 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     );
   }
 
+  IconData _iconForRemoteTitle(String title, bool isActive) {
+    switch (title.toUpperCase()) {
+      case 'DOORS':
+        return isActive ? Icons.lock_rounded : Icons.lock_open_rounded;
+      case 'CLIMATE':
+        return isActive ? Icons.ac_unit_rounded : Icons.mode_fan_off_rounded;
+      case 'WINDOWS':
+        return Icons.vertical_split_rounded;
+      case 'TRUNK':
+        return Icons.luggage_outlined;
+      case 'LOCATE':
+        return Icons.campaign_rounded;
+      case 'SUNROOF':
+        return Icons.wb_twilight_rounded;
+      case 'DEFROST':
+        return Icons.waves_rounded;
+      case 'ENGINE':
+        return Icons.power_settings_new_rounded;
+      default:
+        return Icons.touch_app_rounded;
+    }
+  }
+
+  Widget _buildEquinoxRemotePod({
+    required String title,
+    required String value,
+    required bool isActive,
+    required Color limeAccent,
+    required Color cardCol,
+    required Color borderCol,
+    required Color textMuted,
+    required Color textPrimary,
+    required VoidCallback onTap,
+  }) {
+    final materialIcon = _iconForRemoteTitle(title, isActive);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        height: 86,
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+        decoration: BoxDecoration(
+          color: cardCol,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isActive ? limeAccent.withValues(alpha: 0.7) : borderCol,
+            width: isActive ? 1.3 : 0.9,
+          ),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: limeAccent.withValues(alpha: 0.12),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: isActive
+                    ? limeAccent.withValues(alpha: 0.18)
+                    : (cardCol.computeLuminance() < 0.5 ? const Color(0xFF1E232E) : const Color(0xFFE2E8F0)),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isActive ? limeAccent : borderCol.withValues(alpha: 0.7),
+                  width: isActive ? 1.4 : 0.8,
+                ),
+              ),
+              child: Center(
+                child: Icon(
+                  materialIcon,
+                  size: 17,
+                  color: isActive ? limeAccent : textPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              title,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 8.5,
+                fontWeight: FontWeight.w700,
+                color: textPrimary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 8.0,
+                fontWeight: FontWeight.w500,
+                color: isActive ? limeAccent : textMuted,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildCyberRemoteCard({
     required String title,
     required String value,
@@ -2999,47 +3648,84 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     required Color textPrimary,
     required VoidCallback onTap,
   }) {
+    final materialIcon = _iconForRemoteTitle(title, isActive);
+
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
-        height: 68,
-        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+        height: 98,
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
         decoration: BoxDecoration(
           color: cardCol,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isActive ? limeAccent : borderCol,
-            width: isActive ? 1.5 : 1.0,
+            color: isActive ? limeAccent.withValues(alpha: 0.75) : borderCol,
+            width: isActive ? 1.4 : 1.0,
           ),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: limeAccent.withValues(alpha: 0.12),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: isActive
+                    ? limeAccent.withValues(alpha: 0.20)
+                    : (cardCol.computeLuminance() < 0.5 ? const Color(0xFF1E232E) : const Color(0xFFE2E8F0)),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isActive ? limeAccent : borderCol,
+                  width: isActive ? 1.5 : 1.0,
+                ),
+              ),
+              child: Center(
+                child: Icon(
+                  materialIcon,
+                  size: 19,
+                  color: isActive ? limeAccent : textPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
             Text(
               title,
               style: TextStyle(
                 fontFamily: 'monospace',
                 fontSize: 9.5,
                 fontWeight: FontWeight.w700,
-                letterSpacing: 1.0,
+                letterSpacing: 0.8,
                 color: textMuted,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
+            const SizedBox(height: 2),
             Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                if (icon != null) ...[
-                  Text(icon, style: const TextStyle(fontSize: 11)),
-                  const SizedBox(width: 4),
+                if (icon != null && icon.isNotEmpty) ...[
+                  Text(icon, style: const TextStyle(fontSize: 10)),
+                  const SizedBox(width: 3),
                 ],
                 Flexible(
                   child: Text(
                     value,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 11.5,
                       fontWeight: FontWeight.w700,
-                      color: textPrimary,
+                      color: isActive ? limeAccent : textPrimary,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -5326,6 +6012,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 children: [
                   Text(
                     totalRangeText,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
@@ -5335,6 +6023,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                   ),
                   Text(
                     'TOTAL RANGE',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 9.5,
                       fontWeight: FontWeight.w800,
@@ -6437,5 +7127,198 @@ class _MiniArcDialPainter extends CustomPainter {
     return oldDelegate.progress != progress ||
         oldDelegate.color != color ||
         oldDelegate.trackColor != trackColor;
+  }
+}
+
+class _MiniMapBackgroundPainter extends CustomPainter {
+  final Color accent;
+  const _MiniMapBackgroundPainter({required this.accent});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paintRoad = Paint()
+      ..color = accent.withValues(alpha: 0.3)
+      ..strokeWidth = 3.0
+      ..style = PaintingStyle.stroke;
+
+    final paintMinor = Paint()
+      ..color = Colors.white.withValues(alpha: 0.15)
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawLine(Offset(0, size.height * 0.75), Offset(size.width, size.height * 0.25), paintRoad);
+    canvas.drawLine(Offset(size.width * 0.3, 0), Offset(size.width * 0.3, size.height), paintMinor);
+    canvas.drawLine(Offset(size.width * 0.7, 0), Offset(size.width * 0.7, size.height), paintMinor);
+    canvas.drawLine(Offset(0, size.height * 0.45), Offset(size.width, size.height * 0.45), paintMinor);
+
+    final paintCircle = Paint()
+      ..color = accent.withValues(alpha: 0.2)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+    canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.5), size.width * 0.35, paintCircle);
+  }
+
+  @override
+  bool shouldRepaint(covariant _MiniMapBackgroundPainter oldDelegate) => oldDelegate.accent != accent;
+}
+
+class _ModernSlideToStartBar extends StatefulWidget {
+  final Color limeAccent;
+  final Color cardCol;
+  final Color borderCol;
+  final Color textPrimary;
+  final Color textMuted;
+  final VoidCallback onSlideComplete;
+
+  const _ModernSlideToStartBar({
+    required this.limeAccent,
+    required this.cardCol,
+    required this.borderCol,
+    required this.textPrimary,
+    required this.textMuted,
+    required this.onSlideComplete,
+  });
+
+  @override
+  State<_ModernSlideToStartBar> createState() => _ModernSlideToStartBarState();
+}
+
+class _ModernSlideToStartBarState extends State<_ModernSlideToStartBar> with SingleTickerProviderStateMixin {
+  double _dragOffset = 0.0;
+  late final AnimationController _resetAnimCtrl;
+  late Animation<double> _resetAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _resetAnimCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    )..addListener(() {
+        setState(() => _dragOffset = _resetAnim.value);
+      });
+  }
+
+  @override
+  void dispose() {
+    _resetAnimCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onHorizontalDragUpdate(DragUpdateDetails details, double maxDrag) {
+    if (_resetAnimCtrl.isAnimating) _resetAnimCtrl.stop();
+    setState(() {
+      _dragOffset = (_dragOffset + details.delta.dx).clamp(0.0, maxDrag);
+    });
+  }
+
+  void _onHorizontalDragEnd(DragEndDetails details, double maxDrag) {
+    if (_dragOffset >= maxDrag * 0.75) {
+      widget.onSlideComplete();
+    }
+    _resetAnim = Tween<double>(begin: _dragOffset, end: 0.0).animate(
+      CurvedAnimation(parent: _resetAnimCtrl, curve: Curves.easeOutBack),
+    );
+    _resetAnimCtrl.forward(from: 0.0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const knobSize = 46.0;
+        final totalWidth = constraints.maxWidth;
+        final maxDrag = (totalWidth - knobSize - 8).clamp(0.0, double.infinity);
+        final progress = maxDrag > 0 ? (_dragOffset / maxDrag).clamp(0.0, 1.0) : 0.0;
+
+        return Container(
+          height: 54,
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(
+            color: widget.cardCol,
+            borderRadius: BorderRadius.circular(AppTokens.rFull),
+            border: Border.all(
+              color: progress > 0.1
+                  ? widget.limeAccent.withValues(alpha: 0.3 + (progress * 0.7))
+                  : widget.borderCol,
+              width: 1.2,
+            ),
+            boxShadow: progress > 0.2
+                ? [
+                    BoxShadow(
+                      color: widget.limeAccent.withValues(alpha: 0.15 * progress),
+                      blurRadius: 12,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Stack(
+            alignment: Alignment.centerLeft,
+            children: [
+              if (progress > 0)
+                Container(
+                  width: _dragOffset + knobSize,
+                  decoration: BoxDecoration(
+                    color: widget.limeAccent.withValues(alpha: 0.12 * progress),
+                    borderRadius: BorderRadius.circular(AppTokens.rFull),
+                  ),
+                ),
+              Center(
+                child: Opacity(
+                  opacity: (1.0 - (progress * 1.5)).clamp(0.0, 1.0),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Slide to pre-cool / start',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
+                          color: widget.textMuted,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(Icons.keyboard_double_arrow_right_rounded, size: 16, color: widget.limeAccent),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned(
+                left: _dragOffset,
+                child: GestureDetector(
+                  onHorizontalDragUpdate: (details) => _onHorizontalDragUpdate(details, maxDrag),
+                  onHorizontalDragEnd: (details) => _onHorizontalDragEnd(details, maxDrag),
+                  child: Container(
+                    width: knobSize,
+                    height: knobSize,
+                    decoration: BoxDecoration(
+                      color: progress > 0.5 ? widget.limeAccent : widget.cardCol,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: widget.limeAccent, width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: widget.limeAccent.withValues(alpha: 0.25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Icon(
+                        Icons.power_settings_new_rounded,
+                        size: 22,
+                        color: progress > 0.5 ? Colors.black : widget.limeAccent,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

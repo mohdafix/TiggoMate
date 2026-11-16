@@ -95,6 +95,13 @@ class VehicleTelemetry {
   final String dataSourceLabel;
   final String? rawBlobHex;
 
+  /// Actual cellular signal bars (0..4) reported by the vehicle's telematics T-Box / locate API.
+  /// Null if not reported by the hardware or awaiting locate response.
+  final int? cellularSignalBars;
+
+  /// Raw CSQ (0..31) or RSSI dBm if reported by the T-Box / network service.
+  final int? cellularCsq;
+
   const VehicleTelemetry({
     this.batteryPct = 0,
     this.electricRangeKm = 0,
@@ -147,7 +154,51 @@ class VehicleTelemetry {
     this.isBound = false,
     this.dataSourceLabel = 'Pending Car Bind',
     this.rawBlobHex,
+    this.cellularSignalBars,
+    this.cellularCsq,
   });
+
+  /// Effective cellular signal bars (0..4) ported from CarLinko's NetworkStatusManager.
+  /// Uses actual hardware [cellularSignalBars] when available; otherwise falls
+  /// back to telemetry heartbeat freshness.
+  int get effectiveCellularBars {
+    if (!isBound) return 0;
+    if (cellularSignalBars != null) {
+      return cellularSignalBars!.clamp(0, 4);
+    }
+    final age = DateTime.now().difference(lastUpdated).inSeconds;
+    if (age < 180) return 4;
+    if (age < 600) return 3;
+    if (age < 3600) return 2;
+    return 1;
+  }
+
+  /// Network quality description matching CarLinko's classifications
+  /// ('networkOk', 'networkWeak', 'networkPoor', 'no_network').
+  String get cellularQualityLabel {
+    final bars = effectiveCellularBars;
+    switch (bars) {
+      case 4:
+        return 'Optimal (networkOk)';
+      case 3:
+        return 'Good';
+      case 2:
+        return 'Weak (networkWeak)';
+      case 1:
+        return 'Poor (networkPoor)';
+      default:
+        return 'No Network (no_network)';
+    }
+  }
+
+  /// Official CarLinko network status icon asset path (1..4 bars or no_network).
+  String get networkIconAsset {
+    final bars = effectiveCellularBars;
+    if (bars <= 0) {
+      return 'assets/images/no_network.png';
+    }
+    return 'assets/images/car_network_${bars}_rtl.png';
+  }
 
   /// Full live status as a readable block, for handing to the AI assistant
   /// so it can answer questions about any current vehicle state instead of
@@ -291,6 +342,8 @@ class VehicleTelemetry {
       isSimulated: true,
       isBound: true,
       dataSourceLabel: 'Chery CarLinko Sample Data',
+      cellularSignalBars: 4,
+      cellularCsq: 25,
     );
   }
 
@@ -351,6 +404,24 @@ class VehicleTelemetry {
     final double lon = (m['lon'] as num?)?.toDouble() ?? 0.0;
     final bool parked = (m['is_parked'] as bool?) ?? spd <= 0;
 
+    // Parse actual cellular signal strength from CarLinko / T-Box metadata if provided
+    final rawSig = m['cellular_signal_bars'] ?? m['signal'] ?? m['gsmSignal'] ?? m['csq'] ?? m['netSignal'];
+    int? parsedBars;
+    int? parsedCsq;
+    if (rawSig != null) {
+      final numVal = (rawSig is num) ? rawSig.toInt() : int.tryParse(rawSig.toString().trim());
+      if (numVal != null) {
+        parsedCsq = numVal;
+        if (numVal >= 0 && numVal <= 4) {
+          parsedBars = numVal;
+        } else if (numVal >= 5 && numVal <= 31) {
+          parsedBars = numVal >= 20 ? 4 : (numVal >= 15 ? 3 : (numVal >= 10 ? 2 : 1));
+        } else if (numVal < 0) {
+          parsedBars = numVal >= -75 ? 4 : (numVal >= -85 ? 3 : (numVal >= -100 ? 2 : 1));
+        }
+      }
+    }
+
     return VehicleTelemetry(
       batteryPct: batt.clamp(0, 100),
       electricRangeKm: evRange,
@@ -393,6 +464,8 @@ class VehicleTelemetry {
       isBound: !isSimulated,
       dataSourceLabel: isSimulated ? 'Chery CarLinko Cloud • Simulated' : 'LIVE CARLINKO TELEMATICS',
       rawBlobHex: m['rawHex'] as String?,
+      cellularSignalBars: parsedBars,
+      cellularCsq: parsedCsq,
     );
   }
 
@@ -454,6 +527,8 @@ class VehicleTelemetry {
         'isBound': isBound,
         'dataSourceLabel': dataSourceLabel,
         'rawBlobHex': rawBlobHex,
+        'cellularSignalBars': cellularSignalBars,
+        'cellularCsq': cellularCsq,
       };
 
   factory VehicleTelemetry.fromJson(Map<String, dynamic> json) => VehicleTelemetry(
@@ -508,6 +583,8 @@ class VehicleTelemetry {
         isBound: json['isBound'] as bool? ?? false,
         dataSourceLabel: json['dataSourceLabel'] as String? ?? 'Pending Car Bind',
         rawBlobHex: json['rawBlobHex'] as String?,
+        cellularSignalBars: (json['cellularSignalBars'] as num?)?.toInt(),
+        cellularCsq: (json['cellularCsq'] as num?)?.toInt(),
       );
 
   /// Convert kPa to PSI for dual automotive readouts.
@@ -574,6 +651,8 @@ class VehicleTelemetry {
     bool? isBound,
     String? dataSourceLabel,
     String? rawBlobHex,
+    int? cellularSignalBars,
+    int? cellularCsq,
   }) {
     return VehicleTelemetry(
       batteryPct: batteryPct ?? this.batteryPct,
@@ -627,6 +706,8 @@ class VehicleTelemetry {
       isBound: isBound ?? this.isBound,
       dataSourceLabel: dataSourceLabel ?? this.dataSourceLabel,
       rawBlobHex: rawBlobHex ?? this.rawBlobHex,
+      cellularSignalBars: cellularSignalBars ?? this.cellularSignalBars,
+      cellularCsq: cellularCsq ?? this.cellularCsq,
     );
   }
 }

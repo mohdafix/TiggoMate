@@ -234,9 +234,9 @@ class _EnergyScreenState extends State<EnergyScreen> {
 
     final chosen = await showModalBottomSheet<int>(
       context: context,
-      backgroundColor: const Color(0xFF131722),
+      backgroundColor: context.tokens.resolvedContainerLow,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppTokens.r2Xl)),
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
@@ -290,9 +290,9 @@ class _EnergyScreenState extends State<EnergyScreen> {
 
     final chosen = await showModalBottomSheet<String>(
       context: context,
-      backgroundColor: const Color(0xFF131722),
+      backgroundColor: context.tokens.resolvedContainerLow,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppTokens.r2Xl)),
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
@@ -344,12 +344,13 @@ class _EnergyScreenState extends State<EnergyScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgCol = isDark ? const Color(0xFF0A0B0E) : const Color(0xFFF6F8FA);
-    final cardCol = isDark ? const Color(0xFF12141A) : Colors.white;
-    final borderCol = isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0);
-    final textMuted = isDark ? const Color(0xFF717684) : const Color(0xFF64748B);
-    final textPrimary = isDark ? Colors.white : const Color(0xFF0A0B0E);
-    final limeAccent = context.tokens.accent;
+    final t = context.tokens;
+    final bgCol = t.bg;
+    final cardCol = t.resolvedContainerLow;
+    final borderCol = t.border;
+    final textMuted = t.ink2;
+    final textPrimary = t.ink;
+    final limeAccent = t.accent;
     const orangeAccent = Color(0xFFFF6E40);
 
     return Scaffold(

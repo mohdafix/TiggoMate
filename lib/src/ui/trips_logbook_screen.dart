@@ -707,13 +707,12 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
   }
 
   void _showAddTripPresetModal() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: isDark ? const Color(0xFF0D1219) : Colors.white,
+      backgroundColor: context.tokens.resolvedContainerLow,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppTokens.r2Xl)),
       ),
       builder: (ctx) => _AddTripPresetSheet(
         onSelectPreset: (preset) {
@@ -746,13 +745,12 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
   }
 
   void _showLogModal() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: isDark ? const Color(0xFF0D1219) : Colors.white,
+      backgroundColor: context.tokens.resolvedContainerLow,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppTokens.r2Xl)),
       ),
       builder: (ctx) => _SmartExpenseSheet(
         fuelPrice: widget.fuelPrice,
@@ -774,13 +772,12 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
   }
 
   void _showExportModal() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: isDark ? const Color(0xFF0D1219) : Colors.white,
+      backgroundColor: context.tokens.resolvedContainerLow,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppTokens.r2Xl)),
       ),
       builder: (ctx) => _ExportLogbookModal(
         selectedMonth: _selectedMonth,
@@ -797,13 +794,12 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
   }
 
   void _showTripDetailModal(TripRecord trip) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: isDark ? const Color(0xFF0D1219) : Colors.white,
+      backgroundColor: context.tokens.resolvedContainerLow,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppTokens.r2Xl)),
       ),
       builder: (ctx) => _TripDetailSheet(trip: trip, fuelPrice: widget.fuelPrice, tnbTariff: widget.tnbTariff),
     );
@@ -847,13 +843,13 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
   }
 
   Widget _buildCyberLogbook(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgCol = isDark ? const Color(0xFF0A0B0E) : const Color(0xFFF6F8FA);
-    final cardCol = isDark ? const Color(0xFF12141A) : Colors.white;
-    final borderCol = isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0);
-    final textMuted = isDark ? const Color(0xFF717684) : const Color(0xFF64748B);
-    final textPrimary = isDark ? Colors.white : const Color(0xFF0A0B0E);
-    final limeAccent = context.tokens.accent;
+    final t = context.tokens;
+    final bgCol = t.bg;
+    final cardCol = t.resolvedContainerLow;
+    final borderCol = t.border;
+    final textMuted = t.ink2;
+    final textPrimary = t.ink;
+    final limeAccent = t.accent;
     const orangeAccent = Color(0xFFFF6E40);
 
     final totalKm = _totalDistanceKm;
@@ -978,7 +974,7 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     decoration: BoxDecoration(
                       color: cardCol,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppTokens.rLg),
                       border: Border.all(color: borderCol),
                     ),
                     child: Column(
@@ -1005,7 +1001,7 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     decoration: BoxDecoration(
                       color: cardCol,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppTokens.rLg),
                       border: Border.all(color: borderCol),
                     ),
                     child: Column(
@@ -1032,7 +1028,7 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     decoration: BoxDecoration(
                       color: cardCol,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppTokens.rLg),
                       border: Border.all(color: borderCol),
                     ),
                     child: Column(
@@ -1104,7 +1100,7 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                       side: BorderSide(color: borderCol),
                       backgroundColor: cardCol,
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: const StadiumBorder(),
                     ),
                     child: Text('+ Trip', style: TextStyle(fontFamily: 'monospace', fontSize: 12.5, fontWeight: FontWeight.w700, color: textPrimary)),
                   ),
@@ -1117,7 +1113,7 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                       side: BorderSide(color: borderCol),
                       backgroundColor: cardCol,
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: const StadiumBorder(),
                     ),
                     child: Text('+ Fuel', style: TextStyle(fontFamily: 'monospace', fontSize: 12.5, fontWeight: FontWeight.w700, color: textPrimary)),
                   ),
@@ -1130,7 +1126,7 @@ class _TripsLogbookScreenState extends State<TripsLogbookScreen> {
                       side: BorderSide(color: borderCol),
                       backgroundColor: cardCol,
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: const StadiumBorder(),
                     ),
                     child: Text('+ Charge', style: TextStyle(fontFamily: 'monospace', fontSize: 12.5, fontWeight: FontWeight.w700, color: textPrimary)),
                   ),

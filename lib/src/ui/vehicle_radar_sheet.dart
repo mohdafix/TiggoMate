@@ -15,6 +15,7 @@ import '../service/trip_planner_service.dart';
 import '../theme/app_theme.dart';
 import 'app_notification.dart';
 import 'apple_design_widgets.dart';
+import 'tiggo_map_config.dart';
 
 /// A charging location saved in the app. Live availability and prices are not known.
 class _SavedCharger {
@@ -145,20 +146,20 @@ const List<_SavedPetrolStation> _savedPetrolStations = [
 /// Inspired by tactical automotive radar and official Chery CarLinko Find My Car.
 class VehicleRadarSheet extends StatefulWidget {
   final VehicleTelemetry telemetry;
-  final VoidCallback onHornFlash;
+  final VoidCallback? onHornFlash;
   final VehicleRepository? repository;
 
   const VehicleRadarSheet({
     super.key,
     required this.telemetry,
-    required this.onHornFlash,
+    this.onHornFlash,
     this.repository,
   });
 
   static Future<void> show(
     BuildContext context, {
     required VehicleTelemetry telemetry,
-    required VoidCallback onHornFlash,
+    VoidCallback? onHornFlash,
     VehicleRepository? repository,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -248,6 +249,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
   @override
   void initState() {
     super.initState();
+    TiggoMapConfig.init();
     _radarController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 4),
@@ -498,39 +500,39 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
         ),
       );
     }
-    return ColorFiltered(
-      colorFilter: const ColorFilter.matrix([
-        -1, 0, 0, 0, 255,
-        0, -1, 0, 0, 255,
-        0, 0, -1, 0, 255,
-        0, 0, 0, 1, 0,
-      ]),
-      child: FlutterMap(
-        options: MapOptions(
-          initialCenter: LatLng(lat, lon),
-          initialZoom: 16,
-          interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
-        ),
-        children: [
-          TileLayer(
-            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-            userAgentPackageName: 'com.tiggomate.tiggomate_app',
-          ),
-          if (_hasActiveGeofence || _activeRadarTab == 2)
-            CircleLayer(
-              circles: [
-                CircleMarker(
-                  point: LatLng(lat, lon),
-                  radius: _selectedFenceRadius,
-                  useRadiusInMeter: true,
-                  color: const Color(0xFFD2F835).withValues(alpha: 0.14),
-                  borderColor: const Color(0xFFD2F835),
-                  borderStrokeWidth: 2.0,
-                ),
-              ],
+    return ValueListenableBuilder<TiggoMapStyle>(
+      valueListenable: TiggoMapConfig.activeStyle,
+      builder: (context, mapStyle, _) {
+        return mapStyle.wrapMap(
+          FlutterMap(
+            key: ValueKey('radar_map_${mapStyle.name}'),
+            options: MapOptions(
+              initialCenter: LatLng(lat, lon),
+              initialZoom: 16,
+              interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
             ),
-        ],
-      ),
+            children: [
+              TileLayer(
+                urlTemplate: mapStyle.urlTemplate,
+                userAgentPackageName: 'com.tiggomate.tiggomate_app',
+              ),
+              if (_hasActiveGeofence || _activeRadarTab == 2)
+                CircleLayer(
+                  circles: [
+                    CircleMarker(
+                      point: LatLng(lat, lon),
+                      radius: _selectedFenceRadius,
+                      useRadiusInMeter: true,
+                      color: const Color(0xFFD2F835).withValues(alpha: 0.14),
+                      borderColor: const Color(0xFFD2F835),
+                      borderStrokeWidth: 2.0,
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -652,7 +654,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
 
   void _triggerHornFlash() {
     setState(() => _isFlashing = true);
-    widget.onHornFlash();
+    widget.onHornFlash?.call();
     _showToast('📢 Sounding horn & flashing headlights...');
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) setState(() => _isFlashing = false);
@@ -1102,7 +1104,61 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                     ],
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 10),
+
+                // ---------------- 1.5 MAP STYLE SELECTOR ----------------
+                ValueListenableBuilder<TiggoMapStyle>(
+                  valueListenable: TiggoMapConfig.activeStyle,
+                  builder: (context, currentStyle, _) {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: TiggoMapStyle.values.map((style) {
+                        final isSelected = style == currentStyle;
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                          child: InkWell(
+                            onTap: () => TiggoMapConfig.setStyle(style),
+                            borderRadius: BorderRadius.circular(16),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4.5),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? colors.evTeal.withValues(alpha: 0.18)
+                                    : (isDark ? const Color(0xFF1F2937) : const Color(0xFFE5E7EB)),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: isSelected ? colors.evTeal : Colors.transparent,
+                                  width: 1.2,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    style.icon,
+                                    size: 12,
+                                    color: isSelected ? colors.evTeal : colors.textMuted,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    style.label,
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                      color: isSelected ? colors.textPrimary : colors.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
 
                 // ---------------- 2. LOCATION TELEMETRY CARD ----------------
                 Container(
@@ -1306,30 +1362,84 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                   children: [
                     // Waze Direct Route
                     Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () => _launchWaze(lat, lon),
-                        icon: const Icon(Icons.navigation, size: 15),
-                        label: const Text('Waze Route', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF33CCFF),
-                          foregroundColor: Colors.black87,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF0284C7), Color(0xFF0369A1)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF0284C7).withValues(alpha: 0.25),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => _launchWaze(lat, lon),
+                            borderRadius: BorderRadius.circular(16),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 14),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.navigation_rounded, size: 16, color: Colors.white),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Waze Route',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 10),
                     // Google Maps Direct Route
                     Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () => _launchGoogleMaps(lat, lon),
-                        icon: const Icon(Icons.map_outlined, size: 15),
-                        label: const Text('Google Maps', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF34A853),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF10B981), Color(0xFF059669)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.25),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => _launchGoogleMaps(lat, lon),
+                            borderRadius: BorderRadius.circular(16),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 14),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.map_rounded, size: 16, color: Colors.white),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Google Maps',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -1341,38 +1451,64 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                   children: [
                     // Flash & Horn (for parking garage)
                     Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _triggerHornFlash,
-                        icon: Icon(
-                          _isFlashing ? Icons.flash_on : Icons.notifications_active_outlined,
-                          size: 15,
-                          color: colors.petrolAmber,
-                        ),
-                        label: Text(
-                          _isFlashing ? 'Flashing...' : 'Horn & Flash',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colors.textPrimary),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: colors.border),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: Material(
+                        color: colors.tileBg,
+                        borderRadius: BorderRadius.circular(16),
+                        child: InkWell(
+                          onTap: _triggerHornFlash,
+                          borderRadius: BorderRadius.circular(16),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: colors.border),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  _isFlashing ? Icons.flash_on : Icons.notifications_active_outlined,
+                                  size: 16,
+                                  color: colors.petrolAmber,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _isFlashing ? 'Flashing...' : 'Horn & Flash',
+                                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: colors.textPrimary),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 10),
                     // Copy GPS
                     Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _copyGps,
-                        icon: Icon(Icons.copy, size: 14, color: colors.textSecondary),
-                        label: Text(
-                          'Copy GPS',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colors.textPrimary),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: colors.border),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: Material(
+                        color: colors.tileBg,
+                        borderRadius: BorderRadius.circular(16),
+                        child: InkWell(
+                          onTap: _copyGps,
+                          borderRadius: BorderRadius.circular(16),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: colors.border),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.copy_rounded, size: 15, color: colors.textSecondary),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Copy GPS',
+                                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: colors.textPrimary),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -1662,78 +1798,86 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
           clipBehavior: Clip.antiAlias,
           child: Stack(
             children: [
-              FlutterMap(
-                mapController: _plannerMapController,
-                options: MapOptions(
-                  initialCenter: _selectedPreset != null
-                      ? LatLng((lat + _selectedPreset!.location.latitude) / 2, (lon + _selectedPreset!.location.longitude) / 2)
-                      : LatLng(lat != 0 ? lat : 3.1390, lon != 0 ? lon : 101.6869),
-                  initialZoom: 8.0,
-                ),
-                children: [
-                  TileLayer(
-                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.tiggomate.tiggomate_app',
-                  ),
-                  if (route != null && route.polyline.isNotEmpty)
-                    PolylineLayer(
-                      polylines: [
-                        Polyline(
-                          points: route.polyline,
-                          strokeWidth: 4.5,
-                          color: const Color(0xFF00E5FF),
+              ValueListenableBuilder<TiggoMapStyle>(
+                valueListenable: TiggoMapConfig.activeStyle,
+                builder: (context, mapStyle, _) {
+                  return mapStyle.wrapMap(
+                    FlutterMap(
+                      key: ValueKey('planner_map_${mapStyle.name}'),
+                      mapController: _plannerMapController,
+                      options: MapOptions(
+                        initialCenter: _selectedPreset != null
+                            ? LatLng((lat + _selectedPreset!.location.latitude) / 2, (lon + _selectedPreset!.location.longitude) / 2)
+                            : LatLng(lat != 0 ? lat : 3.1390, lon != 0 ? lon : 101.6869),
+                        initialZoom: 8.0,
+                      ),
+                      children: [
+                        TileLayer(
+                          urlTemplate: mapStyle.urlTemplate,
+                          userAgentPackageName: 'com.tiggomate.tiggomate_app',
+                        ),
+                        if (route != null && route.polyline.isNotEmpty)
+                          PolylineLayer(
+                            polylines: [
+                              Polyline(
+                                points: route.polyline,
+                                strokeWidth: 4.5,
+                                color: const Color(0xFF00E5FF),
+                              ),
+                            ],
+                          ),
+                        MarkerLayer(
+                          markers: [
+                            // Car start marker
+                            Marker(
+                              point: LatLng(lat != 0 ? lat : 3.1390, lon != 0 ? lon : 101.6869),
+                              width: 32,
+                              height: 32,
+                              child: Container(
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF0F172A),
+                                  shape: BoxShape.circle,
+                                  boxShadow: [BoxShadow(color: Colors.black45, blurRadius: 4)],
+                                ),
+                                child: const Icon(Icons.directions_car, color: Color(0xFF00E5FF), size: 18),
+                              ),
+                            ),
+                            // Destination marker
+                            if (_selectedPreset != null)
+                              Marker(
+                                point: _selectedPreset!.location,
+                                width: 32,
+                                height: 32,
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFE11D48),
+                                    shape: BoxShape.circle,
+                                    boxShadow: [BoxShadow(color: Colors.black45, blurRadius: 4)],
+                                  ),
+                                  child: const Icon(Icons.flag_rounded, color: Colors.white, size: 18),
+                                ),
+                              ),
+                            // Recommended DC Fast Charger Marker
+                            if (route?.recommendedStop != null)
+                              Marker(
+                                point: route!.recommendedStop!.location,
+                                width: 36,
+                                height: 36,
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFFFB300),
+                                    shape: BoxShape.circle,
+                                    boxShadow: [BoxShadow(color: Colors.black45, blurRadius: 4)],
+                                  ),
+                                  child: const Icon(Icons.bolt, color: Colors.black, size: 22),
+                                ),
+                              ),
+                          ],
                         ),
                       ],
                     ),
-                  MarkerLayer(
-                    markers: [
-                      // Car start marker
-                      Marker(
-                        point: LatLng(lat != 0 ? lat : 3.1390, lon != 0 ? lon : 101.6869),
-                        width: 32,
-                        height: 32,
-                        child: Container(
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF0F172A),
-                            shape: BoxShape.circle,
-                            boxShadow: [BoxShadow(color: Colors.black45, blurRadius: 4)],
-                          ),
-                          child: const Icon(Icons.directions_car, color: Color(0xFF00E5FF), size: 18),
-                        ),
-                      ),
-                      // Destination marker
-                      if (_selectedPreset != null)
-                        Marker(
-                          point: _selectedPreset!.location,
-                          width: 32,
-                          height: 32,
-                          child: Container(
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFE11D48),
-                              shape: BoxShape.circle,
-                              boxShadow: [BoxShadow(color: Colors.black45, blurRadius: 4)],
-                            ),
-                            child: const Icon(Icons.flag_rounded, color: Colors.white, size: 18),
-                          ),
-                        ),
-                      // Recommended DC Fast Charger Marker
-                      if (route?.recommendedStop != null)
-                        Marker(
-                          point: route!.recommendedStop!.location,
-                          width: 36,
-                          height: 36,
-                          child: Container(
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFFFB300),
-                              shape: BoxShape.circle,
-                              boxShadow: [BoxShadow(color: Colors.black45, blurRadius: 4)],
-                            ),
-                            child: const Icon(Icons.bolt, color: Colors.black, size: 22),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
+                  );
+                },
               ),
               if (isCalc)
                 Container(
@@ -2069,85 +2213,93 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
           clipBehavior: Clip.antiAlias,
           child: Stack(
             children: [
-              FlutterMap(
-                mapController: _geofenceMapController,
-                options: MapOptions(
-                  initialCenter: _effectiveFenceCenter,
-                  initialZoom: 15.0,
-                  interactionOptions: const InteractionOptions(
-                    flags: InteractiveFlag.all,
-                  ),
-                  onTap: (tapPosition, point) {
-                    setState(() => _customFenceCenter = point);
-                  },
-                ),
-                children: [
-                  TileLayer(
-                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.tiggomate.tiggomate_app',
-                  ),
-                  CircleLayer(
-                    circles: [
-                      CircleMarker(
-                        point: _effectiveFenceCenter,
-                        radius: _selectedFenceRadius,
-                        useRadiusInMeter: true,
-                        color: const Color(0xFFD2F835).withValues(alpha: 0.18),
-                        borderColor: const Color(0xFFD2F835),
-                        borderStrokeWidth: 2.5,
+              ValueListenableBuilder<TiggoMapStyle>(
+                valueListenable: TiggoMapConfig.activeStyle,
+                builder: (context, mapStyle, _) {
+                  return mapStyle.wrapMap(
+                    FlutterMap(
+                      key: ValueKey('geofence_map_${mapStyle.name}'),
+                      mapController: _geofenceMapController,
+                      options: MapOptions(
+                        initialCenter: _effectiveFenceCenter,
+                        initialZoom: 15.0,
+                        interactionOptions: const InteractionOptions(
+                          flags: InteractiveFlag.all,
+                        ),
+                        onTap: (tapPosition, point) {
+                          setState(() => _customFenceCenter = point);
+                        },
                       ),
-                    ],
-                  ),
-                  MarkerLayer(
-                    markers: [
-                      // Vehicle Pin if location known
-                      if (_hasAnyLocation && _effectiveLat != 0.0 && _effectiveLon != 0.0)
-                        Marker(
-                          point: LatLng(_effectiveLat, _effectiveLon),
-                          width: 32,
-                          height: 32,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF0F172A),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: const Color(0xFF38BDF8), width: 2),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.5),
-                                  blurRadius: 4,
-                                ),
-                              ],
+                      children: [
+                        TileLayer(
+                          urlTemplate: mapStyle.urlTemplate,
+                          userAgentPackageName: 'com.tiggomate.tiggomate_app',
+                        ),
+                        CircleLayer(
+                          circles: [
+                            CircleMarker(
+                              point: _effectiveFenceCenter,
+                              radius: _selectedFenceRadius,
+                              useRadiusInMeter: true,
+                              color: const Color(0xFFD2F835).withValues(alpha: 0.18),
+                              borderColor: const Color(0xFFD2F835),
+                              borderStrokeWidth: 2.5,
                             ),
-                            child: const Icon(Icons.directions_car, color: Color(0xFF38BDF8), size: 16),
-                          ),
+                          ],
                         ),
-                      // Geofence Center Pin
-                      Marker(
-                        point: _effectiveFenceCenter,
-                        width: 38,
-                        height: 38,
-                        alignment: Alignment.center,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFD2F835),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.black, width: 2),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFD2F835).withValues(alpha: 0.6),
-                                blurRadius: 10,
-                                spreadRadius: 2,
+                        MarkerLayer(
+                          markers: [
+                            // Vehicle Pin if location known
+                            if (_hasAnyLocation && _effectiveLat != 0.0 && _effectiveLon != 0.0)
+                              Marker(
+                                point: LatLng(_effectiveLat, _effectiveLon),
+                                width: 32,
+                                height: 32,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0F172A),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: const Color(0xFF38BDF8), width: 2),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.5),
+                                        blurRadius: 4,
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(Icons.directions_car, color: Color(0xFF38BDF8), size: 16),
+                                ),
                               ),
-                            ],
-                          ),
-                          child: const Center(
-                            child: Icon(Icons.shield, color: Colors.black, size: 18),
-                          ),
+                            // Geofence Center Pin
+                            Marker(
+                              point: _effectiveFenceCenter,
+                              width: 38,
+                              height: 38,
+                              alignment: Alignment.center,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFD2F835),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.black, width: 2),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFFD2F835).withValues(alpha: 0.6),
+                                      blurRadius: 10,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                child: const Center(
+                                  child: Icon(Icons.shield, color: Colors.black, size: 18),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  );
+                },
               ),
 
               // Top instructions pill
@@ -2783,15 +2935,15 @@ class _CircularRadarMapPainter extends CustomPainter {
     for (int i = 0; i < 2; i++) {
       final waveProgress = (animValue + (i * 0.5)) % 1.0;
       final waveRadius = waveProgress * radius * 0.92;
-      final waveAlpha = (1.0 - waveProgress).clamp(0.0, 1.0) * 0.45;
+      final waveAlpha = (1.0 - waveProgress).clamp(0.0, 1.0) * 0.40;
       if (waveRadius > 10) {
         canvas.drawCircle(
           center,
           waveRadius,
           Paint()
-            ..color = const Color(0xFF39FF14).withValues(alpha: waveAlpha)
+            ..color = const Color(0xFF00E5FF).withValues(alpha: waveAlpha)
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.4,
+            ..strokeWidth = 1.2,
         );
       }
     }
@@ -2814,8 +2966,8 @@ class _CircularRadarMapPainter extends CustomPainter {
       endAngle: fanAngle,
       colors: const [
         Colors.transparent,
-        Color(0x3300E5FF),
-        Color(0x6639FF14),
+        Color(0x1000E5FF),
+        Color(0x4500E5FF),
       ],
       stops: const [0.0, 0.45, 1.0],
       transform: GradientRotation(radarAngle - fanAngle),
@@ -2830,8 +2982,8 @@ class _CircularRadarMapPainter extends CustomPainter {
       center,
       lineEnd,
       Paint()
-        ..color = const Color(0xFF39FF14).withValues(alpha: 0.70)
-        ..strokeWidth = 3.5
+        ..color = const Color(0xFF00E5FF).withValues(alpha: 0.85)
+        ..strokeWidth = 3.2
         ..strokeCap = StrokeCap.round,
     );
 
@@ -2840,8 +2992,8 @@ class _CircularRadarMapPainter extends CustomPainter {
       center,
       lineEnd,
       Paint()
-        ..color = const Color(0xFFE8FFD8)
-        ..strokeWidth = 1.8
+        ..color = Colors.white
+        ..strokeWidth = 1.6
         ..strokeCap = StrokeCap.round,
     );
 

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../trips/smart_trip_tracker.dart';
+import '../theme/app_tokens.dart';
 import 'app_notification.dart';
 import 'book_service_appointment_sheet.dart';
 
@@ -1150,13 +1151,13 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
       });
     }
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgCol = isDark ? const Color(0xFF0A0B0E) : const Color(0xFFF8FAFC);
-    final cardCol = isDark ? const Color(0xFF12141A) : Colors.white;
-    final borderCol = isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0);
-    final textMuted = isDark ? const Color(0xFF717684) : const Color(0xFF64748B);
-    final textPrimary = isDark ? Colors.white : const Color(0xFF0A0B0E);
-    const cyberLime = Color(0xFFD2F835);
+    final t = context.tokens;
+    final bgCol = t.bg;
+    final cardCol = t.resolvedContainerLow;
+    final borderCol = t.border;
+    final textMuted = t.ink2;
+    final textPrimary = t.ink;
+    final cyberLime = t.accent;
     const cyberOrange = Color(0xFFFF6E40);
 
     // Determine nearest centre if GPS is available
@@ -1244,9 +1245,9 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                     children: [
                       Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: const [
+                        children: [
                           Icon(Icons.near_me_rounded, color: cyberLime, size: 12),
-                          SizedBox(width: 5),
+                          const SizedBox(width: 5),
                           Text(
                             'NEAREST SERVICE CENTRE',
                             style: TextStyle(
@@ -1268,7 +1269,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                         ),
                         child: Text(
                           '${closestCentre.distanceTo(_userPosition!.latitude, _userPosition!.longitude).toStringAsFixed(1)} km away',
-                          style: const TextStyle(fontFamily: 'monospace', fontSize: 10, fontWeight: FontWeight.w700, color: cyberLime),
+                          style: TextStyle(fontFamily: 'monospace', fontSize: 10, fontWeight: FontWeight.w700, color: cyberLime),
                         ),
                       ),
                     ],
@@ -1343,7 +1344,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                   decoration: InputDecoration(
                     hintText: 'Search city, dealer, or state (e.g. Puchong, Ipoh)...',
                     hintStyle: TextStyle(fontSize: 11.5, color: textMuted),
-                    prefixIcon: const Icon(Icons.search, size: 18, color: cyberLime),
+                    prefixIcon: Icon(Icons.search, size: 18, color: cyberLime),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
                             icon: Icon(Icons.clear, size: 16, color: textMuted),
@@ -1366,7 +1367,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(6),
-                      borderSide: const BorderSide(color: cyberLime),
+                      borderSide: BorderSide(color: cyberLime),
                     ),
                   ),
                 ),
@@ -1512,9 +1513,9 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                   }
                 },
                 child: Row(
-                  children: const [
+                  children: [
                     Text('OFFICIAL PORTAL', style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: cyberLime, fontWeight: FontWeight.w700)),
-                    SizedBox(width: 3),
+                    const SizedBox(width: 3),
                     Icon(Icons.open_in_new, size: 11, color: cyberLime),
                   ],
                 ),
@@ -1542,7 +1543,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                             _selectedType = 'All';
                           });
                         },
-                        child: const Text('RESET FILTERS', style: TextStyle(fontFamily: 'monospace', color: cyberLime, fontWeight: FontWeight.w700)),
+                        child: Text('RESET FILTERS', style: TextStyle(fontFamily: 'monospace', color: cyberLime, fontWeight: FontWeight.w700)),
                       ),
                     ],
                   ),
@@ -1584,11 +1585,12 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
 
   Widget _buildCentreCard(CheryServiceCentre centre) {
     final is4S = centre.type == '4S';
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardCol = isDark ? const Color(0xFF12141A) : Colors.white;
-    final borderCol = isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0);
-    final textPrimary = isDark ? Colors.white : const Color(0xFF0A0B0E);
-    final textMuted = isDark ? const Color(0xFF717684) : const Color(0xFF64748B);
+    final t = context.tokens;
+    final isDark = t.isDark;
+    final cardCol = t.resolvedContainerLow;
+    final borderCol = t.border;
+    final textPrimary = t.ink;
+    final textMuted = t.ink2;
     const cyberLime = Color(0xFFD2F835);
 
     final distanceKm = (_userPosition != null)

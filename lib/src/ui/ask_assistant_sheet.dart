@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../ai/ai_service.dart';
+import '../ai/chery_club_knowledge.dart';
 import '../carlinko/vehicle_repository.dart';
 import '../service/service_appointment_manager.dart';
 import '../theme/app_tokens.dart';
@@ -29,13 +30,12 @@ class AskAssistantSheet extends StatefulWidget {
     int batteryPct = 24,
     Function(String command)? onExecuteCommand,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: isDark ? const Color(0xFF0A0B0E) : Colors.white,
+      backgroundColor: context.tokens.resolvedContainerLow,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppTokens.r2Xl)),
       ),
       builder: (ctx) => AskAssistantSheet(
         carPlate: carPlate,
@@ -458,12 +458,18 @@ class _AskAssistantSheetState extends State<AskAssistantSheet> with TickerProvid
       })();
       citation = 'Official Chery Service Records';
     } else {
-      final tip = hasApiKey
-          ? ''
-          : '\n\n💡 *Tip: Add your OpenRouter or Gemini API key in Settings & Profile for unrestricted real-time AI reasoning.*';
-      replyText =
-          'Command processed for **Chery Tiggo 7 PHEV CSH** with battery at **${widget.batteryPct}% SoC**.$tip';
-      citation = 'Tiggo 7 Onboard Telematics';
+      final clubMatch = CheryClubKnowledge.matchQuestion(text);
+      if (clubMatch != null) {
+        replyText = clubMatch.detailedAdvice;
+        citation = clubMatch.source;
+      } else {
+        final tip = hasApiKey
+            ? ''
+            : '\n\n💡 *Tip: Add your OpenRouter or Gemini API key in Settings & Profile for unrestricted real-time AI reasoning.*';
+        replyText =
+            'Command processed for **Chery Tiggo 7 PHEV CSH** with battery at **${widget.batteryPct}% SoC**.$tip';
+        citation = 'Tiggo 7 Onboard Telematics';
+      }
     }
 
     setState(() {
@@ -913,6 +919,33 @@ class _AskAssistantSheetState extends State<AskAssistantSheet> with TickerProvid
                               icon: Icons.lock_outline_rounded,
                               label: 'Lock vehicle doors',
                               onTap: () => _sendMessage('lock doors'),
+                              limeAccent: limeAccent,
+                              cardCol: bgCol,
+                              borderCol: borderCol,
+                              textColor: textPrimary,
+                            ),
+                            _buildInstructionChip(
+                              icon: Icons.support_agent_rounded,
+                              label: 'Chery Auto Assist 24/7 Hotline',
+                              onTap: () => _sendMessage('what is Chery Auto Assist 24/7 hotline and accident allowance?'),
+                              limeAccent: limeAccent,
+                              cardCol: bgCol,
+                              borderCol: borderCol,
+                              textColor: textPrimary,
+                            ),
+                            _buildInstructionChip(
+                              icon: Icons.power_off_rounded,
+                              label: 'Charger cable stuck?',
+                              onTap: () => _sendMessage('charging cable stuck cannot unplug gun'),
+                              limeAccent: limeAccent,
+                              cardCol: bgCol,
+                              borderCol: borderCol,
+                              textColor: textPrimary,
+                            ),
+                            _buildInstructionChip(
+                              icon: Icons.local_gas_station_rounded,
+                              label: 'Fuel flap won\'t open?',
+                              onTap: () => _sendMessage('fuel flap won\'t open'),
                               limeAccent: limeAccent,
                               cardCol: bgCol,
                               borderCol: borderCol,

@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
+import 'chery_club_knowledge.dart';
 
 /// Resolved configuration for live AI requests.
 class ResolvedAiConfig {
@@ -316,6 +317,9 @@ Keep responses concise (1 to 2 short paragraphs or lists), direct, and automotiv
 Answer in the user's language (English or Bahasa Melayu).
 
 3. Use the Current Odometer, Service History & Records (last service date, completed services, upcoming appointments), Trip History & Driving Records (latest completed trip, distances, EV percentage, energy consumed, costs, active drive, etc.), and the Live Vehicle Status block above directly whenever relevant (last trip, recent drives, service history, mileage, tyre pressure, doors, climate, battery, fuel, GPS/parked state, etc.) -- never say you don't have access to trip history, driving logs, last service date, or vehicle details when provided above. When the user asks about their last trip or driving log, state the exact details from the Trip History above (route/title, distance in km, EV ratio %, and cost in RM). If no trips are recorded yet in the logbook, state that no trips have been logged yet and guide them to record a drive or tap "+ Add Trip" in the LOG tab.
+
+4. MALAYSIA CHERY TIGGO 7 PHEV CLUB KNOWLEDGE & DIRECTORY:
+${CheryClubKnowledge.knowledgePromptBlock}
 ''';
 
     final modelLower = config.model.toLowerCase();

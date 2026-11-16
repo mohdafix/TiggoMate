@@ -351,5 +351,46 @@ void main() {
         equals('6626f9f0c671271a8c956a30579874df39eb415e5cd42730010bb982060d174e1d89b690206231224e'),
       );
     });
+
+    test('VehicleTelemetry accurately parses and normalizes CarLinko cellular signal strength', () {
+      // 1. Unbound vehicle has 0 bars and points to no_network.png
+      final unbound = VehicleTelemetry.unbound();
+      expect(unbound.effectiveCellularBars, equals(0));
+      expect(unbound.cellularQualityLabel, equals('No Network (no_network)'));
+      expect(unbound.networkIconAsset, equals('assets/images/no_network.png'));
+
+      // 2. Hardware-reported direct bars (1..4)
+      final withBars = unbound.copyWith(isBound: true, cellularSignalBars: 3);
+      expect(withBars.effectiveCellularBars, equals(3));
+      expect(withBars.cellularQualityLabel, equals('Good'));
+      expect(withBars.networkIconAsset, equals('assets/images/car_network_3_rtl.png'));
+
+      // 3. 4 bars maps to networkOk
+      final strong = unbound.copyWith(isBound: true, cellularSignalBars: 4);
+      expect(strong.effectiveCellularBars, equals(4));
+      expect(strong.cellularQualityLabel, equals('Optimal (networkOk)'));
+      expect(strong.networkIconAsset, equals('assets/images/car_network_4_rtl.png'));
+
+      // 4. 1 bar maps to networkPoor
+      final weak = unbound.copyWith(isBound: true, cellularSignalBars: 1);
+      expect(weak.effectiveCellularBars, equals(1));
+      expect(weak.cellularQualityLabel, equals('Poor (networkPoor)'));
+      expect(weak.networkIconAsset, equals('assets/images/car_network_1_rtl.png'));
+
+      // 5. Raw CSQ parsing from blob/locate metadata
+      final parsedCsq25 = VehicleTelemetry.fromBlobMap({'signal': 25}, isSimulated: false);
+      expect(parsedCsq25.cellularSignalBars, equals(4)); // CSQ >= 20 -> 4 bars
+      expect(parsedCsq25.cellularCsq, equals(25));
+
+      final parsedCsq12 = VehicleTelemetry.fromBlobMap({'gsmSignal': 12}, isSimulated: false);
+      expect(parsedCsq12.cellularSignalBars, equals(2)); // CSQ 10..14 -> 2 bars
+
+      // 6. Roundtrip serialization (toJson / fromJson)
+      final json = withBars.toJson();
+      expect(json['cellularSignalBars'], equals(3));
+      final fromJson = VehicleTelemetry.fromJson(json);
+      expect(fromJson.cellularSignalBars, equals(3));
+      expect(fromJson.effectiveCellularBars, equals(3));
+    });
   });
 }

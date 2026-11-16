@@ -110,12 +110,11 @@ class AppleSheetContainer extends StatelessWidget {
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
           height: height,
           decoration: BoxDecoration(
             color: isDark ? const Color(0xE611151F) : const Color(0xF2FFFFFF),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
             border: Border(
               top: BorderSide(
                 color: isDark ? const Color(0x33FFFFFF) : const Color(0x80FFFFFF),
@@ -133,7 +132,7 @@ class AppleSheetContainer extends StatelessWidget {
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.12),
-                blurRadius: 32,
+                blurRadius: 16,
                 offset: const Offset(0, -8),
               ),
             ],
@@ -155,7 +154,14 @@ class AppleSheetContainer extends StatelessWidget {
                   ),
                 ),
               ),
-              child,
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: height ?? (MediaQuery.of(context).size.height * 0.82),
+                ),
+                child: SingleChildScrollView(
+                  child: child,
+                ),
+              ),
             ],
           ),
         ),
