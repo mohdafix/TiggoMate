@@ -94,67 +94,67 @@ class AppTokens extends ThemeExtension<AppTokens> {
   Color get hoverOverlay => (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08);
   Color get focusRing => accent;
 
-  // "Sage Cockpit" light palette: pale sage background, deep forest-green
-  // primary, white cards. Modelled on a reference automotive-app design
-  // with square quick-action tiles and a pill bottom nav.
+  // "Kinetic Volt" light palette: soft off-white matte background, pure
+  // white cards with hairline borders, electric chartreuse (#E8F40C)
+  // primary accent with dark ink text on top. Pill-shaped buttons/chips,
+  // 28-32px card radii. Source: Stitch design export (cockpit_hud_kinetic_light).
   static const light = AppTokens(
-    bg: Color(0xFFE8F0E8),
+    bg: Color(0xFFF5F6F8),
     surface: Color(0xFFFFFFFF),
-    surface2: Color(0xFFF2F7F2),
+    surface2: Color(0xFFF3F4F6),
     surfaceContainerLowest: Color(0xFFFFFFFF),
-    surfaceContainerLow: Color(0xFFF2F7F2),
-    surfaceContainer: Color(0xFFE3EDE3),
-    surfaceContainerHigh: Color(0xFFD7E5D7),
-    surfaceContainerHighest: Color(0xFFC7DBC7),
-    border: Color(0xFFD3E2D3),
-    borderSubtle: Color(0xFFE1ECE1),
-    ink: Color(0xFF16261A),
-    ink2: Color(0xFF5A6B5E),
-    ink3: Color(0xFF8A9A8D),
-    accent: Color(0xFF0F3D1F),
-    onAccent: Color(0xFFFFFFFF),
-    accentContainer: Color(0xFFDCEBDC),
-    onAccentContainer: Color(0xFF0F3D1F),
-    danger: Color(0xFFC0362C),
-    dangerContainer: Color(0xFFF8DAD6),
+    surfaceContainerLow: Color(0xFFF3F4F6),
+    surfaceContainer: Color(0xFFEDEEF0),
+    surfaceContainerHigh: Color(0xFFE7E8EA),
+    surfaceContainerHighest: Color(0xFFE1E2E4),
+    border: Color(0xFFECEEF1),
+    borderSubtle: Color(0xFFF0F1F3),
+    ink: Color(0xFF191C1E),
+    ink2: Color(0xFF474832),
+    ink3: Color(0xFF787960),
+    accent: Color(0xFFE8F40C),
+    onAccent: Color(0xFF111111),
+    accentContainer: Color(0xFFF3F999),
+    onAccentContainer: Color(0xFF686E00),
+    danger: Color(0xFFBA1A1A),
+    dangerContainer: Color(0xFFFFDAD6),
     warn: Color(0xFFC27A12),
     onWarn: Color(0xFFFFFFFF),
     warnContainer: Color(0xFFF6E6C8),
-    ok: Color(0xFF2E8B45),
-    okContainer: Color(0xFFDCEEDC),
+    ok: Color(0xFF006E2F),
+    okContainer: Color(0xFF9FFFAD),
   );
 
-  // "Aurora Cockpit" dark palette: one card surface step (surface2/elevated
-  // is used sparingly), a softened lime accent, and a dedicated cyan used
-  // only for climate so it never collides with the lime EV accent.
-  // "Sage Cockpit" dark palette: deep forest-green-black background,
-  // light sage-green accent for active states, kept structurally
-  // identical to the light palette above.
+  // "Obsidian Telemetry" dark palette: true-black AMOLED canvas, dark
+  // telemetry card surfaces, neon volt-green primary accent with glow
+  // effects, dedicated cyan reserved for climate state. Monospace
+  // (Space Mono) readouts for live numeric telemetry. Source: Stitch
+  // design export (vehicle_status_cockpit_hud_haptic_sound_cues).
   static const dark = AppTokens(
-    bg: Color(0xFF0B140E),
-    surface: Color(0xFF142019),
-    surface2: Color(0xFF1B2A20),
-    surfaceContainerLowest: Color(0xFF070D09),
-    surfaceContainerLow: Color(0xFF142019),
-    surfaceContainer: Color(0xFF192620),
-    surfaceContainerHigh: Color(0xFF1B2A20),
-    surfaceContainerHighest: Color(0xFF26392D),
-    border: Color(0xFF233327),
-    borderSubtle: Color(0xFF1A281F),
-    ink: Color(0xFFE6F0E7),
-    ink2: Color(0xFFA0B8A5),
-    ink3: Color(0xFF718478),
-    accent: Color(0xFF9FD99F),
-    onAccent: Color(0xFF0B1E10),
-    accentContainer: Color(0xFF203A26),
-    onAccentContainer: Color(0xFFBFE8BF),
-    danger: Color(0xFFFF6B5C),
-    dangerContainer: Color(0xFF4A1D16),
-    warn: Color(0xFFE3B35A),
-    onWarn: Color(0xFF231700),
-    warnContainer: Color(0xFF473308),
-    ok: Color(0xFF6BD08A),
-    okContainer: Color(0xFF123A20),
+    bg: Color(0xFF000000),
+    surface: Color(0xFF0D0E12),
+    surface2: Color(0xFF14161D),
+    surfaceContainerLowest: Color(0xFF000000),
+    surfaceContainerLow: Color(0xFF0D0E12),
+    surfaceContainer: Color(0xFF14161D),
+    surfaceContainerHigh: Color(0xFF1A1D27),
+    surfaceContainerHighest: Color(0xFF222530),
+    border: Color(0xFF222530),
+    borderSubtle: Color(0xFF181A22),
+    ink: Color(0xFFFFFFFF),
+    ink2: Color(0xFF8F96A8),
+    ink3: Color(0xFF5B6175),
+    accent: Color(0xFFD2F835),
+    onAccent: Color(0xFF000000),
+    accentContainer: Color(0x1FD2F835),
+    onAccentContainer: Color(0xFFD2F835),
+    danger: Color(0xFFFF4D4D),
+    dangerContainer: Color(0x1AFF4D4D),
+    warn: Color(0xFF25E2D9),
+    onWarn: Color(0xFF00201E),
+    warnContainer: Color(0x1F25E2D9),
+    ok: Color(0xFF22C55E),
+    okContainer: Color(0x1F22C55E),
   );
 
   bool get isDark => bg.computeLuminance() < 0.5;

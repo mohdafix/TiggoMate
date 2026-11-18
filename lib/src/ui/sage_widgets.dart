@@ -179,8 +179,8 @@ class SageCard extends StatelessWidget {
   }
 }
 
-/// Screen header used by non-home screens in the Sage Cockpit style:
-/// back chevron, centred Oswald title, optional trailing action.
+/// Screen header used by non-home screens in the Kinetic Volt / Obsidian
+/// Telemetry cockpit style: back chevron, centred title, optional trailing action.
 class SageHeader extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final Widget? trailing;
@@ -207,9 +207,10 @@ class SageHeader extends StatelessWidget implements PreferredSizeWidget {
               title,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontFamily: 'Oswald',
+                fontFamily: 'Plus Jakarta Sans',
                 fontSize: 20,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.01,
                 color: t.ink,
               ),
             ),

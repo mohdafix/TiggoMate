@@ -6,30 +6,24 @@ import '../carlinko/vehicle_repository.dart';
 import '../carlinko/vehicle_telemetry.dart';
 import 'sage_widgets.dart';
 
-/// Unified Windows, Panoramic Sunroof & Electric Sunshade controller.
+/// Power Windows controller (4-door vent / open / close).
 ///
-/// This single sheet replaces what used to be three separate, overlapping
-/// screens (a windows sheet, a sunroof sheet, and an unused window+sunroof
-/// variant). Every control from all three is kept here: 4-door window
-/// vent/open/close, sunroof open/tilt/close, and the sunshade curtain
-/// toggle — opened from both the "Windows" and "Sunroof" Control Center
-/// pods on the dashboard.
+/// Previously this sheet also carried sunroof and sunshade controls; those
+/// now live in their own dedicated [SunroofControlSheet] so the "Windows"
+/// and "Sunroof" Control Center pods each open a focused, single-purpose
+/// screen instead of one shared "Windows & Sunroof" sheet.
 class WindowsControlSheet extends StatefulWidget {
   final VehicleRepository repository;
   final VehicleTelemetry telemetry;
   final bool initialWindowsVented;
-  final bool initialSunroofOpen;
   final ValueChanged<bool>? onWindowsChanged;
-  final ValueChanged<bool>? onSunroofChanged;
 
   const WindowsControlSheet({
     super.key,
     required this.repository,
     required this.telemetry,
     required this.initialWindowsVented,
-    this.initialSunroofOpen = false,
     this.onWindowsChanged,
-    this.onSunroofChanged,
   });
 
   static Future<void> show(
@@ -37,9 +31,7 @@ class WindowsControlSheet extends StatefulWidget {
     required VehicleRepository repository,
     required VehicleTelemetry telemetry,
     required bool initialWindowsVented,
-    bool initialSunroofOpen = false,
     ValueChanged<bool>? onWindowsChanged,
-    ValueChanged<bool>? onSunroofChanged,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -49,9 +41,7 @@ class WindowsControlSheet extends StatefulWidget {
         repository: repository,
         telemetry: telemetry,
         initialWindowsVented: initialWindowsVented,
-        initialSunroofOpen: initialSunroofOpen,
         onWindowsChanged: onWindowsChanged,
-        onSunroofChanged: onSunroofChanged,
       ),
     );
   }
@@ -62,9 +52,6 @@ class WindowsControlSheet extends StatefulWidget {
 
 class _WindowsControlSheetState extends State<WindowsControlSheet> {
   late bool _isVented;
-  late bool _isSunroofOpen;
-  String _activeSunroofMode = 'closed'; // 'open', 'tilt', 'closed'
-  bool _sunshadeCurtainClosed = false;
 
   bool _isTransmitting = false;
   String? _activeAction;
@@ -75,8 +62,6 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
   void initState() {
     super.initState();
     _isVented = widget.initialWindowsVented;
-    _isSunroofOpen = widget.initialSunroofOpen;
-    _activeSunroofMode = widget.initialSunroofOpen ? 'open' : 'closed';
   }
 
   Future<void> _fireCommand({
@@ -105,6 +90,7 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
 
       if (res.success) {
         HapticFeedback.mediumImpact();
+
         setState(() {
           _statusFeedback = '✓ $label executed successfully';
           _lastSuccess = true;
@@ -143,7 +129,6 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final evAccent = t.accent; // single lime/accent colour, same as the dashboard
-    final sunroofAccent = t.warn; // warm amber, reserved for sunroof glass states
 
     return SageSheetContainer(
       child: Column(
@@ -169,7 +154,7 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Windows & Sunroof',
+                        'Windows',
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.bold,
@@ -178,7 +163,7 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                         ),
                       ),
                       Text(
-                        'Doors, panoramic glass & sunshade',
+                        '4-door power glass',
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w500,
@@ -339,187 +324,6 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
               ),
             ],
           ),
-          const SizedBox(height: 18),
-
-          // 2. Panoramic Glass Roof Section
-          Text(
-            'SUNROOF GLASS',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.6,
-              color: t.ink3,
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          Row(
-            children: [
-              Expanded(
-                child: SageControlTile(
-                  title: 'Open',
-                  subtitle: 'Full sky',
-                  icon: Icons.open_in_browser_rounded,
-                  activeColor: sunroofAccent,
-                  isSelected: _activeSunroofMode == 'open',
-                  isBusy: _isTransmitting && _activeAction == 'roof_open',
-                  onTap: () {
-                    final prevMode = _activeSunroofMode;
-                    final prevOpen = _isSunroofOpen;
-                    _fireCommand(
-                      action: 'roof_open',
-                      opcode: CarLinkoOpcodes.sunroofOpen,
-                      label: 'Open sunroof',
-                      onOptimistic: () => setState(() {
-                        _activeSunroofMode = 'open';
-                        _isSunroofOpen = true;
-                      }),
-                      onRevert: () => setState(() {
-                        _activeSunroofMode = prevMode;
-                        _isSunroofOpen = prevOpen;
-                      }),
-                      onSuccess: () {
-                        _activeSunroofMode = 'open';
-                        _isSunroofOpen = true;
-                        widget.onSunroofChanged?.call(true);
-                      },
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: SageControlTile(
-                  title: 'Tilt',
-                  subtitle: 'Vent only',
-                  icon: Icons.open_in_full_rounded,
-                  activeColor: sunroofAccent,
-                  isSelected: _activeSunroofMode == 'tilt',
-                  isBusy: _isTransmitting && _activeAction == 'roof_tilt',
-                  onTap: () {
-                    final prevMode = _activeSunroofMode;
-                    final prevOpen = _isSunroofOpen;
-                    _fireCommand(
-                      action: 'roof_tilt',
-                      opcode: CarLinkoOpcodes.sunroofTilt,
-                      label: 'Tilt sunroof',
-                      onOptimistic: () => setState(() {
-                        _activeSunroofMode = 'tilt';
-                        _isSunroofOpen = true;
-                      }),
-                      onRevert: () => setState(() {
-                        _activeSunroofMode = prevMode;
-                        _isSunroofOpen = prevOpen;
-                      }),
-                      onSuccess: () {
-                        _activeSunroofMode = 'tilt';
-                        _isSunroofOpen = true;
-                        widget.onSunroofChanged?.call(true);
-                      },
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: SageControlTile(
-                  title: 'Close',
-                  subtitle: 'Sealed',
-                  icon: Icons.wb_twilight_rounded,
-                  activeColor: evAccent,
-                  isSelected: _activeSunroofMode == 'closed',
-                  isBusy: _isTransmitting && _activeAction == 'roof_close',
-                  onTap: () {
-                    final prevMode = _activeSunroofMode;
-                    final prevOpen = _isSunroofOpen;
-                    _fireCommand(
-                      action: 'roof_close',
-                      opcode: CarLinkoOpcodes.sunroofClose,
-                      label: 'Close sunroof',
-                      onOptimistic: () => setState(() {
-                        _activeSunroofMode = 'closed';
-                        _isSunroofOpen = false;
-                      }),
-                      onRevert: () => setState(() {
-                        _activeSunroofMode = prevMode;
-                        _isSunroofOpen = prevOpen;
-                      }),
-                      onSuccess: () {
-                        _activeSunroofMode = 'closed';
-                        _isSunroofOpen = false;
-                        widget.onSunroofChanged?.call(false);
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-
-          // 3. Electric Sunshade Curtain Section
-          Text(
-            'SUNSHADE CURTAIN',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.6,
-              color: t.ink3,
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: t.resolvedContainerHigh,
-              borderRadius: BorderRadius.circular(AppTokens.rLg),
-              border: Border.all(color: t.border),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      _sunshadeCurtainClosed
-                          ? Icons.curtains_closed_rounded
-                          : Icons.curtains_rounded,
-                      size: 22,
-                      color: t.ink,
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Fabric curtain',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: -0.2,
-                            color: t.ink,
-                          ),
-                        ),
-                        Text(
-                          _sunshadeCurtainClosed ? 'Drawn · blocks UV' : 'Retracted · open sky',
-                          style: TextStyle(fontSize: 10.5, color: t.ink3),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                Switch.adaptive(
-                  value: _sunshadeCurtainClosed,
-                  activeThumbColor: evAccent,
-                  onChanged: (v) {
-                    HapticFeedback.selectionClick();
-                    setState(() => _sunshadeCurtainClosed = v);
-                  },
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 16),
 
           // Informational Tip
@@ -543,8 +347,9 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
               ],
             ),
           ),
-          ],
-        ),
+        ],
+      ),
     );
   }
 }
+

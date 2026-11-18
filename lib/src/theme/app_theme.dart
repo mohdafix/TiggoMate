@@ -122,7 +122,7 @@ class AppTheme {
         color: cardBg,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(28),
           side: BorderSide(color: border, width: 1.0),
         ),
         clipBehavior: Clip.antiAlias,
@@ -136,11 +136,11 @@ class AppTheme {
         surfaceTintColor: accentColor.withValues(alpha: 0.05),
         iconTheme: IconThemeData(color: textPrimary),
         titleTextStyle: TextStyle(
-          fontFamily: 'Oswald',
+          fontFamily: 'Plus Jakarta Sans',
           color: textPrimary,
           fontSize: 20,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.1,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.01,
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
@@ -310,7 +310,9 @@ class AppTheme {
         color: cardBg,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          // Obsidian Telemetry uses tighter 16px module radii rather than
+          // the soft 28px squircle of the light Kinetic Volt cards.
+          borderRadius: BorderRadius.circular(16),
           side: BorderSide(color: border, width: 1.0),
         ),
         clipBehavior: Clip.antiAlias,
@@ -323,11 +325,11 @@ class AppTheme {
         scrolledUnderElevation: 0,
         iconTheme: IconThemeData(color: textPrimary),
         titleTextStyle: TextStyle(
-          fontFamily: 'Oswald',
+          fontFamily: 'Plus Jakarta Sans',
           color: textPrimary,
           fontSize: 20,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.1,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.01,
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
@@ -445,25 +447,51 @@ class AppTheme {
   static ThemeData get darkTheme => dark();
 }
 
-/// Oswald display headings + system body text, shared by light and dark.
+/// Plus Jakarta Sans display + body text, shared by light (Kinetic Volt)
+/// and dark (Obsidian Telemetry). Matches the Stitch cockpit design export.
 TextTheme _sageTextTheme(Color primary, Color secondary) {
-  const display = 'Oswald';
+  const display = 'Plus Jakarta Sans';
   return TextTheme(
-    displayLarge: TextStyle(fontFamily: display, color: primary, fontSize: 40, fontWeight: FontWeight.w700, height: 1.05),
-    displayMedium: TextStyle(fontFamily: display, color: primary, fontSize: 34, fontWeight: FontWeight.w700, height: 1.05),
-    displaySmall: TextStyle(fontFamily: display, color: primary, fontSize: 28, fontWeight: FontWeight.w600, height: 1.1),
-    headlineLarge: TextStyle(fontFamily: display, color: primary, fontSize: 26, fontWeight: FontWeight.w600),
-    headlineMedium: TextStyle(fontFamily: display, color: primary, fontSize: 22, fontWeight: FontWeight.w600),
-    headlineSmall: TextStyle(fontFamily: display, color: primary, fontSize: 20, fontWeight: FontWeight.w600),
-    titleLarge: TextStyle(color: primary, fontSize: 18, fontWeight: FontWeight.w700),
-    titleMedium: TextStyle(color: primary, fontSize: 16, fontWeight: FontWeight.w700),
-    titleSmall: TextStyle(color: primary, fontSize: 14, fontWeight: FontWeight.w600),
-    bodyLarge: TextStyle(color: primary, fontSize: 16, fontWeight: FontWeight.w500),
-    bodyMedium: TextStyle(color: primary, fontSize: 14, fontWeight: FontWeight.w500),
-    bodySmall: TextStyle(color: secondary, fontSize: 12, fontWeight: FontWeight.w500),
-    labelLarge: TextStyle(color: primary, fontSize: 14, fontWeight: FontWeight.w600),
-    labelMedium: TextStyle(color: secondary, fontSize: 12, fontWeight: FontWeight.w600),
-    labelSmall: TextStyle(color: secondary, fontSize: 11, fontWeight: FontWeight.w600),
+    displayLarge: TextStyle(fontFamily: display, color: primary, fontSize: 40, fontWeight: FontWeight.w800, height: 1.05, letterSpacing: -0.03),
+    displayMedium: TextStyle(fontFamily: display, color: primary, fontSize: 34, fontWeight: FontWeight.w800, height: 1.05, letterSpacing: -0.02),
+    displaySmall: TextStyle(fontFamily: display, color: primary, fontSize: 28, fontWeight: FontWeight.w700, height: 1.1, letterSpacing: -0.02),
+    headlineLarge: TextStyle(fontFamily: display, color: primary, fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -0.02),
+    headlineMedium: TextStyle(fontFamily: display, color: primary, fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.015),
+    headlineSmall: TextStyle(fontFamily: display, color: primary, fontSize: 20, fontWeight: FontWeight.w600, letterSpacing: -0.01),
+    titleLarge: TextStyle(fontFamily: display, color: primary, fontSize: 18, fontWeight: FontWeight.w700),
+    titleMedium: TextStyle(fontFamily: display, color: primary, fontSize: 16, fontWeight: FontWeight.w700),
+    titleSmall: TextStyle(fontFamily: display, color: primary, fontSize: 14, fontWeight: FontWeight.w600),
+    bodyLarge: TextStyle(fontFamily: display, color: primary, fontSize: 16, fontWeight: FontWeight.w500),
+    bodyMedium: TextStyle(fontFamily: display, color: primary, fontSize: 14, fontWeight: FontWeight.w400),
+    bodySmall: TextStyle(fontFamily: display, color: secondary, fontSize: 12, fontWeight: FontWeight.w400),
+    labelLarge: TextStyle(fontFamily: display, color: primary, fontSize: 14, fontWeight: FontWeight.w600),
+    labelMedium: TextStyle(fontFamily: display, color: secondary, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.02),
+    labelSmall: TextStyle(fontFamily: display, color: secondary, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.06),
+  );
+}
+
+/// Space Mono telemetry readout style, used for live numeric gauges (SoC %,
+/// range km, PSI, voltage) in the Obsidian/Cockpit design. Falls back
+/// gracefully if used on a light surface too.
+TextStyle telemetryMono(Color color, {double fontSize = 24, FontWeight weight = FontWeight.w700}) {
+  return TextStyle(
+    fontFamily: 'Space Mono',
+    color: color,
+    fontSize: fontSize,
+    fontWeight: weight,
+    letterSpacing: -0.02,
+  );
+}
+
+/// Uppercase Space Mono label style for telemetry card headers (e.g.
+/// "COCKPIT ACTUATORS", "CHASSIS TPMS SCHEMATIC").
+TextStyle telemetryLabel(Color color, {double fontSize = 11}) {
+  return TextStyle(
+    fontFamily: 'Space Mono',
+    color: color,
+    fontSize: fontSize,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 1.2,
   );
 }
 

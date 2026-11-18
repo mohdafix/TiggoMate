@@ -20,6 +20,7 @@ import 'location_history_sheet.dart';
 import '../widgets/home_widget_service.dart';
 import 'climate_control_sheet.dart';
 import 'windows_control_sheet.dart';
+import 'sunroof_control_sheet.dart';
 import 'remote_engine_sheet.dart';
 import 'remote_command_diagnostics_sheet.dart';
 import 'car_view_carousel.dart';
@@ -70,6 +71,14 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
   bool _isWindowsVented = false;
   bool _isTrunkOpen = false;
   int _carViewPage = 0; // remembered carousel page (survives card rebuilds)
+
+  // The mini-map's FlutterMap/TileLayer sometimes starts rendering before the
+  // device's network/DNS is actually ready (cold app start, Wi-Fi handoff),
+  // and flutter_map never retries a tile that failed once. _mapReloadToken
+  // changes the TileLayer's ValueKey to force a fresh fetch after a brief
+  // delay or whenever the app resumes, fixing the "map never loads" bug.
+  int _mapReloadToken = 0;
+  bool _mapTileLoadFailed = false;
 
   String get _selectedVehicleColorKey => VehicleSkinManager.instance.currentSkinKey;
 
@@ -141,6 +150,15 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
 
+    // The mini-map sometimes renders before the device's network is ready
+    // at cold app-start, and flutter_map's TileLayer never retries a tile
+    // that already failed. Force one extra reload shortly after first
+    // paint so a transient "not ready yet" failure doesn't leave the
+    // mini-map blank for the rest of the session.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(seconds: 2), _reloadMiniMap);
+    });
+
     // Telemetry was previously only fetched once, at cold app-start --
     // nothing ever re-fetched it, so stale state (climate on/off, doors,
     // GPS) only cleared up if the user killed and reopened the app.
@@ -158,11 +176,29 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && widget.repository.isVehicleBound) {
-      widget.repository.refresh().catchError((e) {
-        debugPrint('Resume CarLinko refresh failed: $e');
-      });
+    if (state == AppLifecycleState.resumed) {
+      if (widget.repository.isVehicleBound) {
+        widget.repository.refresh().catchError((e) {
+          debugPrint('Resume CarLinko refresh failed: $e');
+        });
+      }
+      // Network connectivity can drop while the app is backgrounded; force
+      // the mini-map to re-fetch tiles so it doesn't stay stuck on a
+      // failure that happened before the device reconnected.
+      if (_mapTileLoadFailed) {
+        _reloadMiniMap();
+      }
     }
+  }
+
+  /// Bumps the mini-map's tile layer key, forcing flutter_map to re-issue
+  /// every tile request instead of reusing a cached failure.
+  void _reloadMiniMap() {
+    if (!mounted) return;
+    setState(() {
+      _mapReloadToken++;
+      _mapTileLoadFailed = false;
+    });
   }
 
   @override
@@ -392,103 +428,9 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
     );
   }
 
-  void _openDefrostSheet() {
-    ClimateControlSheet.show(
-      context,
-      telemetry: _telemetry,
-      repository: widget.repository,
-      isDefrostMode: true,
-      initialAcOn: true,
-      initialTempC: 28.0,
-      initialDurationMin: 10,
-      initialFrontDefrost: true,
-      initialRearDefrost: true,
-      onApply: (acOn, tempC, durationMin, {
-        bool? rapidCool,
-        bool? frontDefrost,
-        bool? rearDefrost,
-        bool? airPurifier,
-        int? fanGear,
-        int? seatHeatDriver,
-        int? seatVentDriver,
-        int? seatHeatPass,
-        int? seatVentPass,
-        bool? steeringHeat,
-      }) {
-        final previousAc = _isAcActive;
-        final previousTelemetry = _telemetry;
-        setState(() {
-          _isAcActive = acOn;
-          _telemetry = _telemetry.copyWith(
-            acOn: acOn,
-            acTemp: tempC.round(),
-            airDurationMin: durationMin,
-            rapidCool: rapidCool,
-            frontDefrost: frontDefrost,
-            rearDefrost: rearDefrost,
-            airPurifier: airPurifier,
-            fanGear: fanGear,
-            seatHeatDriver: seatHeatDriver,
-            seatVentDriver: seatVentDriver,
-            seatHeatPass: seatHeatPass,
-            seatVentPass: seatVentPass,
-            steeringHeat: steeringHeat,
-          );
-        });
-        _syncWidgetTelemetry();
-
-        final opcode = acOn
-            ? ((rapidCool == true) ? CarLinkoOpcodes.quickCool : CarLinkoOpcodes.acOn)
-            : CarLinkoOpcodes.acOff;
-
-        if (acOn != previousAc || (acOn && (rapidCool != previousTelemetry.rapidCool))) {
-          _sendCommandAndReport(
-            opcode,
-            successMessage: acOn
-                ? '💨 Defrost ON (${tempC.toStringAsFixed(1)}°C, ${durationMin}m)'
-                : '💨 Defrost OFF',
-            failureMessage: '⚠️ Defrost command failed',
-            onRevert: () {
-              setState(() {
-                _isAcActive = previousAc;
-                _telemetry = previousTelemetry;
-              });
-              _syncWidgetTelemetry();
-            },
-          );
-        }
-
-        if (acOn && (tempC.round() != previousTelemetry.acTemp || acOn != previousAc)) {
-          final tempOp = CarLinkoOpcodes.acTemperature(tempC);
-          _sendCommandAndReport(
-            tempOp,
-            successMessage: '🌡️ Defrost Temp: ${tempC.toStringAsFixed(1)}°C',
-            failureMessage: '⚠️ Temperature setpoint command failed',
-          );
-        }
-
-        if (durationMin != previousTelemetry.airDurationMin) {
-          widget.repository.setAirDuration(durationMin).catchError((_) => false);
-        }
-
-        if (frontDefrost != null && frontDefrost != previousTelemetry.frontDefrost) {
-          _sendCommandAndReport(
-            frontDefrost ? CarLinkoOpcodes.defogOn : CarLinkoOpcodes.defogOff,
-            successMessage: frontDefrost ? '💨 Front Defroster ON' : 'Front Defroster OFF',
-            failureMessage: '⚠️ Front defroster command failed',
-          );
-        }
-
-        if (rearDefrost != null && rearDefrost != previousTelemetry.rearDefrost) {
-          _sendCommandAndReport(
-            rearDefrost ? CarLinkoOpcodes.rearDefogOn : CarLinkoOpcodes.rearDefogOff,
-            successMessage: rearDefrost ? '♨️ Rear Window Defogger ON' : 'Rear Defogger OFF',
-            failureMessage: '⚠️ Rear defogger command failed',
-          );
-        }
-      },
-    );
-  }
+  // Defrost is now reached only from inside the Climate sheet's
+  // "RAPID MODES & DEFROST" section (see _openClimateControlSheet) — there
+  // is no separate Cockpit Actuators pod for it anymore.
 
   void _openWindowsControlSheet() {
     WindowsControlSheet.show(
@@ -496,7 +438,6 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       repository: widget.repository,
       telemetry: _telemetry,
       initialWindowsVented: _isWindowsVented,
-      initialSunroofOpen: _telemetry.sunroofOpen,
       onWindowsChanged: (vented) {
         setState(() {
           _isWindowsVented = vented;
@@ -504,6 +445,17 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
         });
         _syncWidgetTelemetry();
       },
+    );
+  }
+
+  // Sunroof now opens its own dedicated sheet, separate from the Windows
+  // pod — each Control Center pod controls one piece of glass only.
+  void _openSunroofControlSheet() {
+    SunroofControlSheet.show(
+      context,
+      repository: widget.repository,
+      telemetry: _telemetry,
+      initialSunroofOpen: _telemetry.sunroofOpen,
       onSunroofChanged: (isOpen) {
         setState(() {
           _telemetry = _telemetry.copyWith(sunroofOpen: isOpen);
@@ -512,11 +464,6 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
       },
     );
   }
-
-  // Sunroof now opens the same merged Windows & Sunroof sheet as the
-  // windows pod — there is only one screen for door glass + roof glass +
-  // sunshade, so the two Control Center pods both land in the same place.
-  void _openSunroofControlSheet() => _openWindowsControlSheet();
 
   void _openWindowSunroofSheet() => _openWindowsControlSheet();
 
@@ -937,7 +884,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                                   ? widget.vehicleNickname.toUpperCase()
                                   : 'CHERY TIGGO 7 PHEV CSH',
                               style: TextStyle(
-                                fontFamily: 'monospace',
+                                fontFamily: 'Space Mono',
                                 fontSize: 9.5,
                                 fontWeight: FontWeight.w600,
                                 letterSpacing: 1.1,
@@ -958,7 +905,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                             child: Text(
                               widget.carPlateNumber.isNotEmpty ? widget.carPlateNumber : 'VRT 3342',
                               style: TextStyle(
-                                fontFamily: 'monospace',
+                                fontFamily: 'Space Mono',
                                 fontSize: 9.5,
                                 fontWeight: FontWeight.bold,
                                 color: limeAccent,
@@ -1206,7 +1153,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                                       ? 'LIVE · No data this sync'
                                       : 'LIVE · synced ${_syncAgeText()} ago',
                               style: TextStyle(
-                                fontFamily: 'monospace',
+                                fontFamily: 'Space Mono',
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
                                 color: !isBound || looksEmptyWhileLive ? const Color(0xFFFFB74D) : textPrimary,
@@ -1228,7 +1175,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         child: const Text(
                           'RECONNECT',
                           style: TextStyle(
-                            fontFamily: 'monospace',
+                            fontFamily: 'Space Mono',
                             fontSize: 9.5,
                             fontWeight: FontWeight.w800,
                             color: Color(0xFF0A0B0E),
@@ -1239,7 +1186,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       Text(
                         _telemetry.isParked ? 'P · Parked' : 'D · Driving',
                         style: TextStyle(
-                          fontFamily: 'monospace',
+                          fontFamily: 'Space Mono',
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: textMuted,
@@ -1317,7 +1264,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                                   overflow: TextOverflow.clip,
                                   text: TextSpan(
                                     style: TextStyle(
-                                      fontFamily: 'monospace',
+                                      fontFamily: 'Space Mono',
                                       fontSize: 18,
                                       fontWeight: FontWeight.w800,
                                       color: textPrimary,
@@ -1385,7 +1332,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                                       Text(
                                         evRangeText,
                                         style: TextStyle(
-                                          fontFamily: 'monospace',
+                                          fontFamily: 'Space Mono',
                                           fontSize: 10,
                                           fontWeight: FontWeight.w700,
                                           color: isBound ? evBarCol : textMuted,
@@ -1405,7 +1352,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                                       Text(
                                         fuelRangeText,
                                         style: TextStyle(
-                                          fontFamily: 'monospace',
+                                          fontFamily: 'Space Mono',
                                           fontSize: 10,
                                           fontWeight: FontWeight.w700,
                                           color: hasFuelRange ? fuelBarCol : textMuted,
@@ -1433,6 +1380,14 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                           context,
                           telemetry: _telemetry,
                           repository: widget.repository,
+                          onHornFlash: () => _sendCommandAndReport(
+                            // OP_FIND_CAR = "740400" — same opcode used by the
+                            // former dedicated LOCATE pod; tapping the mini-map
+                            // now opens the same radar/locator screen.
+                            CarLinkoOpcodes.findCar,
+                            successMessage: '📢 Lights flashing & horn sounding',
+                            failureMessage: '⚠️ Locate command failed. Please retry.',
+                          ),
                         );
                       },
                       child: Container(
@@ -1460,7 +1415,11 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                                   builder: (context, mapStyle, _) {
                                     return mapStyle.wrapMap(
                                       FlutterMap(
-                                        key: ValueKey('mini_map_${mapStyle.name}'),
+                                        // Re-keying on _mapReloadToken forces flutter_map to
+                                        // rebuild and re-fetch every tile, which is how a
+                                        // cold-start network failure gets retried instead of
+                                        // leaving the mini-map permanently blank.
+                                        key: ValueKey('mini_map_${mapStyle.name}_$_mapReloadToken'),
                                         options: MapOptions(
                                           initialCenter: LatLng(
                                             _telemetry.hasLocation ? _telemetry.latitude : 3.1272,
@@ -1473,6 +1432,15 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                                           TileLayer(
                                             urlTemplate: mapStyle.urlTemplate,
                                             userAgentPackageName: 'com.tiggomate.tiggomate_app',
+                                            errorTileCallback: (tile, error, stackTrace) {
+                                              if (!_mapTileLoadFailed && mounted) {
+                                                _mapTileLoadFailed = true;
+                                                // One short-delay auto-retry; if the network
+                                                // genuinely isn't available yet, the resume
+                                                // listener above will retry again later.
+                                                Future.delayed(const Duration(seconds: 3), _reloadMiniMap);
+                                              }
+                                            },
                                           ),
                                         ],
                                       ),
@@ -1554,7 +1522,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                                         child: Text(
                                           'MAP',
                                           style: TextStyle(
-                                            fontFamily: 'monospace',
+                                            fontFamily: 'Space Mono',
                                             fontSize: 8.5,
                                             fontWeight: FontWeight.w800,
                                             letterSpacing: 0.8,
@@ -1642,7 +1610,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         children: [
                           Row(
                             children: [
-                              Text('Energy consumption', style: TextStyle(fontFamily: 'monospace', fontSize: 10.5, color: textMuted)),
+                              Text('Energy consumption', style: TextStyle(fontFamily: 'Space Mono', fontSize: 10.5, color: textMuted)),
                               const SizedBox(width: 4),
                               Icon(Icons.touch_app_outlined, size: 11, color: textMuted),
                             ],
@@ -1651,7 +1619,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                             _telemetry.energyConsumptionKwh100km != 0
                                 ? '${_telemetry.energyConsumptionKwh100km.toStringAsFixed(2)} kWh/100km'
                                 : '-- kWh/100km',
-                            style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold, color: evBarCol),
+                            style: TextStyle(fontFamily: 'Space Mono', fontSize: 11, fontWeight: FontWeight.bold, color: evBarCol),
                           ),
                         ],
                       ),
@@ -1659,12 +1627,12 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Fuel consumption', style: TextStyle(fontFamily: 'monospace', fontSize: 10.5, color: textMuted)),
+                          Text('Fuel consumption', style: TextStyle(fontFamily: 'Space Mono', fontSize: 10.5, color: textMuted)),
                           Text(
                             _telemetry.fuelConsumptionL100km > 0
                                 ? '${_telemetry.fuelConsumptionL100km.toStringAsFixed(2)} L/100km'
                                 : '-- L/100km',
-                            style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold, color: fuelBarCol),
+                            style: TextStyle(fontFamily: 'Space Mono', fontSize: 11, fontWeight: FontWeight.bold, color: fuelBarCol),
                           ),
                         ],
                       ),
@@ -1677,7 +1645,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                           children: [
                             Row(
                               children: [
-                                Text('Voltage', style: TextStyle(fontFamily: 'monospace', fontSize: 10.5, color: textMuted)),
+                                Text('Voltage', style: TextStyle(fontFamily: 'Space Mono', fontSize: 10.5, color: textMuted)),
                                 const SizedBox(width: 4),
                                 Icon(Icons.info_outline, size: 11, color: voltAccent),
                               ],
@@ -1686,7 +1654,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                               _telemetry.volt12 > 0
                                   ? '${_telemetry.volt12.toStringAsFixed(2)} V'
                                   : '-- V',
-                              style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold, color: voltAccent),
+                              style: TextStyle(fontFamily: 'Space Mono', fontSize: 11, fontWeight: FontWeight.bold, color: voltAccent),
                             ),
                           ],
                         ),
@@ -1702,7 +1670,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 children: [
                   Icon(Icons.battery_charging_full, size: 12, color: textMuted),
                   const SizedBox(width: 4),
-                  Text('12V Aux: -- V', style: TextStyle(fontFamily: 'monospace', fontSize: 10.5, fontWeight: FontWeight.w700, color: textMuted)),
+                  Text('12V Aux: -- V', style: TextStyle(fontFamily: 'Space Mono', fontSize: 10.5, fontWeight: FontWeight.w700, color: textMuted)),
                 ],
               ),
             ],
@@ -1716,7 +1684,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Control Center',
+                      'Cockpit Actuators',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
@@ -1735,9 +1703,9 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                   ],
                 ),
                 Text(
-                  'QUICK ACTIONS',
+                  'CAN-V2 VERIFIED',
                   style: TextStyle(
-                    fontFamily: 'monospace',
+                    fontFamily: 'Space Mono',
                     fontSize: 9,
                     letterSpacing: 0.8,
                     color: textMuted.withValues(alpha: 0.7),
@@ -1747,7 +1715,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             ),
             const SizedBox(height: 10),
 
-            // Row 1 (4 Pods: Doors, Climate, Windows, Trunk)
+            // Row 1 (3 Pods: Doors, Climate, Windows)
             Row(
               children: [
                 Expanded(
@@ -1791,7 +1759,13 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     onTap: _openWindowsControlSheet,
                   ),
                 ),
-                const SizedBox(width: 8),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Row 2 (3 Pods: Trunk, Sunroof, Engine)
+            Row(
+              children: [
                 Expanded(
                   child: _buildEquinoxRemotePod(
                     title: 'TRUNK',
@@ -1803,26 +1777,6 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     textMuted: textMuted,
                     textPrimary: textPrimary,
                     onTap: () => _handleRemoteCommand('trunk'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            // Row 2 (4 Pods: Locate, Sunroof, Defrost, Engine)
-            Row(
-              children: [
-                Expanded(
-                  child: _buildEquinoxRemotePod(
-                    title: 'LOCATE',
-                    value: isBound ? 'Horn/Flash' : '--',
-                    isActive: false,
-                    limeAccent: limeAccent,
-                    cardCol: cardCol,
-                    borderCol: borderCol,
-                    textMuted: textMuted,
-                    textPrimary: textPrimary,
-                    onTap: () => _handleRemoteCommand('locate'),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -1837,20 +1791,6 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     textMuted: textMuted,
                     textPrimary: textPrimary,
                     onTap: _openSunroofControlSheet,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildEquinoxRemotePod(
-                    title: 'DEFROST',
-                    value: !isBound ? '--' : ((_telemetry.frontDefrost || _telemetry.rearDefrost) ? 'Active' : 'Off'),
-                    isActive: _telemetry.frontDefrost || _telemetry.rearDefrost,
-                    limeAccent: limeAccent,
-                    cardCol: cardCol,
-                    borderCol: borderCol,
-                    textMuted: textMuted,
-                    textPrimary: textPrimary,
-                    onTap: _openDefrostSheet,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -1907,7 +1847,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                             child: Text(
                               'Ask or command — "cool cabin to 22°"',
                               style: TextStyle(
-                                fontFamily: 'monospace',
+                                fontFamily: 'Space Mono',
                                 fontSize: 11.5,
                                 color: textMuted,
                               ),
@@ -1947,7 +1887,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                       child: Text(
                         'ASK',
                         style: TextStyle(
-                          fontFamily: 'monospace',
+                          fontFamily: 'Space Mono',
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                           color: textPrimary,
@@ -2062,7 +2002,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     Text(
                       label,
                       style: TextStyle(
-                        fontFamily: 'monospace',
+                        fontFamily: 'Space Mono',
                         fontSize: 9.5,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.5,
@@ -2156,7 +2096,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                 Text(
                   '4G',
                   style: TextStyle(
-                    fontFamily: 'monospace',
+                    fontFamily: 'Space Mono',
                     fontSize: 9.5,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.5,
@@ -2249,7 +2189,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                             Text(
                               'DUAL-LINK BLUETOOTH',
                               style: TextStyle(
-                                fontFamily: 'monospace',
+                                fontFamily: 'Space Mono',
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: 1.2,
@@ -2281,7 +2221,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         child: Text(
                           isBleConnected ? 'BLE ACTIVE' : (isBleScanning ? 'SCANNING' : (isClassicConnected ? 'BT ACTIVE' : 'STANDBY')),
                           style: TextStyle(
-                            fontFamily: 'monospace',
+                            fontFamily: 'Space Mono',
                             fontSize: 9.5,
                             fontWeight: FontWeight.w800,
                             color: statusColor,
@@ -2326,7 +2266,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                             Text(
                               isBleConnected ? 'LINKED (<50ms)' : (isBleScanning ? 'SEARCHING' : 'READY'),
                               style: TextStyle(
-                                fontFamily: 'monospace',
+                                fontFamily: 'Space Mono',
                                 fontSize: 11,
                                 fontWeight: FontWeight.w800,
                                 color: isBleConnected ? bleBlue : (isBleScanning ? scanAmber : textMuted),
@@ -2344,7 +2284,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                             Text(
                               '6e400001 (NUS)',
                               style: TextStyle(
-                                fontFamily: 'monospace',
+                                fontFamily: 'Space Mono',
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.w700,
                                 color: cyberCyan,
@@ -2361,7 +2301,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                               Text(
                                 ble.connectedDeviceId!,
                                 style: TextStyle(
-                                  fontFamily: 'monospace',
+                                  fontFamily: 'Space Mono',
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.w700,
                                   color: textPrimary,
@@ -2589,7 +2529,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                               Text(
                                 'DISCOVERED BLUETOOTH DEVICES (${ble.discoveredDevices.length})',
                                 style: TextStyle(
-                                  fontFamily: 'monospace',
+                                  fontFamily: 'Space Mono',
                                   fontSize: 10,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 0.8,
@@ -2600,7 +2540,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                                 Text(
                                   'Scanning...',
                                   style: TextStyle(
-                                    fontFamily: 'monospace',
+                                    fontFamily: 'Space Mono',
                                     fontSize: 10,
                                     fontWeight: FontWeight.w600,
                                     color: scanAmber,
@@ -2652,7 +2592,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                                           Text(
                                             '${d.device.remoteId.str} • ${d.rssi} dBm',
                                             style: TextStyle(
-                                              fontFamily: 'monospace',
+                                              fontFamily: 'Space Mono',
                                               fontSize: 9.5,
                                               color: textMuted,
                                             ),
@@ -2705,7 +2645,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                             Text(
                               isClassicConnected ? 'Monitoring · Armed' : 'Armed on Connect',
                               style: TextStyle(
-                                fontFamily: 'monospace',
+                                fontFamily: 'Space Mono',
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
                                 color: isClassicConnected ? limeAccent : textMuted,
@@ -2842,7 +2782,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         Text(
                           'T-BOX 4G TELEMATICS',
                           style: TextStyle(
-                            fontFamily: 'monospace',
+                            fontFamily: 'Space Mono',
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 1.2,
@@ -2874,7 +2814,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                     child: Text(
                       isBound ? 'ONLINE' : 'UNBOUND',
                       style: TextStyle(
-                        fontFamily: 'monospace',
+                        fontFamily: 'Space Mono',
                         fontSize: 9.5,
                         fontWeight: FontWeight.w800,
                         color: isBound ? limeAccent : const Color(0xFFFFB74D),
@@ -2913,7 +2853,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                                   ? '${_telemetry.effectiveCellularBars}/4 Bars (${_telemetry.cellularQualityLabel})'
                                   : 'No Signal',
                               style: TextStyle(
-                                fontFamily: 'monospace',
+                                fontFamily: 'Space Mono',
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
                                 color: _telemetry.effectiveCellularBars >= 3
@@ -2936,7 +2876,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                           Text(
                             'CSQ ${_telemetry.cellularCsq} (~${-113 + (_telemetry.cellularCsq! * 2)} dBm)',
                             style: TextStyle(
-                              fontFamily: 'monospace',
+                              fontFamily: 'Space Mono',
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
                               color: cyberCyan,
@@ -2955,7 +2895,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         Text(
                           _telemetry.cellularSignalBars != null ? 'T-Box Live CSQ / Telematics' : 'Cloud Sync Freshness',
                           style: TextStyle(
-                            fontFamily: 'monospace',
+                            fontFamily: 'Space Mono',
                             fontSize: 11.5,
                             fontWeight: FontWeight.w700,
                             color: textPrimary,
@@ -2973,7 +2913,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         Text(
                           isBound ? 'Synced ${_syncAgeText()} ago' : 'No Sync',
                           style: TextStyle(
-                            fontFamily: 'monospace',
+                            fontFamily: 'Space Mono',
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                             color: isBound ? limeAccent : textMuted,
@@ -2991,7 +2931,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         Text(
                           '73-Byte CAN Blob',
                           style: TextStyle(
-                            fontFamily: 'monospace',
+                            fontFamily: 'Space Mono',
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                             color: cyberCyan,
@@ -3009,7 +2949,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
                         Text(
                           widget.carPlateNumber.isNotEmpty ? widget.carPlateNumber : 'VRT 3342',
                           style: TextStyle(
-                            fontFamily: 'monospace',
+                            fontFamily: 'Space Mono',
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                             color: textPrimary,
@@ -3095,12 +3035,8 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
         return Icons.vertical_split_rounded;
       case 'TRUNK':
         return Icons.luggage_outlined;
-      case 'LOCATE':
-        return Icons.campaign_rounded;
       case 'SUNROOF':
         return Icons.wb_twilight_rounded;
-      case 'DEFROST':
-        return Icons.waves_rounded;
       case 'ENGINE':
         return Icons.power_settings_new_rounded;
       default:
@@ -3173,7 +3109,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
             Text(
               title,
               style: TextStyle(
-                fontFamily: 'monospace',
+                fontFamily: 'Space Mono',
                 fontSize: 8.5,
                 fontWeight: FontWeight.w700,
                 color: textPrimary,
@@ -3654,7 +3590,7 @@ class _NeoDashboardState extends State<NeoDashboard> with SingleTickerProviderSt
               ),
               child: SelectableText(
                 hex.isNotEmpty ? hex : 'No raw hex captured yet. Pull to refresh dashboard.',
-                style: const TextStyle(fontFamily: 'monospace', color: Color(0xFF38BDF8), fontSize: 11),
+                style: const TextStyle(fontFamily: 'Space Mono', color: Color(0xFF38BDF8), fontSize: 11),
               ),
             ),
           ],

@@ -3063,9 +3063,10 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                       Text(
                         'Service Center',
                         style: TextStyle(
-                          fontFamily: 'Oswald',
+                          fontFamily: 'Plus Jakarta Sans',
                           fontSize: 24,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.015,
                           color: t.ink,
                         ),
                       ),
