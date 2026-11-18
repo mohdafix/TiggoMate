@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../auth/auth_service.dart';
+import '../theme/app_tokens.dart';
 import 'app_notification.dart';
 
 class AuthSheet extends StatefulWidget {
@@ -111,10 +112,12 @@ class _AuthSheetState extends State<AuthSheet> {
   Widget build(BuildContext context) {
     final user = _authService.currentUser;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF0D1219) : Colors.white;
-    final tileBg = isDark ? const Color(0xFF131922) : const Color(0xFFF3F4F6);
-    final border = isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB);
-    final textSec = isDark ? Colors.white54 : const Color(0xFF6B7280);
+    final t = context.tokens;
+    final bg = t.surface;
+    final tileBg = t.surface2;
+    final border = t.border;
+    final textSec = t.ink2;
+    final accent = t.accent;
 
     return Container(
       decoration: BoxDecoration(
@@ -155,17 +158,17 @@ class _AuthSheetState extends State<AuthSheet> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFD2F835).withValues(alpha: 0.15),
+                        color: accent.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(Icons.cloud_sync, color: Color(0xFFD2F835), size: 22),
+                      child: Icon(Icons.cloud_sync, color: accent, size: 22),
                     ),
                     const SizedBox(width: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text('TiggoMate Cloud Sync', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-                        Text('Firebase Authentication & Storage', style: TextStyle(fontSize: 11, color: textSec)),
+                        Text('Secure sign-in & cloud backup', style: TextStyle(fontSize: 11, color: textSec)),
                       ],
                     ),
                   ],
@@ -193,10 +196,10 @@ class _AuthSheetState extends State<AuthSheet> {
                       children: [
                         CircleAvatar(
                           radius: 24,
-                          backgroundColor: const Color(0xFFD2F835).withValues(alpha: 0.2),
+                          backgroundColor: accent.withValues(alpha: 0.2),
                           child: Text(
                             user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : 'U',
-                            style: const TextStyle(color: Color(0xFFD2F835), fontSize: 18, fontWeight: FontWeight.bold),
+                            style: TextStyle(color: accent, fontSize: 18, fontWeight: FontWeight.bold),
                           ),
                         ),
                         const SizedBox(width: 14),
@@ -209,11 +212,11 @@ class _AuthSheetState extends State<AuthSheet> {
                               const SizedBox(height: 4),
                               Row(
                                 children: [
-                                  Container(width: 6, height: 6, decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFFD2F835))),
+                                  Container(width: 6, height: 6, decoration: BoxDecoration(shape: BoxShape.circle, color: accent)),
                                   const SizedBox(width: 6),
                                   Text(
                                     'Cloud Synced • Plate ${user.carPlate}',
-                                    style: const TextStyle(fontSize: 11, color: Color(0xFFD2F835)),
+                                    style: TextStyle(fontSize: 11, color: accent),
                                   ),
                                 ],
                               ),
@@ -264,8 +267,8 @@ class _AuthSheetState extends State<AuthSheet> {
                   ),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 13),
-                    side: const BorderSide(color: Color(0xFFD2F835), width: 1.2),
-                    backgroundColor: const Color(0xFFD2F835).withValues(alpha: isDark ? 0.12 : 0.08),
+                    side: BorderSide(color: accent, width: 1.2),
+                    backgroundColor: accent.withValues(alpha: isDark ? 0.12 : 0.08),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                 ),
@@ -345,8 +348,8 @@ class _AuthSheetState extends State<AuthSheet> {
                 child: ElevatedButton(
                   onPressed: _loading ? null : _handleEmailAuth,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD2F835),
-                    foregroundColor: const Color(0xFF090D12),
+                    backgroundColor: accent,
+                    foregroundColor: t.onAccent,
                     padding: const EdgeInsets.symmetric(vertical: 13),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
@@ -357,7 +360,7 @@ class _AuthSheetState extends State<AuthSheet> {
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
                         )
                       : Text(
-                          _isSignUp ? 'Create Firebase Account' : 'Sign In with Email',
+                          _isSignUp ? 'Create Account' : 'Sign In with Email',
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                         ),
                 ),

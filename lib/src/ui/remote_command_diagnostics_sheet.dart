@@ -375,7 +375,7 @@ class _RemoteCommandDiagnosticsSheetState extends State<RemoteCommandDiagnostics
               ),
               Switch.adaptive(
                 value: _sendWakeupHandshake,
-                activeColor: colors.evTeal,
+                activeThumbColor: colors.evTeal,
                 onChanged: (v) => setState(() => _sendWakeupHandshake = v),
               ),
             ],
@@ -400,7 +400,7 @@ class _RemoteCommandDiagnosticsSheetState extends State<RemoteCommandDiagnostics
               ),
               Switch.adaptive(
                 value: _send0x23Init,
-                activeColor: colors.evTeal,
+                activeThumbColor: colors.evTeal,
                 onChanged: (v) => setState(() => _send0x23Init = v),
               ),
             ],

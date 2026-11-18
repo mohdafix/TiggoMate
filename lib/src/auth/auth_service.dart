@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 /// User profile representing an authenticated TiggoMate user.
 class UserProfile {
@@ -76,14 +77,14 @@ class UserProfile {
     );
   }
 
-  static UserProfile defaultGuest({String name = 'AFiX', String plate = 'VRT 3342'}) {
+  static UserProfile defaultGuest({String name = 'Driver', String plate = 'VRT 3342'}) {
     return UserProfile(
       uid: 'guest_${DateTime.now().millisecondsSinceEpoch}',
-      email: 'afix@tiggomate.my',
+      email: '',
       displayName: name,
       carPlate: plate,
       vehicleNickname: 'Chery Tiggo 7 PHEV CSH',
-      isGuest: false,
+      isGuest: true,
       lastSyncedAt: DateTime.now(),
     );
   }
@@ -121,7 +122,7 @@ class AuthService {
   }
 
   /// Initialize and restore user from local storage or Firebase Firestore
-  Future<UserProfile> initialize({String defaultName = 'AFiX', String defaultPlate = 'VRT 3342'}) async {
+  Future<UserProfile> initialize({String defaultName = 'Driver', String defaultPlate = 'VRT 3342'}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
 
@@ -147,16 +148,19 @@ class AuthService {
             return _currentUser;
           }
 
+          // An anonymous Firebase user with no cloud profile yet is still
+          // a "guest" from the app's point of view (they haven't linked a
+          // real email/Google account), even though Firebase gave them a uid.
           _currentUser = UserProfile(
             uid: fbUser.uid,
-            email: fbUser.email ?? prefs.getString(_prefKeyEmail) ?? 'driver@tiggomate.my',
+            email: fbUser.email ?? prefs.getString(_prefKeyEmail) ?? '',
             displayName: (fbUser.displayName != null && fbUser.displayName!.isNotEmpty)
                 ? fbUser.displayName!
                 : (prefs.getString(_prefKeyName) ?? defaultName),
             carPlate: prefs.getString(_prefKeyPlate) ?? defaultPlate,
             vehicleNickname: prefs.getString(_prefKeyNickname) ?? 'Chery Tiggo 7 PHEV CSH',
             photoUrl: fbUser.photoURL,
-            isGuest: false,
+            isGuest: fbUser.isAnonymous,
             lastSyncedAt: DateTime.now(),
           );
           _authController.add(_currentUser);
@@ -170,11 +174,11 @@ class AuthService {
       if (uid != null && uid.isNotEmpty) {
         _currentUser = UserProfile(
           uid: uid,
-          email: prefs.getString(_prefKeyEmail) ?? 'driver@tiggomate.my',
+          email: prefs.getString(_prefKeyEmail) ?? '',
           displayName: prefs.getString(_prefKeyName) ?? defaultName,
           carPlate: prefs.getString(_prefKeyPlate) ?? defaultPlate,
           vehicleNickname: prefs.getString(_prefKeyNickname) ?? 'Chery Tiggo 7 PHEV CSH',
-          isGuest: prefs.getBool(_prefKeyIsGuest) ?? false,
+          isGuest: prefs.getBool(_prefKeyIsGuest) ?? true,
           lastSyncedAt: DateTime.now(),
         );
       } else {
@@ -234,21 +238,11 @@ class AuthService {
       }
       return (success: false, message: msg);
     } catch (e) {
-      debugPrint('Fallback local signIn: $e');
-      final name = email.split('@').first;
-      _currentUser = UserProfile(
-        uid: 'fb_${email.hashCode.abs()}',
-        email: email.trim(),
-        displayName: name[0].toUpperCase() + name.substring(1),
-        carPlate: _currentUser.carPlate,
-        vehicleNickname: _currentUser.vehicleNickname,
-        isGuest: false,
-        lastSyncedAt: DateTime.now(),
-      );
-
-      await _persistSession();
-      _authController.add(_currentUser);
-      return (success: true, message: 'Welcome back, ${_currentUser.displayName}!');
+      // Do NOT fabricate a local-only session here: without a real
+      // Firebase user, the uid won't match what's in Firestore and every
+      // subsequent sync will be silently rejected by the security rules.
+      debugPrint('[AuthService] signIn failed (no Firebase user): $e');
+      return (success: false, message: 'Sign in failed. Please check your connection and try again.');
     }
   }
 
@@ -301,54 +295,131 @@ class AuthService {
       }
       return (success: false, message: msg);
     } catch (e) {
-      debugPrint('Fallback local signUp: $e');
-      _currentUser = UserProfile(
-        uid: 'fb_${email.hashCode.abs()}',
-        email: email.trim(),
-        displayName: displayName.trim().isNotEmpty ? displayName.trim() : email.split('@').first,
-        carPlate: carPlate.trim().isNotEmpty ? carPlate.trim().toUpperCase() : 'VRT 3342',
-        vehicleNickname: 'Chery Tiggo 7 PHEV CSH',
-        isGuest: false,
-        lastSyncedAt: DateTime.now(),
-      );
-
-      await _persistSession();
-      _authController.add(_currentUser);
-      return (success: true, message: 'Account registered and synced locally!');
+      // Do NOT fabricate a local-only account here: without a real
+      // Firebase user, Firestore writes for this uid will be rejected by
+      // the security rules and the user will believe they registered
+      // when nothing was actually saved to the cloud.
+      debugPrint('[AuthService] signUp failed (no Firebase user created): $e');
+      return (success: false, message: 'Registration failed. Please check your connection and try again.');
     }
   }
 
-  /// Sign in with Google (OAuth / Firebase)
-  Future<({bool success, String message})> signInWithGoogle() async {
-    // Generates authenticated Google User session connected to Firebase
-    _currentUser = UserProfile(
-      uid: 'google_afix_108273645',
-      email: 'linexsg@gmail.com',
-      displayName: 'Mohd Afix',
-      carPlate: _currentUser.carPlate.isNotEmpty ? _currentUser.carPlate : 'VRT 3342',
-      vehicleNickname: 'Chery Tiggo 7 PHEV CSH',
-      photoUrl: 'https://lh3.googleusercontent.com/a/default-user',
-      isGuest: false,
-      lastSyncedAt: DateTime.now(),
-    );
+  static bool _googleSignInInitialized = false;
 
-    await _persistSession();
-    _authController.add(_currentUser);
-    return (success: true, message: 'Connected with Google (linexsg@gmail.com)');
+  Future<void> _ensureGoogleSignInInitialized() async {
+    if (_googleSignInInitialized) return;
+    await GoogleSignIn.instance.initialize();
+    _googleSignInInitialized = true;
   }
 
-  /// Continue as Guest (Offline Mode)
-  Future<void> continueAsGuest({String name = 'AFiX', String plate = 'VRT 3342'}) async {
+  /// Sign in with Google (OAuth) and exchange the ID token for a real
+  /// Firebase Auth session. If the current session is an anonymous
+  /// Firebase user, the Google credential is linked to it so existing
+  /// trips/appointments/settings are kept instead of starting a new uid.
+  Future<({bool success, String message})> signInWithGoogle() async {
     try {
-      await fb.FirebaseAuth.instance.signOut();
+      await _ensureGoogleSignInInitialized();
+
+      if (!GoogleSignIn.instance.supportsAuthenticate()) {
+        return (success: false, message: 'Google Sign-In is not supported on this platform.');
+      }
+
+      final googleUser = await GoogleSignIn.instance.authenticate();
+      final idToken = googleUser.authentication.idToken;
+      if (idToken == null) {
+        return (
+          success: false,
+          message: 'Google Sign-In did not return an ID token. Check that Google sign-in is enabled for this app in the Firebase console.'
+        );
+      }
+
+      final credential = fb.GoogleAuthProvider.credential(idToken: idToken);
+      final existingUser = fb.FirebaseAuth.instance.currentUser;
+
+      fb.UserCredential userCred;
+      if (existingUser != null && existingUser.isAnonymous) {
+        try {
+          userCred = await existingUser.linkWithCredential(credential);
+        } on fb.FirebaseAuthException catch (e) {
+          if (e.code == 'credential-already-in-use' || e.code == 'email-already-in-use') {
+            // This Google account is already tied to a different Firebase
+            // user; sign into that one instead of the anonymous session.
+            userCred = await fb.FirebaseAuth.instance.signInWithCredential(credential);
+          } else {
+            rethrow;
+          }
+        }
+      } else {
+        userCred = await fb.FirebaseAuth.instance.signInWithCredential(credential);
+      }
+
+      final user = userCred.user;
+      if (user == null) {
+        return (success: false, message: 'Google Sign-In failed: no user returned.');
+      }
+
+      final cloudProfile = await _fetchFromFirestore(user.uid);
+      _currentUser = cloudProfile ??
+          UserProfile(
+            uid: user.uid,
+            email: user.email ?? googleUser.email,
+            displayName: user.displayName ?? googleUser.displayName ?? 'Driver',
+            carPlate: _currentUser.carPlate.isNotEmpty ? _currentUser.carPlate : 'VRT 3342',
+            vehicleNickname: _currentUser.vehicleNickname,
+            photoUrl: user.photoURL ?? googleUser.photoUrl,
+            isGuest: false,
+            lastSyncedAt: DateTime.now(),
+          );
+
+      await _persistSession();
+      _authController.add(_currentUser);
+      return (success: true, message: 'Connected with Google (${_currentUser.email})');
+    } on fb.FirebaseAuthException catch (e) {
+      debugPrint('[AuthService] FirebaseAuthException during Google sign-in: ${e.code} - ${e.message}');
+      return (success: false, message: e.message ?? 'Google Sign-In failed.');
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        return (success: false, message: 'Google Sign-In cancelled.');
+      }
+      debugPrint('[AuthService] GoogleSignInException: ${e.code} - ${e.description}');
+      return (success: false, message: 'Google Sign-In failed: ${e.description ?? e.code}');
+    } catch (e) {
+      debugPrint('[AuthService] Google sign-in error: $e');
+      return (success: false, message: 'Google Sign-In failed: $e');
+    }
+  }
+
+  Future<void> _signOutGoogleIfSignedIn() async {
+    try {
+      await _ensureGoogleSignInInitialized();
+      await GoogleSignIn.instance.signOut();
     } catch (_) {}
+  }
+
+  /// Continue as Guest (Offline Mode). Keeps an anonymous Firebase session
+  /// going (rather than fully signing out) so trips/appointments entered as
+  /// a guest still back up to Firestore and aren't lost if the user later
+  /// upgrades to a real account via linkWithCredential.
+  Future<void> continueAsGuest({String name = 'Driver', String plate = 'VRT 3342'}) async {
+    await _signOutGoogleIfSignedIn();
+    try {
+      if (fb.FirebaseAuth.instance.currentUser == null) {
+        await fb.FirebaseAuth.instance.signInAnonymously();
+      }
+    } catch (e) {
+      debugPrint('[AuthService] Anonymous sign-in on guest mode note: $e');
+    }
     _currentUser = UserProfile.defaultGuest(name: name, plate: plate);
     await _persistSession();
     _authController.add(_currentUser);
   }
 
-  /// Sign out
+  /// Sign out of the current Google/email account and drop back to a
+  /// fresh anonymous guest session (local profile is cleared, but a new
+  /// anonymous Firebase user is established immediately so background
+  /// sync keeps working instead of going dark until the next app launch).
   Future<void> signOut() async {
+    await _signOutGoogleIfSignedIn();
     try {
       await fb.FirebaseAuth.instance.signOut();
     } catch (_) {}
@@ -362,6 +433,11 @@ class AuthService {
     await prefs.setBool(_prefKeyHasChosenAuth, false);
 
     _currentUser = UserProfile.defaultGuest();
+    try {
+      await fb.FirebaseAuth.instance.signInAnonymously();
+    } catch (e) {
+      debugPrint('[AuthService] Anonymous sign-in after signOut note: $e');
+    }
     _authController.add(_currentUser);
   }
 

@@ -1,10 +1,9 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../carlinko/vehicle_telemetry.dart';
 import '../carlinko/vehicle_repository.dart';
-import 'apple_design_widgets.dart';
+import 'sage_widgets.dart';
 
 /// Full-featured Climate & Seat Comfort Control Sheet
 /// Ported from official Chery CarLinko CAN-bus and T-Box control protocols.
@@ -264,51 +263,35 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
 
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.90,
-          ),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xE611151F) : const Color(0xF2FFFFFF),
-            border: Border(
-              top: BorderSide(
-                color: isDark ? const Color(0x33FFFFFF) : const Color(0x80FFFFFF),
-                width: 1.2,
-              ),
-              left: BorderSide(
-                color: isDark ? const Color(0x1AFFFFFF) : const Color(0x1F000000),
-                width: 0.8,
-              ),
-              right: BorderSide(
-                color: isDark ? const Color(0x1AFFFFFF) : const Color(0x1F000000),
-                width: 0.8,
-              ),
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.90,
+        ),
+        decoration: BoxDecoration(
+          color: colors.cardBg,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.1),
+              blurRadius: 16,
+              offset: const Offset(0, -8),
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.12),
-                blurRadius: 16,
-                offset: const Offset(0, -8),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.max,
-            children: [
-              // Apple Pull Handle Pill
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4.5,
-                  margin: const EdgeInsets.only(top: 10, bottom: 10),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0x4DFFFFFF) : const Color(0x33000000),
-                    borderRadius: BorderRadius.circular(2.5),
-                  ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.max,
+          children: [
+            // Sage Cockpit Pull Handle Pill
+            Center(
+              child: Container(
+                width: 36,
+                height: 4.5,
+                margin: const EdgeInsets.only(top: 10, bottom: 10),
+                decoration: BoxDecoration(
+                  color: colors.border,
+                  borderRadius: BorderRadius.circular(2.5),
                 ),
               ),
+            ),
 
           // Header Bar
           Padding(
@@ -366,7 +349,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                 ),
                 const SizedBox(width: 8),
                 // Master Power Pill
-                ApplePressable(
+                SagePressable(
                   onTap: () {
                     HapticFeedback.mediumImpact();
                     if (widget.isDefrostMode) {
@@ -446,7 +429,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                 Row(
                   children: [
                     Expanded(
-                      child: ApplePressable(
+                      child: SagePressable(
                         onTap: () {
                           HapticFeedback.mediumImpact();
                           setState(() {
@@ -520,7 +503,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: ApplePressable(
+                      child: SagePressable(
                         onTap: () async {
                           HapticFeedback.mediumImpact();
                           setState(() {
@@ -596,7 +579,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: ApplePressable(
+                      child: SagePressable(
                         onTap: () {
                           HapticFeedback.mediumImpact();
                           setState(() {
@@ -773,7 +756,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                           final isSelected = (_targetTemp - t).abs() < 0.2;
                           return Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: ApplePressable(
+                            child: SagePressable(
                               onTap: () {
                                 setState(() {
                                   _targetTemp = t;
@@ -800,7 +783,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                                     fontFamily: 'monospace',
                                     fontSize: 11,
                                     fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                                    color: isSelected ? Colors.black : colors.textSecondary,
+                                    color: isSelected ? colors.onAccent : colors.textSecondary,
                                   ),
                                 ),
                               ),
@@ -923,7 +906,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                             final isSel = _durationMin == m;
                             return Padding(
                               padding: const EdgeInsets.only(left: 3),
-                              child: ApplePressable(
+                              child: SagePressable(
                                 onTap: () => setState(() => _durationMin = m),
                                 pressedScale: 0.92,
                                 enableHaptics: true,
@@ -939,7 +922,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                                       fontFamily: 'monospace',
                                       fontSize: 10,
                                       fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
-                                      color: isSel ? Colors.black : colors.textSecondary,
+                                      color: isSel ? colors.onAccent : colors.textSecondary,
                                     ),
                                   ),
                                 ),
@@ -989,7 +972,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                           return Expanded(
                             child: Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 2),
-                              child: ApplePressable(
+                              child: SagePressable(
                                 onTap: () => setState(() => _fanGear = i),
                                 pressedScale: 0.92,
                                 enableHaptics: true,
@@ -1006,7 +989,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                                         fontFamily: 'monospace',
                                         fontSize: 11,
                                         fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
-                                        color: isSel ? Colors.black : colors.textSecondary,
+                                        color: isSel ? colors.onAccent : colors.textSecondary,
                                       ),
                                     ),
                                   ),
@@ -1172,13 +1155,13 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
           Container(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xE611151F) : Colors.white.withValues(alpha: 0.9),
+              color: colors.cardBg.withValues(alpha: isDark ? 0.90 : 0.95),
               border: Border(top: BorderSide(color: isDark ? const Color(0x33FFFFFF) : const Color(0x1F000000))),
             ),
             child: SizedBox(
               width: double.infinity,
               height: 48,
-              child: ApplePressable(
+              child: SagePressable(
                 onTap: _applyChanges,
                 pressedScale: 0.97,
                 enableHaptics: true,
@@ -1205,7 +1188,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                             Icon(
                               widget.isDefrostMode ? Icons.waves_rounded : Icons.send_rounded,
                               size: 16,
-                              color: Colors.black,
+                              color: colors.onAccent,
                             ),
                             const SizedBox(width: 8),
                             Text(
@@ -1216,11 +1199,11 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                                   : (_acOn
                                       ? 'TURN ON CLIMATE (${_targetTemp.toStringAsFixed(1)}°C)'
                                       : 'TURN OFF CLIMATE'),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontFamily: 'monospace',
                                 fontWeight: FontWeight.w800,
                                 fontSize: 12.5,
-                                color: Colors.black,
+                                color: colors.onAccent,
                                 letterSpacing: 0.5,
                               ),
                             ),
@@ -1236,8 +1219,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
         ],
       ),
     ),
-  ),
-);
+  );
   }
 
   Widget _buildTempStepButton({
@@ -1246,7 +1228,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
     required VoidCallback onTap,
     required AppColors colors,
   }) {
-    return ApplePressable(
+    return SagePressable(
       onTap: enabled ? onTap : null,
       pressedScale: 0.90,
       enableHaptics: true,
@@ -1280,7 +1262,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
     required VoidCallback onTap,
   }) {
     return Expanded(
-      child: ApplePressable(
+      child: SagePressable(
         onTap: onTap,
         pressedScale: 0.93,
         enableHaptics: true,
@@ -1364,7 +1346,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                   final isSel = ventLevel == lvl;
                   return Padding(
                     padding: const EdgeInsets.only(left: 3),
-                    child: ApplePressable(
+                    child: SagePressable(
                       onTap: () => onVentChange(lvl),
                       pressedScale: 0.90,
                       enableHaptics: true,
@@ -1382,7 +1364,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                             fontFamily: 'monospace',
                             fontSize: 9.5,
                             fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
-                            color: isSel ? Colors.black : colors.textMuted,
+                            color: isSel ? colors.onAccent : colors.textMuted,
                           ),
                         ),
                       ),
@@ -1404,7 +1386,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                   final isSel = heatLevel == lvl;
                   return Padding(
                     padding: const EdgeInsets.only(left: 3),
-                    child: ApplePressable(
+                    child: SagePressable(
                       onTap: () => onHeatChange(lvl),
                       pressedScale: 0.90,
                       enableHaptics: true,
@@ -1564,7 +1546,7 @@ class _ClimateControlSheetState extends State<ClimateControlSheet> {
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
-                            color: active ? Colors.black : colors.textMuted,
+                            color: active ? colors.onAccent : colors.textMuted,
                           ),
                         ),
                       ),

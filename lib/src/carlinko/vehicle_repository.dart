@@ -940,7 +940,6 @@ class LiveCarLinkoRepository implements VehicleRepository {
       String? note,
     }) {
       final ackStatus = res['ackStatus']?.toString();
-      final retried7801 = res['retriedWith7801'] == true;
       final applied = res['applied'] != false;
 
       if (applied) {
@@ -1685,6 +1684,23 @@ class AppVehicleRepository implements VehicleRepository {
       _controller.add(_current);
     }
     return restored;
+  }
+
+  /// Fills the dashboard with the last real telemetry reading backed up
+  /// to Firestore, for the gap between app launch and the first live
+  /// CarLinko poll (or permanently, if there's no live session at all).
+  /// Never overwrites telemetry that's already live/bound.
+  Future<void> restoreLastKnownTelemetryFromCloud() async {
+    if (_current.isBound) return;
+    try {
+      final snapshot = await FirebaseSyncService.instance.fetchLastTelemetrySnapshot();
+      if (snapshot != null && !_current.isBound) {
+        _current = snapshot;
+        _controller.add(_current);
+      }
+    } catch (e) {
+      debugPrint('[AppVehicleRepository] Cloud telemetry restore note: $e');
+    }
   }
 
   /// Explicitly reset to offline simulation mode (safe fallback before dealership activation).

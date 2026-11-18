@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../auth/auth_service.dart';
+import '../theme/app_tokens.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback onAuthenticated;
@@ -19,8 +20,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _nameController = TextEditingController(text: 'Mohd Afix');
-  final _plateController = TextEditingController(text: 'VRT 3342');
+  final _nameController = TextEditingController();
+  final _plateController = TextEditingController();
 
   @override
   void dispose() {
@@ -79,8 +80,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleGuestMode() async {
     setState(() => _loading = true);
     await _authService.continueAsGuest(
-      name: _nameController.text.isNotEmpty ? _nameController.text : 'AFiX',
-      plate: _plateController.text.isNotEmpty ? _plateController.text : 'VRT 3342',
+      name: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : 'Driver',
+      plate: _plateController.text.trim().isNotEmpty ? _plateController.text.trim() : 'VRT 3342',
     );
     if (mounted) {
       setState(() => _loading = false);
@@ -91,11 +92,13 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF131922) : Colors.white;
-    final inputBg = isDark ? const Color(0xFF090D12) : const Color(0xFFF3F4F6);
-    final border = isDark ? const Color(0xFF232D3D) : const Color(0xFFE5E7EB);
-    final textPrimary = isDark ? Colors.white : const Color(0xFF111827);
-    final textSec = isDark ? Colors.white60 : const Color(0xFF6B7280);
+    final t = context.tokens;
+    final cardBg = t.surface;
+    final inputBg = t.surface2;
+    final border = t.border;
+    final textPrimary = t.ink;
+    final textSec = t.ink2;
+    final accent = t.accent;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -117,17 +120,17 @@ class _LoginScreenState extends State<LoginScreen> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: cardBg,
-                        border: Border.all(color: const Color(0xFFD2F835).withValues(alpha: 0.4), width: 2),
+                        border: Border.all(color: accent.withValues(alpha: 0.4), width: 2),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFFD2F835).withValues(alpha: isDark ? 0.15 : 0.2),
+                            color: accent.withValues(alpha: isDark ? 0.15 : 0.2),
                             blurRadius: 24,
                             spreadRadius: 4,
                           ),
                         ],
                       ),
-                      child: const Center(
-                        child: Icon(Icons.electric_bolt_rounded, size: 44, color: Color(0xFFD2F835)),
+                      child: Center(
+                        child: Icon(Icons.electric_bolt_rounded, size: 44, color: accent),
                       ),
                     ),
                   ),
@@ -189,9 +192,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(vertical: 10),
                                     decoration: BoxDecoration(
-                                      color: !_isSignUp ? const Color(0xFFD2F835).withValues(alpha: 0.2) : Colors.transparent,
+                                      color: !_isSignUp ? accent.withValues(alpha: 0.2) : Colors.transparent,
                                       borderRadius: BorderRadius.circular(8),
-                                      border: !_isSignUp ? Border.all(color: const Color(0xFFD2F835)) : null,
+                                      border: !_isSignUp ? Border.all(color: accent) : null,
                                     ),
                                     child: Text(
                                       'Sign In',
@@ -199,7 +202,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       style: TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.bold,
-                                        color: !_isSignUp ? const Color(0xFFD2F835) : textSec,
+                                        color: !_isSignUp ? accent : textSec,
                                       ),
                                     ),
                                   ),
@@ -215,9 +218,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(vertical: 10),
                                     decoration: BoxDecoration(
-                                      color: _isSignUp ? const Color(0xFFD2F835).withValues(alpha: 0.2) : Colors.transparent,
+                                      color: _isSignUp ? accent.withValues(alpha: 0.2) : Colors.transparent,
                                       borderRadius: BorderRadius.circular(8),
-                                      border: _isSignUp ? Border.all(color: const Color(0xFFD2F835)) : null,
+                                      border: _isSignUp ? Border.all(color: accent) : null,
                                     ),
                                     child: Text(
                                       'Create Account',
@@ -225,7 +228,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       style: TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.bold,
-                                        color: _isSignUp ? const Color(0xFFD2F835) : textSec,
+                                        color: _isSignUp ? accent : textSec,
                                       ),
                                     ),
                                   ),
@@ -267,12 +270,12 @@ class _LoginScreenState extends State<LoginScreen> {
                             controller: _nameController,
                             decoration: InputDecoration(
                               labelText: 'Driver Name',
-                              prefixIcon: const Icon(Icons.person_outline, size: 20, color: Color(0xFFD2F835)),
+                              prefixIcon: Icon(Icons.person_outline, size: 20, color: accent),
                               filled: true,
                               fillColor: inputBg,
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
                               enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
-                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFD2F835))),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: accent)),
                             ),
                           ),
                           const SizedBox(height: 14),
@@ -281,12 +284,12 @@ class _LoginScreenState extends State<LoginScreen> {
                             textCapitalization: TextCapitalization.characters,
                             decoration: InputDecoration(
                               labelText: 'Car Plate Number',
-                              prefixIcon: const Icon(Icons.directions_car_outlined, size: 20, color: Color(0xFFD2F835)),
+                              prefixIcon: Icon(Icons.directions_car_outlined, size: 20, color: accent),
                               filled: true,
                               fillColor: inputBg,
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
                               enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
-                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFD2F835))),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: accent)),
                             ),
                           ),
                           const SizedBox(height: 14),
@@ -299,12 +302,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           decoration: InputDecoration(
                             labelText: 'Email Address',
                             hintText: 'e.g. driver@tiggomate.my',
-                            prefixIcon: const Icon(Icons.email_outlined, size: 20, color: Color(0xFFD2F835)),
+                            prefixIcon: Icon(Icons.email_outlined, size: 20, color: accent),
                             filled: true,
                             fillColor: inputBg,
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
                             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFD2F835))),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: accent)),
                           ),
                         ),
                         const SizedBox(height: 14),
@@ -315,7 +318,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           obscureText: _obscurePassword,
                           decoration: InputDecoration(
                             labelText: 'Password',
-                            prefixIcon: const Icon(Icons.lock_outline, size: 20, color: Color(0xFFD2F835)),
+                            prefixIcon: Icon(Icons.lock_outline, size: 20, color: accent),
                             suffixIcon: IconButton(
                               icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, size: 18, color: textSec),
                               onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
@@ -324,7 +327,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             fillColor: inputBg,
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
                             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFD2F835))),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: accent)),
                           ),
                         ),
                         const SizedBox(height: 20),
@@ -333,8 +336,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         ElevatedButton(
                           onPressed: _loading ? null : _handleEmailAuth,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFD2F835),
-                            foregroundColor: Colors.black,
+                            backgroundColor: accent,
+                            foregroundColor: t.onAccent,
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             elevation: 0,
@@ -342,7 +345,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: _loading
                               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
                               : Text(
-                                  _isSignUp ? 'Create Cloud Account' : 'Sign In with Firebase',
+                                  _isSignUp ? 'Create Account' : 'Sign In',
                                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                                 ),
                         ),
@@ -382,7 +385,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Firebase Firestore Database (Singapore • asia-southeast1)\nSyncs PHEV telemetry, trips, smart charging & service schedule across devices.',
+                    'Secure cloud backup (Singapore)\nSyncs PHEV telemetry, trips, smart charging & service schedule across devices.',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 10.5, color: isDark ? Colors.white38 : const Color(0xFF9CA3AF), height: 1.4),
                   ),

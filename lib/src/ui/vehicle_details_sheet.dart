@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../carlinko/vehicle_telemetry.dart';
-import '../theme/app_theme.dart';
 import '../theme/app_tokens.dart';
 
 /// Equinox-style Vehicle Details Screen (Screen 2 of Chevy Equinox Reference)
@@ -52,13 +51,12 @@ class VehicleDetailsSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final t = context.tokens;
-    final bgCol = isDark ? const Color(0xFF0D0F14) : t.bg;
-    final cardCol = isDark ? const Color(0xFF151922) : t.surface;
-    final borderCol = isDark ? const Color(0xFF222834) : t.border;
-    final textPrimary = isDark ? Colors.white : t.ink;
-    final textMuted = isDark ? const Color(0xFF8C95A6) : t.ink2;
+    final bgCol = t.bg;
+    final cardCol = t.surface;
+    final borderCol = t.border;
+    final textPrimary = t.ink;
+    final textMuted = t.ink2;
     final limeAccent = t.accent;
-    const alertAmber = Color(0xFFFFB300);
     const alertRed = Color(0xFFEF4444);
 
     final flKpa = telemetry.tyreFlPressureKpa;
@@ -228,6 +226,7 @@ class VehicleDetailsSheet extends StatelessWidget {
                                 tempC: flTemp.round(),
                                 isDark: isDark,
                                 isLeft: true,
+                                okColor: limeAccent,
                               ),
                             ),
 
@@ -241,6 +240,7 @@ class VehicleDetailsSheet extends StatelessWidget {
                                 tempC: frTemp.round(),
                                 isDark: isDark,
                                 isLeft: false,
+                                okColor: limeAccent,
                               ),
                             ),
 
@@ -254,6 +254,7 @@ class VehicleDetailsSheet extends StatelessWidget {
                                 tempC: rlTemp.round(),
                                 isDark: isDark,
                                 isLeft: true,
+                                okColor: limeAccent,
                               ),
                             ),
 
@@ -267,6 +268,7 @@ class VehicleDetailsSheet extends StatelessWidget {
                                 tempC: rrTemp.round(),
                                 isDark: isDark,
                                 isLeft: false,
+                                okColor: limeAccent,
                               ),
                             ),
 
@@ -466,13 +468,14 @@ class VehicleDetailsSheet extends StatelessWidget {
     required int tempC,
     required bool isDark,
     required bool isLeft,
+    required Color okColor,
   }) {
     final hasReading = pressureKpa > 0;
     final isLow = hasReading && pressureKpa < 215.0;
     final isAmber = hasReading && pressureKpa < 225.0;
     final color = !hasReading
         ? const Color(0xFF9CA3AF)
-        : (isLow ? const Color(0xFFEF4444) : (isAmber ? const Color(0xFFFFB300) : const Color(0xFFD2F835)));
+        : (isLow ? const Color(0xFFEF4444) : (isAmber ? const Color(0xFFFFB300) : okColor));
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_tokens.dart';
 import '../widgets/home_widget_service.dart';
 
 /// Modal sheet showcasing Android Home Screen Widget preview and
@@ -105,10 +106,12 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF0F172A) : Colors.white;
-    final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
-    final textMuted = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-    final cardBorder = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
+    final t = context.tokens;
+    final bg = t.surface;
+    final textPrimary = t.ink;
+    final textMuted = t.ink2;
+    final cardBorder = t.border;
+    final accent = t.accent;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.85,
@@ -151,10 +154,10 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFD2F835).withValues(alpha: 0.15),
+                      color: accent.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.widgets_outlined, color: Color(0xFFD2F835), size: 24),
+                    child: Icon(Icons.widgets_outlined, color: accent, size: 24),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -208,15 +211,15 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
                           Icon(
                             Icons.sync,
                             size: 14,
-                            color: const Color(0xFFD2F835),
+                            color: accent,
                           ),
                           const SizedBox(width: 4),
                           Text(
                             _isSyncing ? 'Syncing...' : 'Sync Now',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFFD2F835),
+                              color: accent,
                             ),
                           ),
                         ],
@@ -259,7 +262,7 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
               _buildShortcutTile(
                 context: context,
                 icon: Icons.lock_outline,
-                iconColor: const Color(0xFFD2F835),
+                iconColor: accent,
                 title: widget.isLocked ? 'Unlock Vehicle' : 'Lock Vehicle',
                 subtitle: '🔒 Lock / Unlock Chery Tiggo 7 PHEV doors',
                 actionUri: 'tiggomate://action/lock',
@@ -292,7 +295,7 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
               _buildShortcutTile(
                 context: context,
                 icon: Icons.radar,
-                iconColor: const Color(0xFFD2F835),
+                iconColor: accent,
                 title: 'Find My Car (Radar HUD)',
                 subtitle: '📍 360° Circular Radar locator & parking distance',
                 actionUri: 'tiggomate://action/radar',
@@ -347,15 +350,16 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
   }
 
   Widget _buildWidgetVisualPreview(BuildContext context, bool isDark) {
+    final accent = context.tokens.accent;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFF0B132B),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFD2F835).withValues(alpha: 0.5), width: 1.5),
+        border: Border.all(color: accent.withValues(alpha: 0.5), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFD2F835).withValues(alpha: 0.12),
+            color: accent.withValues(alpha: 0.12),
             blurRadius: 16,
             spreadRadius: 2,
           ),
@@ -398,7 +402,7 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
                       decoration: BoxDecoration(
                         color: widget.isCharging
                             ? const Color(0xFFF59E0B)
-                            : const Color(0xFFD2F835),
+                            : accent,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -412,7 +416,7 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
                         fontWeight: FontWeight.bold,
                         color: widget.isCharging
                             ? const Color(0xFFF59E0B)
-                            : const Color(0xFFD2F835),
+                            : accent,
                       ),
                     ),
                   ],
@@ -431,10 +435,10 @@ class _WidgetsShortcutsSheetState extends State<WidgetsShortcutsSheet> {
                   children: [
                     Text(
                       '${HomeWidgetValues.format(widget.batterySoc)}%',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w900,
-                        color: Color(0xFFD2F835),
+                        color: accent,
                       ),
                     ),
                     Text(

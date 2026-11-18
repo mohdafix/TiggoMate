@@ -10,6 +10,7 @@ class Accent {
   const Accent(this.id, this.name, this.day, this.onDay, this.night, this.onNight);
 
   static const all = <Accent>[
+    Accent('forest', 'Forest Sage', Color(0xFF0F3D1F), Colors.white, Color(0xFF9FD99F), Color(0xFF0B1E10)),
     Accent('lime', 'Cyber Lime', Color(0xFF65A30D), Colors.white, Color(0xFFD2F835), Color(0xFF0A0B0E)),
     Accent('cyan', 'Electric Cyan', Color(0xFF0284C7), Colors.white, Color(0xFF40C4FF), Color(0xFF0A0B0E)),
     Accent('orange', 'Petrol Orange', Color(0xFFEA580C), Colors.white, Color(0xFFFF6E40), Color(0xFF0A0B0E)),

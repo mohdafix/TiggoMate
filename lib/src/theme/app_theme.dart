@@ -127,6 +127,7 @@ class AppTheme {
         ),
         clipBehavior: Clip.antiAlias,
       ),
+      textTheme: _sageTextTheme(textPrimary, textSecondary),
       appBarTheme: AppBarTheme(
         backgroundColor: cardBg,
         foregroundColor: textPrimary,
@@ -135,10 +136,11 @@ class AppTheme {
         surfaceTintColor: accentColor.withValues(alpha: 0.05),
         iconTheme: IconThemeData(color: textPrimary),
         titleTextStyle: TextStyle(
+          fontFamily: 'Oswald',
           color: textPrimary,
-          fontSize: 18,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.2,
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.1,
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
@@ -313,6 +315,7 @@ class AppTheme {
         ),
         clipBehavior: Clip.antiAlias,
       ),
+      textTheme: _sageTextTheme(textPrimary, textSecondary),
       appBarTheme: AppBarTheme(
         backgroundColor: tokens.resolvedContainerLow,
         foregroundColor: textPrimary,
@@ -320,10 +323,11 @@ class AppTheme {
         scrolledUnderElevation: 0,
         iconTheme: IconThemeData(color: textPrimary),
         titleTextStyle: TextStyle(
+          fontFamily: 'Oswald',
           color: textPrimary,
-          fontSize: 18,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.2,
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.1,
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
@@ -439,6 +443,28 @@ class AppTheme {
 
   static ThemeData get lightTheme => light();
   static ThemeData get darkTheme => dark();
+}
+
+/// Oswald display headings + system body text, shared by light and dark.
+TextTheme _sageTextTheme(Color primary, Color secondary) {
+  const display = 'Oswald';
+  return TextTheme(
+    displayLarge: TextStyle(fontFamily: display, color: primary, fontSize: 40, fontWeight: FontWeight.w700, height: 1.05),
+    displayMedium: TextStyle(fontFamily: display, color: primary, fontSize: 34, fontWeight: FontWeight.w700, height: 1.05),
+    displaySmall: TextStyle(fontFamily: display, color: primary, fontSize: 28, fontWeight: FontWeight.w600, height: 1.1),
+    headlineLarge: TextStyle(fontFamily: display, color: primary, fontSize: 26, fontWeight: FontWeight.w600),
+    headlineMedium: TextStyle(fontFamily: display, color: primary, fontSize: 22, fontWeight: FontWeight.w600),
+    headlineSmall: TextStyle(fontFamily: display, color: primary, fontSize: 20, fontWeight: FontWeight.w600),
+    titleLarge: TextStyle(color: primary, fontSize: 18, fontWeight: FontWeight.w700),
+    titleMedium: TextStyle(color: primary, fontSize: 16, fontWeight: FontWeight.w700),
+    titleSmall: TextStyle(color: primary, fontSize: 14, fontWeight: FontWeight.w600),
+    bodyLarge: TextStyle(color: primary, fontSize: 16, fontWeight: FontWeight.w500),
+    bodyMedium: TextStyle(color: primary, fontSize: 14, fontWeight: FontWeight.w500),
+    bodySmall: TextStyle(color: secondary, fontSize: 12, fontWeight: FontWeight.w500),
+    labelLarge: TextStyle(color: primary, fontSize: 14, fontWeight: FontWeight.w600),
+    labelMedium: TextStyle(color: secondary, fontSize: 12, fontWeight: FontWeight.w600),
+    labelSmall: TextStyle(color: secondary, fontSize: 11, fontWeight: FontWeight.w600),
+  );
 }
 
 /// Dynamic Theme-Aware Context Color Helper.

@@ -1211,8 +1211,8 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                 ),
                 ElevatedButton.icon(
                   onPressed: () => _makePhoneCall(CheryServiceDirectory.tollFreeCareline),
-                  icon: const Icon(Icons.call, size: 12, color: Colors.black),
-                  label: const Text('CALL', style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w800, color: Colors.black, fontSize: 11)),
+                  icon: Icon(Icons.call, size: 12, color: context.tokens.onAccent),
+                  label: Text('CALL', style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w800, color: context.tokens.onAccent, fontSize: 11)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: cyberLime,
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1314,8 +1314,8 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                       const SizedBox(width: 6),
                       ElevatedButton.icon(
                         onPressed: () => _openMaps(closestCentre!),
-                        icon: const Icon(Icons.directions, size: 11, color: Colors.black),
-                        label: const Text('GO', style: TextStyle(fontFamily: 'monospace', fontSize: 10.5, fontWeight: FontWeight.w800, color: Colors.black)),
+                        icon: Icon(Icons.directions, size: 11, color: context.tokens.onAccent),
+                        label: Text('GO', style: TextStyle(fontFamily: 'monospace', fontSize: 10.5, fontWeight: FontWeight.w800, color: context.tokens.onAccent)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: cyberLime,
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1401,13 +1401,13 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                         SizedBox(
                           width: 12,
                           height: 12,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: _sortByNearest ? Colors.black : cyberLime),
+                          child: CircularProgressIndicator(strokeWidth: 2, color: _sortByNearest ? context.tokens.onAccent : cyberLime),
                         )
                       else
                         Icon(
                           Icons.near_me_rounded,
                           size: 14,
-                          color: _sortByNearest ? Colors.black : cyberLime,
+                          color: _sortByNearest ? context.tokens.onAccent : cyberLime,
                         ),
                       const SizedBox(width: 5),
                       Text(
@@ -1416,7 +1416,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                           fontFamily: 'monospace',
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color: _sortByNearest ? Colors.black : textPrimary,
+                          color: _sortByNearest ? context.tokens.onAccent : textPrimary,
                         ),
                       ),
                     ],
@@ -1443,7 +1443,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                       style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 10.5,
-                        color: isSelected ? Colors.black : textMuted,
+                        color: isSelected ? context.tokens.onAccent : textMuted,
                         fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                       ),
                     ),
@@ -1469,7 +1469,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                       style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 10,
-                        color: isSelected ? Colors.black : textMuted,
+                        color: isSelected ? context.tokens.onAccent : textMuted,
                         fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                       ),
                     ),
@@ -1591,7 +1591,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
     final borderCol = t.border;
     final textPrimary = t.ink;
     final textMuted = t.ink2;
-    const cyberLime = Color(0xFFD2F835);
+    final cyberLime = t.accent;
 
     final distanceKm = (_userPosition != null)
         ? centre.distanceTo(_userPosition!.latitude, _userPosition!.longitude)
@@ -1644,11 +1644,11 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.near_me, size: 9.5, color: cyberLime),
+                      Icon(Icons.near_me, size: 9.5, color: cyberLime),
                       const SizedBox(width: 3),
                       Text(
                         '${distanceKm.toStringAsFixed(1)} km',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'monospace',
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
@@ -1719,7 +1719,7 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
           // Phone & Hours Row
           Row(
             children: [
-              const Icon(Icons.phone_outlined, size: 13, color: cyberLime),
+              Icon(Icons.phone_outlined, size: 13, color: cyberLime),
               const SizedBox(width: 6),
               Text(
                 centre.phone.isNotEmpty
@@ -1753,8 +1753,8 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
                         ? centre.phone
                         : CheryServiceDirectory.tollFreeCareline,
                   ),
-                  icon: const Icon(Icons.call, size: 12, color: cyberLime),
-                  label: const Text('CALL', style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: cyberLime, fontWeight: FontWeight.w700)),
+                  icon: Icon(Icons.call, size: 12, color: cyberLime),
+                  label: Text('CALL', style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: cyberLime, fontWeight: FontWeight.w700)),
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: cyberLime.withValues(alpha: 0.8)),
                     padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1781,8 +1781,8 @@ class _CheryServiceCentresScreenState extends State<CheryServiceCentresScreen> {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () => _openMaps(centre),
-                  icon: const Icon(Icons.directions, size: 12, color: Colors.black),
-                  label: const Text('MAP', style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: Colors.black, fontWeight: FontWeight.w800)),
+                  icon: Icon(Icons.directions, size: 12, color: context.tokens.onAccent),
+                  label: Text('MAP', style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: context.tokens.onAccent, fontWeight: FontWeight.w800)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: cyberLime,
                     padding: const EdgeInsets.symmetric(vertical: 8),

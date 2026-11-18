@@ -13,8 +13,9 @@ import '../carlinko/vehicle_repository.dart';
 import '../service/phone_parking_location.dart';
 import '../service/trip_planner_service.dart';
 import '../theme/app_theme.dart';
+import '../theme/app_tokens.dart';
 import 'app_notification.dart';
-import 'apple_design_widgets.dart';
+import 'sage_widgets.dart';
 import 'tiggo_map_config.dart';
 
 /// A charging location saved in the app. Live availability and prices are not known.
@@ -162,11 +163,11 @@ class VehicleRadarSheet extends StatefulWidget {
     VoidCallback? onHornFlash,
     VehicleRepository? repository,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final t = context.tokens;
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: isDark ? const Color(0xFF0D1219) : Colors.white,
+      backgroundColor: t.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -314,7 +315,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
           await Geolocator.getCurrentPosition(
             locationSettings: const LocationSettings(timeLimit: Duration(seconds: 4)),
           );
-      if (mounted && pos != null) {
+      if (mounted) {
         final point = LatLng(pos.latitude, pos.longitude);
         setState(() => _customFenceCenter = point);
         _geofenceMapController.move(point, 15.5);
@@ -487,9 +488,9 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
           children: [
             const Icon(Icons.satellite_alt_rounded, color: Color(0xFF9CA3AF), size: 36),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Awaiting Vehicle GPS Fix',
-              style: TextStyle(color: Color(0xFFD2F835), fontSize: 11, fontWeight: FontWeight.bold),
+              style: TextStyle(color: context.tokens.accent, fontSize: 11, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
             const Text(
@@ -523,8 +524,8 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                       point: LatLng(lat, lon),
                       radius: _selectedFenceRadius,
                       useRadiusInMeter: true,
-                      color: const Color(0xFFD2F835).withValues(alpha: 0.14),
-                      borderColor: const Color(0xFFD2F835),
+                      color: context.tokens.accent.withValues(alpha: 0.14),
+                      borderColor: context.tokens.accent,
                       borderStrokeWidth: 2.0,
                     ),
                   ],
@@ -875,7 +876,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                                   Icon(
                                     Icons.shield_outlined,
                                     size: 14,
-                                    color: _activeRadarTab == 2 ? const Color(0xFFD2F835) : colors.textMuted,
+                                    color: _activeRadarTab == 2 ? colors.evTeal : colors.textMuted,
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
@@ -2042,7 +2043,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                   Row(
                     children: [
                       Expanded(
-                        child: ApplePressable(
+                        child: SagePressable(
                           onTap: () async {
                             final lat = route.recommendedStop!.location.latitude;
                             final lon = route.recommendedStop!.location.longitude;
@@ -2065,7 +2066,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: ApplePressable(
+                        child: SagePressable(
                           onTap: () async {
                             final lat = route.recommendedStop!.location.latitude;
                             final lon = route.recommendedStop!.location.longitude;
@@ -2109,7 +2110,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: _hasActiveGeofence
-                  ? const Color(0xFFD2F835).withValues(alpha: 0.5)
+                  ? colors.evTeal.withValues(alpha: 0.5)
                   : colors.border,
             ),
           ),
@@ -2119,12 +2120,12 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: (_hasActiveGeofence ? const Color(0xFFD2F835) : colors.textMuted)
+                  color: (_hasActiveGeofence ? colors.evTeal : colors.textMuted)
                       .withValues(alpha: 0.15),
                 ),
                 child: Icon(
                   _hasActiveGeofence ? Icons.security : Icons.shield_outlined,
-                  color: _hasActiveGeofence ? const Color(0xFFD2F835) : colors.textMuted,
+                  color: _hasActiveGeofence ? colors.evTeal : colors.textMuted,
                   size: 24,
                 ),
               ),
@@ -2148,7 +2149,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: _hasActiveGeofence
-                                ? const Color(0xFFD2F835)
+                                ? colors.evTeal
                                 : (isDark ? Colors.white10 : Colors.black12),
                             borderRadius: BorderRadius.circular(6),
                           ),
@@ -2157,7 +2158,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                             style: TextStyle(
                               fontSize: 9,
                               fontWeight: FontWeight.w900,
-                              color: _hasActiveGeofence ? Colors.black : colors.textMuted,
+                              color: _hasActiveGeofence ? colors.onAccent : colors.textMuted,
                             ),
                           ),
                         ),
@@ -2191,7 +2192,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
               style: TextStyle(
                 fontSize: 10.5,
                 fontWeight: FontWeight.w600,
-                color: _customFenceCenter != null ? const Color(0xFFD2F835) : colors.evTeal,
+                color: colors.evTeal,
               ),
             ),
           ],
@@ -2241,8 +2242,8 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                               point: _effectiveFenceCenter,
                               radius: _selectedFenceRadius,
                               useRadiusInMeter: true,
-                              color: const Color(0xFFD2F835).withValues(alpha: 0.18),
-                              borderColor: const Color(0xFFD2F835),
+                              color: colors.evTeal.withValues(alpha: 0.18),
+                              borderColor: colors.evTeal,
                               borderStrokeWidth: 2.5,
                             ),
                           ],
@@ -2278,19 +2279,19 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                               alignment: Alignment.center,
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFD2F835),
+                                  color: colors.evTeal,
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.black, width: 2),
+                                  border: Border.all(color: colors.onAccent, width: 2),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFFD2F835).withValues(alpha: 0.6),
+                                      color: colors.evTeal.withValues(alpha: 0.6),
                                       blurRadius: 10,
                                       spreadRadius: 2,
                                     ),
                                   ],
                                 ),
-                                child: const Center(
-                                  child: Icon(Icons.shield, color: Colors.black, size: 18),
+                                child: Center(
+                                  child: Icon(Icons.shield, color: colors.onAccent, size: 18),
                                 ),
                               ),
                             ),
@@ -2317,7 +2318,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.touch_app, color: Color(0xFFD2F835), size: 13),
+                      Icon(Icons.touch_app, color: colors.evTeal, size: 13),
                       const SizedBox(width: 5),
                       Flexible(
                         child: Text(
@@ -2340,7 +2341,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    ApplePressable(
+                    SagePressable(
                       onTap: _snapToCarLocation,
                       pressedScale: 0.92,
                       enableHaptics: true,
@@ -2365,7 +2366,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                       ),
                     ),
                     const SizedBox(width: 6),
-                    ApplePressable(
+                    SagePressable(
                       onTap: _snapToPhoneLocation,
                       pressedScale: 0.92,
                       enableHaptics: true,
@@ -2374,17 +2375,17 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                         decoration: BoxDecoration(
                           color: const Color(0xFF0F172A).withValues(alpha: 0.92),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFD2F835).withValues(alpha: 0.6)),
+                          border: Border.all(color: colors.evTeal.withValues(alpha: 0.6)),
                           boxShadow: [
                             BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 4),
                           ],
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.my_location, color: Color(0xFFD2F835), size: 13),
-                            SizedBox(width: 4),
-                            Text('Phone', style: TextStyle(color: Color(0xFFD2F835), fontSize: 11, fontWeight: FontWeight.bold)),
+                            Icon(Icons.my_location, color: colors.evTeal, size: 13),
+                            const SizedBox(width: 4),
+                            Text('Phone', style: TextStyle(color: colors.evTeal, fontSize: 11, fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ),
@@ -2410,7 +2411,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
             return Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 3),
-                child: ApplePressable(
+                child: SagePressable(
                   onTap: () => setState(() => _selectedFenceRadius = r),
                   pressedScale: 0.94,
                   enableHaptics: true,
@@ -2418,11 +2419,11 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                     padding: const EdgeInsets.symmetric(vertical: 9),
                     decoration: BoxDecoration(
                       color: isSel
-                          ? const Color(0xFFD2F835)
+                          ? colors.evTeal
                           : (isDark ? const Color(0xFF1E2632) : const Color(0xFFF1F5F9)),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: isSel ? const Color(0xFFD2F835) : colors.border,
+                        color: isSel ? colors.evTeal : colors.border,
                       ),
                     ),
                     child: Center(
@@ -2432,7 +2433,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                           fontFamily: 'monospace',
                           fontSize: 12,
                           fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
-                          color: isSel ? Colors.black : colors.textPrimary,
+                          color: isSel ? colors.onAccent : colors.textPrimary,
                         ),
                       ),
                     ),
@@ -2481,13 +2482,13 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: colors.border)),
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: colors.border)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFD2F835))),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: colors.evTeal)),
           ),
         ),
         const SizedBox(height: 14),
 
         // Action Button: Arm / Create Geofence
-        ApplePressable(
+        SagePressable(
           onTap: _createGeofence,
           pressedScale: 0.97,
           enableHaptics: true,
@@ -2495,13 +2496,11 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 14),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFD2F835), Color(0xFFBCE32A)],
-              ),
+              color: colors.evTeal,
               borderRadius: BorderRadius.circular(14),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFD2F835).withValues(alpha: 0.3),
+                  color: colors.evTeal.withValues(alpha: 0.3),
                   blurRadius: 10,
                   offset: const Offset(0, 3),
                 ),
@@ -2510,16 +2509,16 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.shield, color: Colors.black, size: 18),
+                Icon(Icons.shield, color: colors.onAccent, size: 18),
                 const SizedBox(width: 8),
                 Text(
                   _customFenceCenter != null
                       ? 'Arm Geofence at Selected Location (${_selectedFenceRadius.toInt()}m)'
                       : 'Arm Geofence at Car Location (${_selectedFenceRadius.toInt()}m)',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
-                    color: Colors.black,
+                    color: colors.onAccent,
                   ),
                 ),
               ],
@@ -2587,7 +2586,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                 color: colors.tileBg,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: status ? const Color(0xFFD2F835).withValues(alpha: 0.4) : colors.border,
+                  color: status ? colors.evTeal.withValues(alpha: 0.4) : colors.border,
                 ),
               ),
               child: Row(
@@ -2596,12 +2595,12 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: (status ? const Color(0xFFD2F835) : colors.textMuted).withValues(alpha: 0.15),
+                      color: (status ? colors.evTeal : colors.textMuted).withValues(alpha: 0.15),
                     ),
                     child: Icon(
                       isLocal ? Icons.shield_outlined : Icons.fmd_good,
                       size: 16,
-                      color: status ? const Color(0xFFD2F835) : colors.textMuted,
+                      color: status ? colors.evTeal : colors.textMuted,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -2651,7 +2650,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
                   ),
                   Switch(
                     value: status,
-                    activeColor: const Color(0xFFD2F835),
+                    activeThumbColor: colors.evTeal,
                     onChanged: (val) => _toggleGeofenceStatus(id, fence['status']),
                   ),
                   IconButton(
@@ -2685,7 +2684,7 @@ class _VehicleRadarSheetState extends State<VehicleRadarSheet> with SingleTicker
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 13, color: isSel ? const Color(0xFFD2F835) : colors.textMuted),
+              Icon(icon, size: 13, color: isSel ? colors.evTeal : colors.textMuted),
               const SizedBox(width: 4),
               Text(
                 label,

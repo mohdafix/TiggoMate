@@ -319,7 +319,7 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
                 icon: Icons.account_circle_outlined,
                 label: 'Cloud Account',
                 value: accountName,
-                accentColor: const Color(0xFFD2F835),
+                accentColor: t.accent,
                 isDark: isDark,
               ),
               Divider(height: 18, color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0)),
@@ -339,7 +339,7 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
                     : 'Live CAN-Bus Sync',
                 accentColor: isPreActivation
                     ? const Color(0xFFFF6E40)
-                    : const Color(0xFFD2F835),
+                    : t.accent,
                 isDark: isDark,
               ),
               Divider(height: 18, color: isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0)),
@@ -397,13 +397,13 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
             width: double.infinity,
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: _isError ? Colors.red.withValues(alpha: 0.12) : const Color(0xFFD2F835).withValues(alpha: 0.12),
+              color: _isError ? Colors.red.withValues(alpha: 0.12) : t.accent.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: _isError ? Colors.red.withValues(alpha: 0.3) : const Color(0xFFD2F835).withValues(alpha: 0.3)),
+              border: Border.all(color: _isError ? Colors.red.withValues(alpha: 0.3) : t.accent.withValues(alpha: 0.3)),
             ),
             child: Text(
               _statusMessage!,
-              style: TextStyle(fontSize: 11.5, color: _isError ? Colors.redAccent : const Color(0xFFD2F835)),
+              style: TextStyle(fontSize: 11.5, color: _isError ? Colors.redAccent : t.accent),
             ),
           ),
           const SizedBox(height: 14),
@@ -416,8 +416,8 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
           child: ElevatedButton.icon(
             onPressed: _syncing ? null : _handleRefreshSync,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFD2F835),
-              foregroundColor: Colors.black,
+              backgroundColor: t.accent,
+              foregroundColor: t.onAccent,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               elevation: 0,
             ),
@@ -737,8 +737,8 @@ class _CarlinkoConnectDialogState extends State<CarlinkoConnectDialog> {
           child: ElevatedButton.icon(
             onPressed: _loading ? null : _handleConnect,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFD2F835),
-              foregroundColor: Colors.black,
+              backgroundColor: t.accent,
+              foregroundColor: t.onAccent,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               elevation: 0,
             ),

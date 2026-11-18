@@ -38,8 +38,8 @@ class _SetupIntroScreenState extends State<SetupIntroScreen> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: 'Mohd Afix');
-    _plateController = TextEditingController(text: 'VRT 3342');
+    _nameController = TextEditingController();
+    _plateController = TextEditingController();
     _loadExisting();
   }
 
@@ -74,7 +74,7 @@ class _SetupIntroScreenState extends State<SetupIntroScreen> {
   }
 
   Future<void> _finishSetup() async {
-    final name = _nameController.text.trim().isEmpty ? 'Mohd Afix' : _nameController.text.trim();
+    final name = _nameController.text.trim().isEmpty ? 'Driver' : _nameController.text.trim();
     final plate = _plateController.text.trim().isEmpty ? 'VRT 3342' : _plateController.text.trim().toUpperCase();
 
     try {

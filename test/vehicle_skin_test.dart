@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tiggomate_app/src/carlinko/vehicle_repository.dart';
 import 'package:tiggomate_app/src/carlinko/vehicle_skin.dart';
 import 'package:tiggomate_app/src/ui/neo_dashboard.dart';
+import 'package:tiggomate_app/src/ui/sage_widgets.dart';
 import 'package:tiggomate_app/src/ui/settings_screen.dart';
 
 void main() {
@@ -94,6 +95,9 @@ void main() {
 
   group('NeoDashboard Vehicle Skin Reactivity', () {
     testWidgets('NeoDashboard reactively updates car render when VehicleSkinManager changes', (tester) async {
+      // This asserts on the legacy Cyber dashboard's carousel pages.
+      DashboardStyle.useSage.value = false;
+      addTearDown(() => DashboardStyle.useSage.value = true);
       await VehicleSkinManager.instance.setSkin('khaki_white');
       final repo = MockVehicleRepository();
 

@@ -38,15 +38,15 @@ void main() {
     test('Light theme creates valid ThemeData with Brightness.light', () {
       final light = AppTheme.lightTheme;
       expect(light.brightness, equals(Brightness.light));
-      expect(light.scaffoldBackgroundColor, equals(const Color(0xFFF7F8FA)));
+      expect(light.scaffoldBackgroundColor, equals(const Color(0xFFE8F0E8)));
       expect(light.colorScheme.surface, equals(const Color(0xFFFFFFFF)));
     });
 
     test('Dark theme creates valid ThemeData with Brightness.dark', () {
       final dark = AppTheme.darkTheme;
       expect(dark.brightness, equals(Brightness.dark));
-      expect(dark.scaffoldBackgroundColor, equals(const Color(0xFF0A0B0E)));
-      expect(dark.colorScheme.surface, equals(const Color(0xFF12141A)));
+      expect(dark.scaffoldBackgroundColor, equals(const Color(0xFF0B140E)));
+      expect(dark.colorScheme.surface, equals(const Color(0xFF142019)));
     });
   });
 }

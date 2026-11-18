@@ -150,6 +150,36 @@ class VehicleAlertsManager extends ChangeNotifier {
         _seedInitialAlerts();
       }
     }
+    unawaited(_restoreFromCloud());
+  }
+
+  /// Pulls alerts backed up to Firestore and merges in any that aren't
+  /// already known locally (e.g. logged on a different device, or after
+  /// a reinstall). Runs after local load so the UI shows something
+  /// immediately rather than waiting on a network round trip.
+  Future<void> _restoreFromCloud() async {
+    try {
+      final cloudAlerts = await FirebaseSyncService.instance.fetchAlerts();
+      if (cloudAlerts.isEmpty) return;
+      final existingIds = _alerts.map((a) => a.id).toSet();
+      bool added = false;
+      for (final a in cloudAlerts) {
+        if (!existingIds.contains(a.id)) {
+          _alerts.add(a);
+          added = true;
+        }
+      }
+      if (added) {
+        _alerts.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+        if (_alerts.length > 50) {
+          _alerts.removeRange(50, _alerts.length);
+        }
+        notifyListeners();
+        await _persist();
+      }
+    } catch (e) {
+      debugPrint('[VehicleAlertsManager] Cloud restore note: $e');
+    }
   }
 
   void _seedInitialAlerts() {

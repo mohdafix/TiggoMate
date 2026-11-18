@@ -4,7 +4,7 @@ import '../theme/app_tokens.dart';
 import '../carlinko/carlinko_api.dart';
 import '../carlinko/vehicle_repository.dart';
 import '../carlinko/vehicle_telemetry.dart';
-import 'apple_design_widgets.dart';
+import 'sage_widgets.dart';
 
 /// Unified Windows, Panoramic Sunroof & Electric Sunshade controller.
 ///
@@ -145,7 +145,7 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
     final evAccent = t.accent; // single lime/accent colour, same as the dashboard
     final sunroofAccent = t.warn; // warm amber, reserved for sunroof glass states
 
-    return AppleSheetContainer(
+    return SageSheetContainer(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -264,7 +264,7 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
           Row(
             children: [
               Expanded(
-                child: AppleControlTile(
+                child: SageControlTile(
                   title: 'Vent',
                   subtitle: '20mm gap',
                   icon: Icons.air_rounded,
@@ -289,7 +289,7 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: AppleControlTile(
+                child: SageControlTile(
                   title: 'Open all',
                   subtitle: 'Lower 4x',
                   icon: Icons.vertical_align_bottom_rounded,
@@ -314,7 +314,7 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: AppleControlTile(
+                child: SageControlTile(
                   title: 'Close all',
                   subtitle: 'Sealed',
                   icon: Icons.vertical_align_top_rounded,
@@ -356,7 +356,7 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
           Row(
             children: [
               Expanded(
-                child: AppleControlTile(
+                child: SageControlTile(
                   title: 'Open',
                   subtitle: 'Full sky',
                   icon: Icons.open_in_browser_rounded,
@@ -389,7 +389,7 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: AppleControlTile(
+                child: SageControlTile(
                   title: 'Tilt',
                   subtitle: 'Vent only',
                   icon: Icons.open_in_full_rounded,
@@ -422,7 +422,7 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: AppleControlTile(
+                child: SageControlTile(
                   title: 'Close',
                   subtitle: 'Sealed',
                   icon: Icons.wb_twilight_rounded,
@@ -511,7 +511,7 @@ class _WindowsControlSheetState extends State<WindowsControlSheet> {
                 ),
                 Switch.adaptive(
                   value: _sunshadeCurtainClosed,
-                  activeColor: evAccent,
+                  activeThumbColor: evAccent,
                   onChanged: (v) {
                     HapticFeedback.selectionClick();
                     setState(() => _sunshadeCurtainClosed = v);

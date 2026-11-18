@@ -16,6 +16,7 @@ import 'mytnb_connect_dialog.dart';
 import 'setup_intro_screen.dart';
 import 'remote_command_diagnostics_sheet.dart';
 import '../firebase/firebase_sync_service.dart';
+import 'sage_widgets.dart';
 import '../service/bluetooth_driving_tracker_service.dart';
 import '../service/price_book_service.dart';
 import '../service/background_guardian_service.dart';
@@ -94,6 +95,20 @@ class SettingsService {
 
   static Future<AppSettings> load() async {
     final prefs = await SharedPreferences.getInstance();
+
+    // Fresh install / new device with no local prefs yet: try restoring
+    // from Firestore before falling back to hard-coded defaults, so a
+    // reinstall doesn't silently lose the saved owner/plate/pricing.
+    if (!prefs.containsKey(_kOwner)) {
+      try {
+        final cloud = await FirebaseSyncService.instance.fetchSettings();
+        if (cloud != null) {
+          await save(cloud);
+          return cloud;
+        }
+      } catch (_) {}
+    }
+
     return AppSettings(
       ownerName: prefs.getString(_kOwner) ?? "Chery Owner",
       carPlateNumber: prefs.getString(_kPlate) ?? "VAG 7777",
@@ -441,6 +456,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     message: '✓ Background push notifications are active! You will receive alerts without opening the app.',
                     icon: Icons.notifications_active_rounded,
                   );
+                  if (!context.mounted) return;
                   AppNotification.show(
                     context,
                     message: '🔔 Test notification sent to status bar!',
@@ -1031,6 +1047,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   : (themeCtrl.themeMode == ThemeMode.light ? 'Tesla Light' : 'System Automatic'),
               onTap: _showThemeModePicker,
             ),
+            ValueListenableBuilder<bool>(
+              valueListenable: DashboardStyle.useSage,
+              builder: (context, useSage, _) => _switchRow(
+                Icons.dashboard_customize_outlined,
+                'Sage Cockpit dashboard',
+                useSage ? 'New sage-green layout' : 'Legacy Cyber layout',
+                useSage,
+                (val) => DashboardStyle.set(val),
+              ),
+            ),
             _switchRow(Icons.access_time, '24-hour clock', _is24Hour ? '13:00' : '1:00 PM', _is24Hour, (val) async {
               setState(() => _is24Hour = val);
               try {
@@ -1440,7 +1466,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _group('Account & Cloud Sync', [
             _buildSettingTile(
               leading: Icon(Icons.cloud_done_outlined, color: t.ink2, size: 22),
-              title: 'Firebase Account',
+              title: 'Account & Cloud Backup',
               subtitle: user.isAuthenticated ? '${user.displayName} · ${user.email}' : 'Browsing as Guest Driver',
               trailing: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

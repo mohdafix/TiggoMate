@@ -19,20 +19,29 @@ void main() {
       expect(user.vehicleNickname, contains('Chery Tiggo 7'));
     });
 
-    test('Sign in with Google establishes authenticated session', () async {
+    test('Sign in with Google fails gracefully without a real Firebase/Google session', () async {
+      // No Firebase App and no real Google account are available in this
+      // unit test sandbox, so signInWithGoogle must report failure rather
+      // than fabricate a fake authenticated user (that fake-success path
+      // was the bug: it let anyone "sign in" as a fixed hard-coded
+      // account without ever touching Firebase or Google).
       final auth = AuthService();
       await auth.initialize();
+      final before = auth.currentUser;
 
       final res = await auth.signInWithGoogle();
-      expect(res.success, isTrue);
-      expect(auth.currentUser.email, equals('linexsg@gmail.com'));
-      expect(auth.currentUser.displayName, equals('Mohd Afix'));
-      expect(auth.currentUser.isAuthenticated, isTrue);
+      expect(res.success, isFalse);
+      // Session must be unchanged on failure.
+      expect(auth.currentUser.uid, equals(before.uid));
     });
 
-    test('Sign Up with Email creates user account', () async {
+    test('Sign Up with Email reports failure rather than a fake local account', () async {
+      // Without a reachable Firebase backend, signUpWithEmail must not
+      // silently create a local-only account: that uid would never match
+      // what's in Firestore, and every subsequent sync would be rejected.
       final auth = AuthService();
       await auth.initialize();
+      final before = auth.currentUser;
 
       final res = await auth.signUpWithEmail(
         email: 'afix@example.com',
@@ -41,10 +50,8 @@ void main() {
         carPlate: 'vrt 3342',
       );
 
-      expect(res.success, isTrue);
-      expect(auth.currentUser.email, equals('afix@example.com'));
-      expect(auth.currentUser.displayName, equals('Afix Driver'));
-      expect(auth.currentUser.carPlate, equals('VRT 3342'));
+      expect(res.success, isFalse);
+      expect(auth.currentUser.uid, equals(before.uid));
     });
 
     test('Sign In rejects invalid email or short password', () async {
@@ -61,11 +68,12 @@ void main() {
     test('Sign out clears user session back to default guest', () async {
       final auth = AuthService();
       await auth.initialize();
-      await auth.signInWithGoogle();
-      expect(auth.currentUser.isAuthenticated, isTrue);
+      await auth.continueAsGuest(name: 'Test Driver', plate: 'ABC 1234');
+      expect(auth.currentUser.displayName, equals('Test Driver'));
 
       await auth.signOut();
-      expect(auth.currentUser.email, equals('afix@tiggomate.my'));
+      expect(auth.currentUser.isGuest, isTrue);
+      expect(auth.currentUser.email, isEmpty);
     });
   });
 }

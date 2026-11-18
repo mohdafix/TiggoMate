@@ -13,6 +13,7 @@ import 'package:tiggomate_app/src/theme/app_theme.dart';
 // ask_assistant_sheet merged into AssistantTab
 import 'package:tiggomate_app/src/ui/energy_screen.dart';
 import 'package:tiggomate_app/src/ui/neo_dashboard.dart';
+import 'package:tiggomate_app/src/ui/sage_widgets.dart';
 import 'package:tiggomate_app/src/ui/trips_logbook_screen.dart';
 import 'package:tiggomate_app/src/ui/vehicle_radar_sheet.dart';
 import 'package:tiggomate_app/src/ui/smart_charging_sheet.dart';
@@ -43,6 +44,9 @@ void main() {
   });
 
   testWidgets('LoginScreen renders on first launch when not authenticated and allows guest entry', (WidgetTester tester) async {
+    // This asserts on the legacy Cyber dashboard's all-caps header copy.
+    DashboardStyle.useSage.value = false;
+    addTearDown(() => DashboardStyle.useSage.value = true);
     SharedPreferences.setMockInitialValues({
       'tiggomate_has_chosen_auth': false,
       'tm_has_completed_setup': true,
@@ -53,7 +57,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('TiggoMate'), findsWidgets);
-    expect(find.text('Sign In with Firebase'), findsOneWidget);
+    // "Sign In" appears both as the tab label and the submit button text.
+    expect(find.text('Sign In'), findsNWidgets(2));
     expect(find.text('Continue with Google'), findsOneWidget);
     expect(find.text('Continue as Guest Driver (Offline Mode)'), findsOneWidget);
 
@@ -67,6 +72,9 @@ void main() {
   });
 
   testWidgets('TiggoMate smoke test', (WidgetTester tester) async {
+    // This asserts on the legacy Cyber dashboard's all-caps nav/header copy.
+    DashboardStyle.useSage.value = false;
+    addTearDown(() => DashboardStyle.useSage.value = true);
     await tester.pumpWidget(const TiggoMateApp());
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
@@ -165,6 +173,10 @@ void main() {
     });
     final semantics = tester.ensureSemantics();
 
+    // This asserts on the legacy Cyber dashboard's carousel/remote deck.
+    DashboardStyle.useSage.value = false;
+    addTearDown(() => DashboardStyle.useSage.value = true);
+
     await VehicleSkinManager.instance.setSkin('khaki_white');
     final repo = MockVehicleRepository(withSampleData: true);
 
@@ -249,6 +261,10 @@ void main() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
     });
+
+    // This asserts on the legacy Cyber dashboard's exact placeholder text.
+    DashboardStyle.useSage.value = false;
+    addTearDown(() => DashboardStyle.useSage.value = true);
 
     final repo = MockVehicleRepository();
 

@@ -5,6 +5,7 @@ import 'package:tiggomate_app/src/theme/app_theme.dart';
 import 'package:tiggomate_app/src/ui/app_notification.dart';
 import 'package:tiggomate_app/src/carlinko/vehicle_repository.dart';
 import 'package:tiggomate_app/src/ui/neo_dashboard.dart';
+import 'package:tiggomate_app/src/ui/sage_widgets.dart';
 
 void main() {
   setUp(() async {
@@ -238,6 +239,9 @@ void main() {
 
   group('NeoDashboard Notification Bell Dock Integration', () {
     testWidgets('NeoDashboard header displays notification bell and opens VehicleAlertsSheet', (tester) async {
+      // This asserts on the legacy Cyber dashboard's header layout.
+      DashboardStyle.useSage.value = false;
+      addTearDown(() => DashboardStyle.useSage.value = true);
       final repo = MockVehicleRepository();
 
       await tester.pumpWidget(

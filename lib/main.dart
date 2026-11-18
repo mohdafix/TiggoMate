@@ -18,6 +18,7 @@ import 'src/carlinko/vehicle_skin.dart';
 import 'src/mytnb/mytnb_api.dart';
 
 import 'src/ui/neo_dashboard.dart';
+import 'src/ui/sage_widgets.dart';
 import 'src/ui/chery_service_centres_screen.dart';
 import 'src/ai/chery_club_knowledge.dart';
 import 'src/ui/trips_logbook_screen.dart';
@@ -56,6 +57,7 @@ void main() async {
     await AppThemeController.instance.init();
     await Accent.load();
     await VehicleSkinManager.instance.init();
+    await DashboardStyle.init();
   } catch (e) {
     debugPrint('AppThemeController.init warning: $e');
   }
@@ -126,12 +128,18 @@ class _AppRootGateState extends State<AppRootGate> {
   void initState() {
     super.initState();
     _initGate();
-    _authService.authStateChanges.listen((user) {
-      if (mounted) {
-        setState(() {
-          _hasChosenAuth = user.isAuthenticated || !user.isGuest;
-        });
-      }
+    _authService.authStateChanges.listen((_) {
+      // The explicit "has chosen auth" flag (set by sign-in, sign-up,
+      // continue-as-guest, and cleared by sign-out) is the source of
+      // truth for gating — inferring it from isGuest here would bounce
+      // guests back to the login screen right after they chose guest mode.
+      _authService.hasChosenAuth().then((chosen) {
+        if (mounted) {
+          setState(() {
+            _hasChosenAuth = chosen;
+          });
+        }
+      });
     });
   }
 
@@ -261,6 +269,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           AppVehicleRepository.instance.setPreActivationActive(account: acc);
         } catch (_) {}
       }
+      if (!restored) {
+        // Still show last-known real readings (odometer, SoC, etc.)
+        // instead of a blank/simulated dashboard while there's no live
+        // session.
+        await AppVehicleRepository.instance.restoreLastKnownTelemetryFromCloud();
+      }
     }());
 
     if (mounted) {
@@ -356,35 +370,52 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       bottomNavigationBar: SafeArea(
         top: false,
         bottom: true,
-        child: Container(
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
-          decoration: BoxDecoration(
-            color: context.tokens.resolvedContainerLow.withValues(alpha: isDark ? 0.96 : 0.98),
-            borderRadius: BorderRadius.circular(AppTokens.rFull),
-            border: Border.all(
-              color: context.tokens.resolvedBorderSubtle,
-              width: 1.0,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.10),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
+        child: ValueListenableBuilder<bool>(
+          valueListenable: DashboardStyle.useSage,
+          builder: (context, useSage, _) {
+            if (useSage) {
+              return SageNavBar(
+                currentIndex: _currentIndex,
+                onTap: (i) => setState(() => _currentIndex = i),
+                items: const [
+                  SageNavItem(icon: Icons.directions_car_outlined, selectedIcon: Icons.directions_car, label: 'Car'),
+                  SageNavItem(icon: Icons.chat_bubble_outline, selectedIcon: Icons.chat_bubble, label: 'Assistant'),
+                  SageNavItem(icon: Icons.route_outlined, selectedIcon: Icons.route, label: 'Log'),
+                  SageNavItem(icon: Icons.build_outlined, selectedIcon: Icons.build, label: 'Service'),
+                ],
+              );
+            }
+            return Container(
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+              decoration: BoxDecoration(
+                color: context.tokens.resolvedContainerLow.withValues(alpha: isDark ? 0.96 : 0.98),
+                borderRadius: BorderRadius.circular(AppTokens.rFull),
+                border: Border.all(
+                  color: context.tokens.resolvedBorderSubtle,
+                  width: 1.0,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.10),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: SizedBox(
-            height: 58,
-            child: Row(
-              children: [
-                _buildCyberBottomNavItem(0, 'CAR', Icons.directions_car_outlined, Icons.directions_car),
-                _buildCyberBottomNavItem(1, 'ASSISTANT', Icons.chat_bubble_outline, Icons.chat_bubble),
-                _buildCyberBottomNavItem(2, 'LOG', Icons.route_outlined, Icons.route),
-                _buildCyberBottomNavItem(3, 'SERVICE', Icons.build_outlined, Icons.build),
-              ],
-            ),
-          ),
+              child: SizedBox(
+                height: 58,
+                child: Row(
+                  children: [
+                    _buildCyberBottomNavItem(0, 'CAR', Icons.directions_car_outlined, Icons.directions_car),
+                    _buildCyberBottomNavItem(1, 'ASSISTANT', Icons.chat_bubble_outline, Icons.chat_bubble),
+                    _buildCyberBottomNavItem(2, 'LOG', Icons.route_outlined, Icons.route),
+                    _buildCyberBottomNavItem(3, 'SERVICE', Icons.build_outlined, Icons.build),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -2544,11 +2575,11 @@ class MaintenanceTab extends StatefulWidget {
 
 class _MaintenanceTabState extends State<MaintenanceTab> {
   void _confirmCompleteAppointment(BuildContext context, ServiceAppointment apt) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final t = context.tokens;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF131922) : Colors.white,
+        backgroundColor: t.surface,
         title: const Text('Mark as Done?'),
         content: Text('Mark your ${apt.serviceType} at ${apt.centreName} as completed?'),
         actions: [
@@ -2564,7 +2595,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                 setState(() => _lastServiceDate = apt.appointmentDate);
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: context.tokens.accent, foregroundColor: const Color(0xFF0A0B0E)),
+            style: ElevatedButton.styleFrom(backgroundColor: t.accent, foregroundColor: t.onAccent),
             child: const Text('Mark Done'),
           ),
         ],
@@ -2573,11 +2604,11 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
   }
 
   void _confirmCancelAppointment(BuildContext context, ServiceAppointment apt) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final t = context.tokens;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF131922) : Colors.white,
+        backgroundColor: t.surface,
         title: const Text('Cancel Appointment?'),
         content: Text('Are you sure you want to cancel your service booking at ${apt.centreName} on ${apt.formattedDate}?'),
         actions: [
@@ -2931,11 +2962,13 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
     ),
   ];
 
-  Widget _buildSubTabSwitcher(bool isDark) {
-    final cardCol = isDark ? const Color(0xFF12141A) : Colors.white;
-    final borderCol = isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0);
-    final textMuted = isDark ? const Color(0xFF717684) : const Color(0xFF64748B);
-    const cyberLime = Color(0xFFD2F835);
+  Widget _buildSubTabSwitcher(BuildContext context, bool isDark) {
+    final t = context.tokens;
+    final cardCol = t.surface;
+    final borderCol = t.border;
+    final textMuted = t.ink2;
+    final cyberLime = t.accent;
+    final onAccent = t.onAccent;
 
     return Container(
       height: 38,
@@ -2963,7 +2996,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.5,
-                    color: _activeSubTab == 0 ? Colors.black : textMuted,
+                    color: _activeSubTab == 0 ? onAccent : textMuted,
                   ),
                 ),
               ),
@@ -2985,7 +3018,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                     Icon(
                       Icons.location_on,
                       size: 13,
-                      color: _activeSubTab == 1 ? Colors.black : cyberLime,
+                      color: _activeSubTab == 1 ? onAccent : cyberLime,
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -2995,7 +3028,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.5,
-                        color: _activeSubTab == 1 ? Colors.black : textMuted,
+                        color: _activeSubTab == 1 ? onAccent : textMuted,
                       ),
                     ),
                   ],
@@ -3011,7 +3044,8 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgCol = isDark ? const Color(0xFF0A0B0E) : const Color(0xFFF6F8FA);
+    final t = context.tokens;
+    final bgCol = t.bg;
 
     return Scaffold(
       backgroundColor: bgCol,
@@ -3029,10 +3063,10 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                       Text(
                         'Service Center',
                         style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.3,
-                          color: isDark ? Colors.white : const Color(0xFF0A0B0E),
+                          fontFamily: 'Oswald',
+                          fontSize: 24,
+                          fontWeight: FontWeight.w600,
+                          color: t.ink,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -3041,7 +3075,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
-                          color: isDark ? const Color(0xFF717684) : const Color(0xFF64748B),
+                          color: t.ink2,
                         ),
                       ),
                     ],
@@ -3049,21 +3083,21 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1B202C) : const Color(0xFFE2E8F0),
+                      color: t.resolvedAccentContainer,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: isDark ? const Color(0xFF2B3242) : const Color(0xFFD8DDE6)),
+                      border: Border.all(color: t.border),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.calendar_today_rounded, size: 12, color: context.tokens.accent),
+                        Icon(Icons.calendar_today_rounded, size: 12, color: t.accent),
                         const SizedBox(width: 5),
                         Text(
                           'Chery Care',
                           style: TextStyle(
                             fontSize: 10.5,
                             fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : Colors.black,
+                            color: isDark ? t.onAccentContainer ?? t.accent : t.accent,
                           ),
                         ),
                       ],
@@ -3074,7 +3108,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-              child: _buildSubTabSwitcher(isDark),
+              child: _buildSubTabSwitcher(context, isDark),
             ),
             Expanded(
               child: _activeSubTab == 1
@@ -3099,12 +3133,13 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
   }
 
   Widget _buildScheduleAndPricingView(BuildContext context, bool isDark) {
-    final bgCol = isDark ? const Color(0xFF0A0B0E) : const Color(0xFFF6F8FA);
-    final cardCol = isDark ? const Color(0xFF12141A) : Colors.white;
-    final borderCol = isDark ? const Color(0xFF1E222B) : const Color(0xFFE2E8F0);
-    final textMuted = isDark ? const Color(0xFF717684) : const Color(0xFF64748B);
-    final textPrimary = isDark ? Colors.white : const Color(0xFF0A0B0E);
-    final limeAccent = context.tokens.accent;
+    final t = context.tokens;
+    final bgCol = t.bg;
+    final cardCol = t.surface;
+    final borderCol = t.border;
+    final textMuted = t.ink2;
+    final textPrimary = t.ink;
+    final limeAccent = t.accent;
 
     final currentKm = AppVehicleRepository.instance.isVehicleBound && AppVehicleRepository.instance.currentTelemetry.odometerKm > 0
         ? AppVehicleRepository.instance.currentTelemetry.odometerKm
@@ -3737,7 +3772,7 @@ class _MaintenanceTabState extends State<MaintenanceTab> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _buildSubTabSwitcher(isDark),
+        _buildSubTabSwitcher(context, isDark),
         const SizedBox(height: 14),
 
         // Filter Chips

@@ -225,7 +225,7 @@ class _EnergyScreenState extends State<EnergyScreen> {
 
   Future<void> _pickDuration() async {
     final durations = [
-      {'label': 'Until target SoC (${_targetSoc}%)', 'min': 0},
+      {'label': 'Until target SoC ($_targetSoc%)', 'min': 0},
       {'label': '02 h 00 min', 'min': 120},
       {'label': '04 h 00 min', 'min': 240},
       {'label': '06 h 00 min', 'min': 360},
@@ -804,7 +804,7 @@ class _EnergyScreenState extends State<EnergyScreen> {
                           ),
                           Switch(
                             value: _isScheduledChargingEnabled,
-                            activeColor: limeAccent,
+                            activeThumbColor: limeAccent,
                             onChanged: (val) {
                               setState(() => _isScheduledChargingEnabled = val);
                               _persistSettings();
@@ -928,7 +928,7 @@ class _EnergyScreenState extends State<EnergyScreen> {
                           ),
                           Switch(
                             value: _reminderEnabled,
-                            activeColor: limeAccent,
+                            activeThumbColor: limeAccent,
                             onChanged: (val) {
                               setState(() => _reminderEnabled = val);
                               _persistSettings();
@@ -1041,7 +1041,7 @@ class _EnergyScreenState extends State<EnergyScreen> {
                           _targetSoc,
                           _powerKw,
                         );
-                        if (mounted) {
+                        if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               backgroundColor: const Color(0xFF131722),

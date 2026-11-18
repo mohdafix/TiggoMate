@@ -64,6 +64,32 @@ class FirebaseSyncService {
     }
   }
 
+  final Set<String> _claimedVehicleScopes = {};
+
+  /// Claims (or re-confirms) ownership of a `vehicles/{plate}` document for
+  /// the current uid. Vehicle documents are keyed by plate number, which
+  /// is visible on the car itself, so the Firestore security rules require
+  /// an `ownerUid` field matching the writer before any subcollection
+  /// write/read under that vehicle is allowed. Calling this before every
+  /// write is cheap once cached in-memory per app session, and `set` with
+  /// `merge: true` acts as "create if absent, else no-op on a field the
+  /// rules already verified matches" so it's safe to call repeatedly.
+  Future<bool> _claimVehicleOwnership(String vScope) async {
+    if (_claimedVehicleScopes.contains(vScope)) return true;
+    final uid = currentUserId;
+    if (uid == null) return false;
+    final vRef = _vehicleDoc(vScope);
+    if (vRef == null) return false;
+    try {
+      await vRef.set({'ownerUid': uid, 'plate': vScope}, SetOptions(merge: true));
+      _claimedVehicleScopes.add(vScope);
+      return true;
+    } catch (e) {
+      debugPrint('[FirebaseSync] Vehicle ownership claim note ($vScope): $e');
+      return false;
+    }
+  }
+
   // =========================================================================
   // 1. SERVICE APPOINTMENT SYNCHRONIZATION
   // =========================================================================
@@ -99,10 +125,14 @@ class FirebaseSyncService {
       final userRef = _userDoc(uid);
       if (userRef == null) return;
 
-      await userRef.collection('appointments').doc(appointmentId).update({
+      // `set` with merge instead of `update`: an appointment created while
+      // offline (never previously synced) has no Firestore doc yet, and
+      // `update` throws `not-found` in that case instead of just marking
+      // it cancelled.
+      await userRef.collection('appointments').doc(appointmentId).set({
         'isCancelled': true,
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
       debugPrint('[FirebaseSync] Appointment marked cancelled: $appointmentId');
     } catch (e) {
       debugPrint('[FirebaseSync] Appointment delete error: $e');
@@ -149,7 +179,7 @@ class FirebaseSyncService {
     tripMap['vehicleId'] = vScope;
 
     try {
-      final vRef = _vehicleDoc(vScope);
+      final vRef = await _claimVehicleOwnership(vScope) ? _vehicleDoc(vScope) : null;
       if (vRef != null) {
         await vRef.collection('trips').doc(trip.id).set(
               tripMap,
@@ -183,9 +213,9 @@ class FirebaseSyncService {
     final Map<String, TripRecord> results = {};
 
     try {
-      final vRef = _vehicleDoc(vScope);
+      final vRef = await _claimVehicleOwnership(vScope) ? _vehicleDoc(vScope) : null;
       if (vRef != null) {
-        final query = await vRef.collection('trips').get();
+        final query = await vRef.collection('trips').orderBy('timestamp', descending: true).limit(500).get();
         for (final doc in query.docs) {
           try {
             results[doc.id] = TripRecord.fromJson(doc.data());
@@ -203,7 +233,7 @@ class FirebaseSyncService {
       try {
         final userRef = _userDoc(uid);
         if (userRef != null) {
-          final query = await userRef.collection('trips').get();
+          final query = await userRef.collection('trips').orderBy('timestamp', descending: true).limit(500).get();
           for (final doc in query.docs) {
             try {
               results[doc.id] = TripRecord.fromJson(doc.data());
@@ -234,7 +264,7 @@ class FirebaseSyncService {
     expMap['vehicleId'] = vScope;
 
     try {
-      final vRef = _vehicleDoc(vScope);
+      final vRef = await _claimVehicleOwnership(vScope) ? _vehicleDoc(vScope) : null;
       if (vRef != null) {
         await vRef.collection('expenses').doc(expense.id).set(
               expMap,
@@ -268,9 +298,9 @@ class FirebaseSyncService {
     final Map<String, ExpenseRecord> results = {};
 
     try {
-      final vRef = _vehicleDoc(vScope);
+      final vRef = await _claimVehicleOwnership(vScope) ? _vehicleDoc(vScope) : null;
       if (vRef != null) {
-        final query = await vRef.collection('expenses').get();
+        final query = await vRef.collection('expenses').limit(1000).get();
         for (final doc in query.docs) {
           try {
             results[doc.id] = ExpenseRecord.fromJson(doc.data());
@@ -288,7 +318,7 @@ class FirebaseSyncService {
       try {
         final userRef = _userDoc(uid);
         if (userRef != null) {
-          final query = await userRef.collection('expenses').get();
+          final query = await userRef.collection('expenses').limit(1000).get();
           for (final doc in query.docs) {
             try {
               results[doc.id] = ExpenseRecord.fromJson(doc.data());
@@ -327,7 +357,7 @@ class FirebaseSyncService {
     };
 
     try {
-      final vRef = _vehicleDoc(vScope);
+      final vRef = await _claimVehicleOwnership(vScope) ? _vehicleDoc(vScope) : null;
       if (vRef != null) {
         await vRef.collection('settings').doc('vehicle').set(settingsMap, SetOptions(merge: true));
         debugPrint('[FirebaseSync] Settings backed up to vehicle cloud ($vScope)');
@@ -354,7 +384,7 @@ class FirebaseSyncService {
     final vScope = vehicleScopeId;
 
     try {
-      final vRef = _vehicleDoc(vScope);
+      final vRef = await _claimVehicleOwnership(vScope) ? _vehicleDoc(vScope) : null;
       if (vRef != null) {
         final doc = await vRef.collection('settings').doc('vehicle').get();
         if (doc.exists && doc.data() != null) {
@@ -439,7 +469,7 @@ class FirebaseSyncService {
       final userRef = _userDoc(uid);
       if (userRef == null) return [];
 
-      final query = await userRef.collection('alerts').get();
+      final query = await userRef.collection('alerts').limit(200).get();
       final List<VehicleAlertItem> results = [];
       for (final doc in query.docs) {
         try {
@@ -511,7 +541,8 @@ class FirebaseSyncService {
       'updatedAt': FieldValue.serverTimestamp(),
     };
     try {
-      final vRef = _vehicleDoc(vehicleScopeId);
+      final vScope = vehicleScopeId;
+      final vRef = await _claimVehicleOwnership(vScope) ? _vehicleDoc(vScope) : null;
       if (vRef != null) {
         await vRef.collection('settings').doc('priceBook').set(payload, SetOptions(merge: true));
       }
@@ -535,7 +566,8 @@ class FirebaseSyncService {
   Future<Map<String, dynamic>?> fetchPriceBook() async {
     if (!isFirebaseAvailable) return null;
     try {
-      final vRef = _vehicleDoc(vehicleScopeId);
+      final vScope = vehicleScopeId;
+      final vRef = await _claimVehicleOwnership(vScope) ? _vehicleDoc(vScope) : null;
       if (vRef != null) {
         final doc = await vRef.collection('settings').doc('priceBook').get();
         if (doc.exists && doc.data() != null) {
